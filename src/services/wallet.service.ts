@@ -5,6 +5,7 @@ import { MetricEvent } from "../models/MetricEvent";
 import { recordAudit } from "../middleware/audit";
 import { ApiError } from "../utils/apiError";
 import { logger } from "../config/logger";
+import { env } from "../config/env";
 
 /**
  * Runs `fn` inside a Mongo session/transaction when the deployment is a replica set
@@ -89,6 +90,12 @@ export async function getWalletSummary(testerId: Types.ObjectId) {
   };
 }
 
+/**
+ * Payouts are manual UPI transfers, not a gateway payout API — that avoids the
+ * commission a payment gateway takes on payouts. The tradeoff is turnaround time, so
+ * every request is quoted a WITHDRAWAL_SLA_HOURS (default 48h) completion window up
+ * front, tracked on expectedCompletionAt for display.
+ */
 export async function requestWithdrawal(testerId: Types.ObjectId, amount: number) {
   if (amount <= 0) throw ApiError.badRequest("Withdrawal amount must be positive");
 
@@ -102,6 +109,7 @@ export async function requestWithdrawal(testerId: Types.ObjectId, amount: number
     type: "withdrawal",
     amount,
     status: "pending",
+    expectedCompletionAt: new Date(Date.now() + env.wallet.withdrawalSlaHours * 3_600_000),
   });
 
   await MetricEvent.create({ type: "withdrawal_requested", meta: { testerId, amount } });
@@ -133,21 +141,22 @@ export async function rejectWithdrawal(txnId: Types.ObjectId, adminId: Types.Obj
 }
 
 /**
- * Admin approves a withdrawal. Payout dispatch (UPI) is invoked by the caller
- * (controller) via payment.service so this module stays free of gateway concerns;
- * this function only owns the ledger + balance transition once a payout succeeds.
+ * Admin pays the tester manually via UPI (outside LaunchOps, no gateway payout call —
+ * see requestWithdrawal), then marks the request complete here with the UPI transaction
+ * ID as proof. Single admin action: there's no separate "approve" step before this one —
+ * paying and completing are the same real-world action.
  */
-export async function markWithdrawalPaid(txnId: Types.ObjectId, adminId: Types.ObjectId, upiRef: string) {
+export async function completeWithdrawal(txnId: Types.ObjectId, adminId: Types.ObjectId, transactionId: string) {
   return withOptionalTransaction(async (session) => {
     const txn = await WalletTransaction.findById(txnId).session(session);
     if (!txn) throw ApiError.notFound("Withdrawal request not found");
     if (txn.type !== "withdrawal" || txn.status !== "pending") {
-      throw ApiError.badRequest("Only pending withdrawal requests can be paid out");
+      throw ApiError.badRequest("Only pending withdrawal requests can be completed");
     }
 
     const before = { status: txn.status };
     txn.status = "paid";
-    txn.upiRef = upiRef;
+    txn.transactionId = transactionId;
     await txn.save({ session: session ?? undefined });
 
     await Tester.findByIdAndUpdate(
@@ -158,11 +167,11 @@ export async function markWithdrawalPaid(txnId: Types.ObjectId, adminId: Types.O
 
     await recordAudit({
       actorId: adminId,
-      action: "wallet.withdrawal.paid",
+      action: "wallet.withdrawal.completed",
       entityType: "WalletTransaction",
       entityId: txn._id,
       before,
-      after: { status: txn.status, upiRef },
+      after: { status: txn.status, transactionId },
     });
 
     await MetricEvent.create({ type: "withdrawal_paid", meta: { testerId: txn.testerId, amount: txn.amount } });

@@ -12,7 +12,11 @@ const router = Router();
  *     summary: Get the authenticated client's own profile
  *     security: [{ bearerAuth: [] }]
  *     responses:
- *       200: { description: Client profile }
+ *       200:
+ *         description: Client profile
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Client' } } }
  *   patch:
  *     tags: [Clients]
  *     summary: Update the authenticated client's own profile (company, contact, billing)
@@ -31,7 +35,11 @@ const router = Router();
  *                   gstin: { type: string }
  *                   billingAddress: { type: string }
  *     responses:
- *       200: { description: Updated client profile }
+ *       200:
+ *         description: Updated client profile
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Client' } } }
  */
 router.get("/me", requireAuth(), requireRole("client"), getMyClientProfile);
 router.patch("/me", requireAuth(), requireRole("client"), updateMyClientProfile);
@@ -47,7 +55,15 @@ router.patch("/me", requireAuth(), requireRole("client"), updateMyClientProfile)
  *       - { in: query, name: page, schema: { type: integer } }
  *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:
- *       200: { description: Paginated list of clients }
+ *       200:
+ *         description: Paginated list of clients
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data: { type: array, items: { $ref: '#/components/schemas/Client' } }
+ *                 meta: { $ref: '#/components/schemas/PaginationMeta' }
  */
 router.get("/", requireAuth(), requireRole("admin"), listClients);
 
@@ -61,7 +77,11 @@ router.get("/", requireAuth(), requireRole("admin"), listClients);
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string } }
  *     responses:
- *       200: { description: Client }
+ *       200:
+ *         description: Client
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Client' } } }
  *       404: { description: Not found }
  */
 router.get("/:id", requireAuth(), requireRole("admin"), getClientById);

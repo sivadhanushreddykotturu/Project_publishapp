@@ -14,7 +14,15 @@ const router = Router();
  *     parameters:
  *       - { in: query, name: status, schema: { type: string, enum: [pending, paid, manual_paid, failed] } }
  *     responses:
- *       200: { description: Paginated invoices }
+ *       200:
+ *         description: Paginated invoices
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data: { type: array, items: { $ref: '#/components/schemas/Invoice' } }
+ *                 meta: { $ref: '#/components/schemas/PaginationMeta' }
  */
 router.get("/", requireAuth(), requireRole("client", "admin"), listInvoices);
 
@@ -28,7 +36,18 @@ router.get("/", requireAuth(), requireRole("client", "admin"), listInvoices);
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string } }
  *     responses:
- *       200: { description: Razorpay order + publishable key id }
+ *       200:
+ *         description: Razorpay order + publishable key id
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     order: { type: object, description: "Razorpay order object (id, amount, currency, ...)" }
+ *                     keyId: { type: string }
  */
 router.post("/:id/checkout", requireAuth(), requireRole("client"), checkoutInvoice);
 
@@ -49,7 +68,11 @@ router.post("/:id/checkout", requireAuth(), requireRole("client"), checkoutInvoi
  *             properties:
  *               note: { type: string }
  *     responses:
- *       200: { description: Invoice marked paid; project activates automatically }
+ *       200:
+ *         description: Invoice marked paid; project activates automatically
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Invoice' } } }
  */
 router.post("/:id/mark-paid", requireAuth(), requireRole("admin"), markInvoicePaid);
 

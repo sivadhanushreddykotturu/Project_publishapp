@@ -14,7 +14,20 @@ import {
   StepState,
   PLAY_INTEGRATION_MODES,
   PlayIntegrationMode,
+  CLIENT_VERIFICATION_STATUSES,
+  ClientVerificationStatus,
 } from "./enums";
+
+export interface IClientVerification {
+  required: boolean;
+  status: ClientVerificationStatus;
+  /** Proof the client controls the Play Console listing (R2 object key) — the agreed criterion for managed_testing/launch_ready/custom. */
+  proofUrl?: string;
+  note?: string;
+  submittedAt?: Date;
+  verifiedAt?: Date;
+  verifiedBy?: Types.ObjectId;
+}
 
 export interface IStep {
   order: number;
@@ -39,6 +52,20 @@ export interface IPlayIntegration {
   versionCode?: number;
   /** Last API-mode failure, surfaced to the admin console for one-click fallback to manual. */
   lastApiError?: string;
+
+  // Real-world Play Console timeline milestones (STEP_TYPES: google_email_review,
+  // testing_period, production_review). Kept on playIntegration rather than embedded
+  // per-step config so they survive independent of any single Step document's shape.
+  /** Admin confirmed the verified tester emails were added to Play Console and submitted for review. */
+  emailReviewSubmittedAt?: Date;
+  /** submittedAt + GOOGLE_EMAIL_REVIEW_HOURS — the cron auto-verifies at this point if the admin hasn't already. */
+  emailReviewExpectedApprovalAt?: Date;
+  /** When the mandatory testing_period window started — production application is blocked before start + TESTING_PERIOD_DAYS. */
+  testingPeriodStartAt?: Date;
+  /** Admin/client applied for production access (only allowed once the testing period has elapsed). */
+  productionAppliedAt?: Date;
+  /** Admin manually confirmed Google approved production — there's no API signal for this. */
+  productionApprovedAt?: Date;
 }
 
 export interface IProject extends Document {
@@ -59,6 +86,7 @@ export interface IProject extends Document {
   steps: IStep[];
   stepTemplateVersion: number;
   playIntegration: IPlayIntegration;
+  verification: IClientVerification;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -86,6 +114,24 @@ const playIntegrationSchema = new Schema<IPlayIntegration>(
     testerGoogleGroupEmail: { type: String },
     versionCode: { type: Number },
     lastApiError: { type: String },
+    emailReviewSubmittedAt: { type: Date },
+    emailReviewExpectedApprovalAt: { type: Date },
+    testingPeriodStartAt: { type: Date },
+    productionAppliedAt: { type: Date },
+    productionApprovedAt: { type: Date },
+  },
+  { _id: false }
+);
+
+const clientVerificationSchema = new Schema<IClientVerification>(
+  {
+    required: { type: Boolean, default: false },
+    status: { type: String, enum: CLIENT_VERIFICATION_STATUSES, default: "not_required" },
+    proofUrl: { type: String },
+    note: { type: String },
+    submittedAt: { type: Date },
+    verifiedAt: { type: Date },
+    verifiedBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
   { _id: false }
 );
@@ -110,6 +156,7 @@ const projectSchema = new Schema<IProject>(
     steps: { type: [stepSchema], default: [] },
     stepTemplateVersion: { type: Number, default: 1 },
     playIntegration: { type: playIntegrationSchema, default: () => ({}) },
+    verification: { type: clientVerificationSchema, default: () => ({}) },
   },
   { timestamps: true }
 );

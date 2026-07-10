@@ -8,7 +8,12 @@ export interface IWalletTransaction extends Document {
   type: WalletTxnType;
   amount: number; // minor units (paise) — always positive; type/status determine effect
   status: WalletTxnStatus;
-  upiRef?: string;
+  /** Withdrawals are paid out manually via UPI (no payment-gateway payout — avoids
+   *  gateway commission on payouts); this is the UPI transaction ID the admin attaches
+   *  as proof once they've sent the transfer and marked it complete. */
+  transactionId?: string;
+  /** Set when a withdrawal is requested — requestedAt + 48h, shown to the tester as the SLA. */
+  expectedCompletionAt?: Date;
   note?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -21,7 +26,8 @@ const walletTransactionSchema = new Schema<IWalletTransaction>(
     type: { type: String, enum: WALLET_TXN_TYPES, required: true },
     amount: { type: Number, required: true, min: 1 },
     status: { type: String, enum: WALLET_TXN_STATUSES, default: "pending", index: true },
-    upiRef: { type: String },
+    transactionId: { type: String },
+    expectedCompletionAt: { type: Date },
     note: { type: String },
   },
   { timestamps: true }

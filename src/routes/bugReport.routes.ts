@@ -32,7 +32,11 @@ const router = Router();
  *               stepsToReproduce: { type: array, items: { type: string } }
  *               attachments: { type: array, items: { type: string } }
  *     responses:
- *       201: { description: Bug report created (status "open") }
+ *       201:
+ *         description: Bug report created (status "open")
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/BugReport' } } }
  *   get:
  *     tags: [Bug Reports]
  *     summary: List bug reports for a project (clients only ever see published, de-duplicated reports)
@@ -41,7 +45,15 @@ const router = Router();
  *       - { in: path, name: projectId, required: true, schema: { type: string } }
  *       - { in: query, name: status, schema: { type: string, enum: [open, duplicate, merged, published] } }
  *     responses:
- *       200: { description: Paginated bug reports }
+ *       200:
+ *         description: Paginated bug reports
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data: { type: array, items: { $ref: '#/components/schemas/BugReport' } }
+ *                 meta: { $ref: '#/components/schemas/PaginationMeta' }
  */
 router.post("/projects/:projectId/bug-reports", requireAuth(), requireRole("tester"), submitBugReport);
 router.get("/projects/:projectId/bug-reports", requireAuth(), requireRole("client", "admin"), listBugReports);
@@ -64,7 +76,18 @@ router.get("/projects/:projectId/bug-reports", requireAuth(), requireRole("clien
  *               canonicalId: { type: string }
  *               duplicateIds: { type: array, items: { type: string } }
  *     responses:
- *       200: { description: Duplicates linked to the canonical report }
+ *       200:
+ *         description: Duplicates linked to the canonical report
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     canonicalId: { type: string }
+ *                     mergedCount: { type: integer }
  */
 router.post("/bug-reports/merge", requireAuth(), requireRole("admin"), mergeBugReports);
 
@@ -85,7 +108,14 @@ router.post("/bug-reports/merge", requireAuth(), requireRole("admin"), mergeBugR
  *             properties:
  *               ids: { type: array, items: { type: string } }
  *     responses:
- *       200: { description: Reports published }
+ *       200:
+ *         description: Reports published
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data: { type: object, properties: { publishedCount: { type: integer } } }
  */
 router.post("/bug-reports/publish", requireAuth(), requireRole("admin"), publishBugReports);
 

@@ -23,8 +23,19 @@ async function makeApiModeProject(overrides: Partial<Record<string, unknown>> = 
     requiredTesters: 14,
     status: "active",
     steps: [
-      { order: 1, type: "verification", state: "verified", config: { gate: "project" } },
-      { order: 2, type: "play_store_invite", state: "pending", config: { gate: "project" } },
+      { order: 1, type: "verification", state: "verified", config: { gate: "project", perTesterAction: true } },
+      {
+        order: 2,
+        type: "google_email_review",
+        state: "verified",
+        config: { gate: "manual", perTesterAction: false },
+      },
+      {
+        order: 3,
+        type: "play_store_invite",
+        state: "pending",
+        config: { gate: "project", perTesterAction: true },
+      },
     ],
     playIntegration: {
       mode: "api",
@@ -103,7 +114,7 @@ describe("playIntegration.service — Google Play API mode", () => {
     expect(deps.syncTesterGoogleGroup).not.toHaveBeenCalled();
   });
 
-  it("distributes testing links to Step-2 testers after a successful sync", async () => {
+  it("distributes testing links to play_store_invite-stage testers after a successful sync", async () => {
     const project = await makeApiModeProject();
     const admin = await makeAdmin();
     const testerUser = await User.create({ clerkUserId: "clerk_t1", role: "tester", name: "T1", email: "t1@test.com" });
@@ -112,7 +123,7 @@ describe("playIntegration.service — Google Play API mode", () => {
       projectId: project._id,
       testerId: tester._id,
       status: "active",
-      currentStep: 2,
+      currentStep: 3,
       lastActivityAt: new Date(),
     });
 

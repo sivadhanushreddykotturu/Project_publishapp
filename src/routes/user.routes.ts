@@ -25,7 +25,11 @@ const router = Router();
  *               email: { type: string, format: email }
  *               phone: { type: string }
  *     responses:
- *       200: { description: User provisioned or fetched }
+ *       200:
+ *         description: User provisioned or fetched
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/User' } } }
  *       401: { description: Not authenticated with Clerk }
  */
 router.post("/sync", syncUser);
@@ -38,7 +42,22 @@ router.post("/sync", syncUser);
  *     summary: Get the current user plus their role-specific profile (client or tester)
  *     security: [{ bearerAuth: [] }]
  *     responses:
- *       200: { description: Current user and profile }
+ *       200:
+ *         description: Current user and profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user: { $ref: '#/components/schemas/User' }
+ *                     profile:
+ *                       oneOf:
+ *                         - { $ref: '#/components/schemas/Client' }
+ *                         - { $ref: '#/components/schemas/Tester' }
+ *                         - { type: 'null' }
  *       401: { description: Not authenticated }
  */
 router.get("/me", requireAuth(), getMe);

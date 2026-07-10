@@ -6,10 +6,8 @@ import { WalletTransaction } from "../models/WalletTransaction";
 import { ApiError } from "../utils/apiError";
 import { asyncHandler } from "../utils/asyncHandler";
 import { getPagination, buildPageMeta } from "../utils/pagination";
-import { getWalletSummary, requestWithdrawal, rejectWithdrawal, markWithdrawalPaid } from "../services/wallet.service";
-import { payoutViaUpi } from "../services/payment.service";
+import { getWalletSummary, requestWithdrawal, rejectWithdrawal, completeWithdrawal } from "../services/wallet.service";
 import { dispatchNotification } from "../services/notification.service";
-import { logger } from "../config/logger";
 
 export const getMyWallet = asyncHandler(async (req: Request, res: Response) => {
   const tester = await Tester.findOne({ userId: req.dbUser!._id });
@@ -44,39 +42,6 @@ export const listWithdrawals = asyncHandler(async (req: Request, res: Response) 
   res.status(200).json({ data: items, meta: buildPageMeta(page, limit, total) });
 });
 
-/**
- * Approves a withdrawal and attempts an immediate UPI payout. If the payout partner
- * isn't wired up yet, the transaction stays "pending" and is surfaced for manual
- * payout — this endpoint never silently drops the request (Tech Spec §14).
- */
-export const approveWithdrawal = asyncHandler(async (req: Request, res: Response) => {
-  const txn = await WalletTransaction.findById(req.params.id);
-  if (!txn || txn.type !== "withdrawal" || txn.status !== "pending") {
-    throw ApiError.badRequest("Only pending withdrawal requests can be approved");
-  }
-  const tester = await Tester.findById(txn.testerId);
-  if (!tester?.upi.vpa) throw ApiError.badRequest("Tester has no UPI ID on file");
-
-  try {
-    const payout = await payoutViaUpi({ vpa: tester.upi.vpa, amountPaise: txn.amount, reference: txn._id.toString() });
-    const paidTxn = await markWithdrawalPaid(txn._id, req.dbUser!._id, (payout as { id: string }).id);
-    await dispatchNotification({
-      recipientUserId: tester.userId,
-      type: "withdrawal_approved",
-      channel: "email",
-      relatedId: txn._id.toString(),
-      payload: { amount: txn.amount },
-    });
-    res.status(200).json({ data: paidTxn });
-  } catch (err) {
-    logger.warn({ err, txnId: txn._id }, "Automated UPI payout unavailable — leave for manual payout");
-    res.status(202).json({
-      data: txn,
-      message: "Payout partner unavailable — mark this paid manually once you've sent the UPI transfer.",
-    });
-  }
-});
-
 const rejectSchema = z.object({ reason: z.string().min(1) });
 
 export const rejectWithdrawalRequest = asyncHandler(async (req: Request, res: Response) => {
@@ -96,11 +61,28 @@ export const rejectWithdrawalRequest = asyncHandler(async (req: Request, res: Re
   res.status(200).json({ data: txn });
 });
 
-const manualPaySchema = z.object({ upiRef: z.string().min(1) });
+const completeSchema = z.object({ transactionId: z.string().min(1) });
 
-/** Fallback when the automated payout partner call fails but the admin sent the transfer directly. */
-export const markWithdrawalPaidManually = asyncHandler(async (req: Request, res: Response) => {
-  const { upiRef } = manualPaySchema.parse(req.body);
-  const txn = await markWithdrawalPaid(new Types.ObjectId(req.params.id), req.dbUser!._id, upiRef);
+/**
+ * Admin has already sent the UPI transfer manually (outside LaunchOps — no gateway payout
+ * call, see wallet.service#completeWithdrawal) and now marks the request complete,
+ * attaching the UPI transaction ID as proof. Single action: there's no separate "approve"
+ * step — paying and completing are the same real-world action.
+ */
+export const completeWithdrawalRequest = asyncHandler(async (req: Request, res: Response) => {
+  const { transactionId } = completeSchema.parse(req.body);
+  const txn = await completeWithdrawal(new Types.ObjectId(req.params.id), req.dbUser!._id, transactionId);
+
+  const tester = await Tester.findById(txn.testerId);
+  if (tester) {
+    await dispatchNotification({
+      recipientUserId: tester.userId,
+      type: "withdrawal_completed",
+      channel: "email",
+      relatedId: txn._id.toString(),
+      payload: { amount: txn.amount, transactionId },
+    });
+  }
+
   res.status(200).json({ data: txn });
 });

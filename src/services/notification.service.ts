@@ -50,10 +50,14 @@ function emailSubject(type: NotificationType): string {
     step_rejected: "Action needed: a submission was rejected",
     queue_promoted: "You're off the waitlist — you're now assigned",
     tester_replaced: "A tester was replaced on your project",
-    withdrawal_approved: "Your withdrawal was approved",
+    withdrawal_completed: "Your withdrawal is complete — funds sent",
     withdrawal_rejected: "Your withdrawal request was rejected",
     support_reply: "New reply on your support ticket",
     project_completed: "Your project is complete",
+    install_scheduled: "It's your turn — install the app today",
+    email_review_reminder: "Google's tester-list review window has passed — check Play Console",
+    client_verification_approved: "You're verified — your invoice is ready",
+    client_verification_rejected: "We need more information before we can proceed",
   };
   return subjects[type];
 }

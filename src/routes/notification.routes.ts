@@ -14,7 +14,15 @@ const router = Router();
  *     parameters:
  *       - { in: query, name: status, schema: { type: string, enum: [queued, sent, failed] } }
  *     responses:
- *       200: { description: Paginated notifications }
+ *       200:
+ *         description: Paginated notifications
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data: { type: array, items: { $ref: '#/components/schemas/Notification' } }
+ *                 meta: { $ref: '#/components/schemas/PaginationMeta' }
  */
 router.get("/", requireAuth(), requireRole("admin"), listNotifications);
 
@@ -28,7 +36,11 @@ router.get("/", requireAuth(), requireRole("admin"), listNotifications);
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string } }
  *     responses:
- *       200: { description: Notification resend attempted }
+ *       200:
+ *         description: Notification resend attempted
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Notification' } } }
  */
 router.post("/:id/resend", requireAuth(), requireRole("admin"), resendNotification);
 

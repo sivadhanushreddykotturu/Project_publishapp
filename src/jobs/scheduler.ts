@@ -3,6 +3,8 @@ import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { runInactivityCheck } from "./inactivityCron";
 import { runReminderSweep } from "./reminderCron";
+import { runEmailReviewSweep } from "./emailReviewCron";
+import { runInstallPacingSweep } from "./installPacingCron";
 import { retryPendingNotifications } from "../services/notification.service";
 
 let tasks: ScheduledTask[] = [];
@@ -29,9 +31,30 @@ export function startScheduler() {
     }
   });
 
-  tasks = [inactivityTask, reminderTask];
+  const emailReviewTask = cron.schedule(env.workflow.emailReviewCronSchedule, async () => {
+    try {
+      await runEmailReviewSweep();
+    } catch (err) {
+      logger.error({ err }, "Email review sweep failed");
+    }
+  });
+
+  const installPacingTask = cron.schedule(env.workflow.installPacingCronSchedule, async () => {
+    try {
+      await runInstallPacingSweep();
+    } catch (err) {
+      logger.error({ err }, "Install pacing sweep failed");
+    }
+  });
+
+  tasks = [inactivityTask, reminderTask, emailReviewTask, installPacingTask];
   logger.info(
-    { inactivity: env.workflow.inactivityCronSchedule, reminder: env.workflow.reminderCronSchedule },
+    {
+      inactivity: env.workflow.inactivityCronSchedule,
+      reminder: env.workflow.reminderCronSchedule,
+      emailReview: env.workflow.emailReviewCronSchedule,
+      installPacing: env.workflow.installPacingCronSchedule,
+    },
     "Cron scheduler started"
   );
 }

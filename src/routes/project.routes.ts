@@ -6,7 +6,13 @@ import {
   joinProjectAsTester,
   getProjectQueue,
   getVerifiedEmails,
+  submitProjectVerification,
+  reviewProjectVerification,
+  submitProjectEmailsForReview,
+  confirmProjectEmailReview,
   markProjectTestersInvited,
+  applyProjectForProduction,
+  confirmProjectProductionApproved,
   updatePlayIntegrationConfig,
   syncProjectPlayRelease,
   getCompletionReport,
@@ -21,7 +27,7 @@ const router = Router();
  *   post:
  *     tags: [Projects]
  *     summary: "Create a project (client onboarding: choose package, upload app details)"
- *     description: Creates the project (status "awaiting_payment") and its Invoice. The project activates automatically once the invoice is paid (webhook or manual mark-paid).
+ *     description: "\"testers_only\" is self-serve: creates the project (status \"awaiting_payment\") and its Invoice immediately; the project activates once the invoice is paid. \"managed_testing\", \"launch_ready\", and \"custom\" instead require client verification first (Play Console access proof + a direct discussion) — no invoice is created yet, and the project starts in \"pending_verification\". See /verification/submit and /verification/review."
  *     security: [{ bearerAuth: [] }]
  *     requestBody:
  *       required: true
@@ -31,7 +37,7 @@ const router = Router();
  *             type: object
  *             required: [package, appDetails]
  *             properties:
- *               package: { type: string, enum: [testers_only, managed_testing, launch_ready] }
+ *               package: { type: string, enum: [testers_only, managed_testing, launch_ready, custom] }
  *               requiredTesters: { type: integer, minimum: 14 }
  *               appDetails:
  *                 type: object
@@ -42,7 +48,19 @@ const router = Router();
  *                   description: { type: string }
  *                   playStoreUrl: { type: string }
  *     responses:
- *       201: { description: Project and invoice created }
+ *       201:
+ *         description: "Project created — with an Invoice if self-serve, or with invoice: null and status pending_verification otherwise"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     project: { $ref: '#/components/schemas/Project' }
+ *                     invoice: { oneOf: [{ $ref: '#/components/schemas/Invoice' }, { type: 'null' }] }
+ *                 message: { type: string }
  *   get:
  *     tags: [Projects]
  *     summary: List projects (client sees only their own; admin sees all)
@@ -52,7 +70,15 @@ const router = Router();
  *       - { in: query, name: page, schema: { type: integer } }
  *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:
- *       200: { description: Paginated list of projects }
+ *       200:
+ *         description: Paginated list of projects
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data: { type: array, items: { $ref: '#/components/schemas/Project' } }
+ *                 meta: { $ref: '#/components/schemas/PaginationMeta' }
  */
 router.post("/", requireAuth(), requireRole("client"), createProject);
 router.get("/", requireAuth(), requireRole("client", "admin"), listProjects);
@@ -67,7 +93,11 @@ router.get("/", requireAuth(), requireRole("client", "admin"), listProjects);
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string } }
  *     responses:
- *       200: { description: Project }
+ *       200:
+ *         description: Project
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Project' } } }
  *       403: { description: Not your project }
  *       404: { description: Not found }
  */
@@ -83,7 +113,11 @@ router.get("/:id", requireAuth(), requireRole("client", "admin"), getProjectById
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string } }
  *     responses:
- *       201: { description: Assignment created (active or queued) }
+ *       201:
+ *         description: Assignment created (active or queued)
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Assignment' } } }
  *       409: { description: Tester already joined this project }
  */
 router.post("/:id/join", requireAuth(), requireRole("tester"), joinProjectAsTester);
@@ -98,7 +132,14 @@ router.post("/:id/join", requireAuth(), requireRole("tester"), joinProjectAsTest
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string } }
  *     responses:
- *       200: { description: Queued assignments }
+ *       200:
+ *         description: Queued assignments
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data: { type: array, items: { $ref: '#/components/schemas/Assignment' } }
  */
 router.get("/:id/queue", requireAuth(), requireRole("admin"), getProjectQueue);
 
@@ -112,16 +153,136 @@ router.get("/:id/queue", requireAuth(), requireRole("admin"), getProjectQueue);
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string } }
  *     responses:
- *       200: { description: Verified tester emails }
+ *       200:
+ *         description: Verified tester emails
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     emails: { type: array, items: { type: string, format: email } }
+ *                     count: { type: integer }
  */
 router.get("/:id/verified-tester-emails", requireAuth(), requireRole("admin"), getVerifiedEmails);
+
+/**
+ * @openapi
+ * /projects/{id}/verification/submit:
+ *   post:
+ *     tags: [Projects]
+ *     summary: Client submits proof they control the Play Console listing
+ *     description: Only applies to projects that require verification (managed_testing, launch_ready, custom). Upload the proof via /uploads/presign first and pass the resulting R2 key here.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [proofUrl]
+ *             properties:
+ *               proofUrl: { type: string, description: "R2 object key from /uploads/presign" }
+ *               note: { type: string }
+ *     responses:
+ *       200:
+ *         description: Verification marked submitted, awaiting admin review
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Project' } } }
+ *       400: { description: This project doesn't require verification }
+ */
+router.post("/:id/verification/submit", requireAuth(), requireRole("client"), submitProjectVerification);
+
+/**
+ * @openapi
+ * /projects/{id}/verification/review:
+ *   post:
+ *     tags: [Projects]
+ *     summary: Admin approves or rejects client verification after the direct discussion
+ *     description: Approving creates the invoice (unblocking payment) and moves the project to awaiting_payment. For package="custom" (no fixed pricing), customAmount is required. Rejecting leaves the project in pending_verification so the client can resubmit proof.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [approve]
+ *             properties:
+ *               approve: { type: boolean }
+ *               note: { type: string }
+ *               customAmount: { type: integer, description: "Required to approve a custom-package project. Amount in paise." }
+ *               customGst: { type: integer, description: "Optional — defaults to 18% of customAmount." }
+ *     responses:
+ *       200:
+ *         description: "Verification recorded — invoice included if approved"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     project: { $ref: '#/components/schemas/Project' }
+ *                     invoice: { oneOf: [{ $ref: '#/components/schemas/Invoice' }, { type: 'null' }] }
+ *       400: { description: "customAmount missing for a custom package, or verification not required" }
+ */
+router.post("/:id/verification/review", requireAuth(), requireRole("admin"), reviewProjectVerification);
+
+/**
+ * @openapi
+ * /projects/{id}/submit-email-review:
+ *   post:
+ *     tags: [Projects]
+ *     summary: "Confirm verified tester emails were added to Play Console and submitted for Google's review"
+ *     description: "Starts the ~2-3h review clock (GOOGLE_EMAIL_REVIEW_HOURS). A cron auto-advances the gate once it elapses; call /confirm-email-review to advance it earlier if Google approves sooner."
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Email review marked submitted, expected-approval timestamp recorded
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Project' } } }
+ *       400: { description: Verification step is not yet fully verified }
+ */
+router.post("/:id/submit-email-review", requireAuth(), requireRole("admin"), submitProjectEmailsForReview);
+
+/**
+ * @openapi
+ * /projects/{id}/confirm-email-review:
+ *   post:
+ *     tags: [Projects]
+ *     summary: Manually confirm Google approved the tester list before the ~3h estimate elapses
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Email review confirmed — play_store_invite is now open
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Project' } } }
+ *       400: { description: Email review has not been submitted yet }
+ */
+router.post("/:id/confirm-email-review", requireAuth(), requireRole("admin"), confirmProjectEmailReview);
 
 /**
  * @openapi
  * /projects/{id}/testers-invited:
  *   post:
  *     tags: [Projects]
- *     summary: Confirm tester emails were added to Play Console and invitations sent — opens Step 2
+ *     summary: Record the real opt-in URL once Google's tester-list review has cleared — opens play_store_invite
+ *     description: Requires the google_email_review step to already be verified (via /confirm-email-review or the auto-advance cron).
  *     security: [{ bearerAuth: [] }]
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string } }
@@ -135,10 +296,60 @@ router.get("/:id/verified-tester-emails", requireAuth(), requireRole("admin"), g
  *             properties:
  *               optInUrl: { type: string, format: uri }
  *     responses:
- *       200: { description: Project advanced to Step 2 }
- *       400: { description: Step 1 is not yet fully verified }
+ *       200:
+ *         description: play_store_invite opened for verified testers
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Project' } } }
+ *       400: { description: Email review has not been confirmed yet }
  */
 router.post("/:id/testers-invited", requireAuth(), requireRole("admin"), markProjectTestersInvited);
+
+/**
+ * @openapi
+ * /projects/{id}/apply-production:
+ *   post:
+ *     tags: [Projects]
+ *     summary: Apply for Play Store production access — hard-blocked until the mandatory 14-day testing period has elapsed
+ *     description: "Google's own rule, not a LaunchOps estimate (TESTING_PERIOD_DAYS, default 14). The 14-day clock starts automatically once every tester has opted in (play_store_invite gate closes)."
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Production application recorded
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Project' } } }
+ *       400: { description: Testing period hasn't elapsed yet — response includes days remaining }
+ *       409: { description: Already applied for production }
+ */
+router.post("/:id/apply-production", requireAuth(), requireRole("client", "admin"), applyProjectForProduction);
+
+/**
+ * @openapi
+ * /projects/{id}/confirm-production-approved:
+ *   post:
+ *     tags: [Projects]
+ *     summary: Admin manually confirms Google approved production (no API signal exists for this)
+ *     description: Closes production_review and completion, then checks whether every tester who was ever active has finished their part — if so, marks the project completed.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Production approved and recorded
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Project' } } }
+ *       400: { description: Production hasn't been applied for yet }
+ */
+router.post(
+  "/:id/confirm-production-approved",
+  requireAuth(),
+  requireRole("admin"),
+  confirmProjectProductionApproved
+);
 
 /**
  * @openapi
@@ -163,7 +374,11 @@ router.post("/:id/testers-invited", requireAuth(), requireRole("admin"), markPro
  *               serviceAccountLinked: { type: boolean }
  *               testerGoogleGroupEmail: { type: string, format: email }
  *     responses:
- *       200: { description: Updated Play integration config }
+ *       200:
+ *         description: Updated Play integration config
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Project' } } }
  */
 router.patch("/:id/play-integration", requireAuth(), requireRole("admin"), updatePlayIntegrationConfig);
 
@@ -178,7 +393,20 @@ router.patch("/:id/play-integration", requireAuth(), requireRole("admin"), updat
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string } }
  *     responses:
- *       200: { description: Bundle uploaded and rolled out; Step 2 opened for verified testers }
+ *       200:
+ *         description: Bundle uploaded and rolled out; play_store_invite opened for verified testers
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     project: { $ref: '#/components/schemas/Project' }
+ *                     versionCode: { type: integer }
+ *                     testerListAutomated: { type: boolean }
+ *                     note: { type: string }
  *       400: { description: API mode prerequisites not met (service account, package name, or AAB missing) }
  *       502: { description: Google Play API call failed — fall back to POST /testers-invited }
  */
@@ -194,7 +422,32 @@ router.post("/:id/sync-play-release", requireAuth(), requireRole("admin"), syncP
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string } }
  *     responses:
- *       200: { description: Completion report }
+ *       200:
+ *         description: Completion report
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     project:
+ *                       type: object
+ *                       properties:
+ *                         id: { type: string }
+ *                         appName: { type: string }
+ *                         status: { type: string }
+ *                     testerCompletionSummary:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           testerId: { type: string }
+ *                           status: { type: string }
+ *                           currentStep: { type: integer }
+ *                     bugReports: { type: array, items: { $ref: '#/components/schemas/BugReport' } }
+ *                     generatedAt: { type: string, format: date-time }
  */
 router.get("/:id/completion-report", requireAuth(), requireRole("client", "admin"), getCompletionReport);
 

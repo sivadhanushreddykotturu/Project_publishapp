@@ -24,7 +24,19 @@ const router = Router();
  *               contentType: { type: string }
  *               scope: { type: string, enum: [proofs, bug-reports, aab-uploads, upi-qr] }
  *     responses:
- *       200: { description: Presigned upload URL and object key }
+ *       200:
+ *         description: Presigned upload URL and object key
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     uploadUrl: { type: string }
+ *                     key: { type: string }
+ *                     expiresIn: { type: integer, description: "Seconds" }
  *       400: { description: File type not allowed }
  */
 router.post("/presign", requireAuth(), presignUpload);
@@ -39,7 +51,18 @@ router.post("/presign", requireAuth(), presignUpload);
  *     parameters:
  *       - { in: query, name: key, required: true, schema: { type: string } }
  *     responses:
- *       200: { description: Presigned download URL }
+ *       200:
+ *         description: Presigned download URL
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     downloadUrl: { type: string }
+ *                     expiresIn: { type: integer, description: "Seconds" }
  */
 router.get("/presign-download", requireAuth(), presignDownload);
 

@@ -25,6 +25,10 @@ export interface IAssignment extends Document {
   inactivityFlag: boolean;
   lastActivityAt: Date;
   assignedAt?: Date;
+  /** Auto-assigned when the testing_period step opens — 2 testers/day so installs
+   *  land naturally over the mandatory 14-day window instead of all at once. */
+  scheduledInstallDate?: Date;
+  installPacingNotifiedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,6 +60,8 @@ const assignmentSchema = new Schema<IAssignment>(
     inactivityFlag: { type: Boolean, default: false },
     lastActivityAt: { type: Date, default: Date.now },
     assignedAt: { type: Date },
+    scheduledInstallDate: { type: Date },
+    installPacingNotifiedAt: { type: Date },
   },
   { timestamps: true }
 );

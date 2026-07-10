@@ -18,7 +18,11 @@ const router = Router();
  *     summary: Get the authenticated tester's own profile
  *     security: [{ bearerAuth: [] }]
  *     responses:
- *       200: { description: Tester profile }
+ *       200:
+ *         description: Tester profile
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Tester' } } }
  *   put:
  *     tags: [Testers]
  *     summary: Create or update the authenticated tester's profile (devices, experience, UPI)
@@ -46,7 +50,11 @@ const router = Router();
  *                   vpa: { type: string }
  *                   qrImageUrl: { type: string }
  *     responses:
- *       200: { description: Tester profile upserted }
+ *       200:
+ *         description: Tester profile upserted
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Tester' } } }
  *       409: { description: UPI ID already registered to another tester }
  */
 router.get("/me", requireAuth(), requireRole("tester"), getMyTesterProfile);
@@ -64,7 +72,15 @@ router.put("/me", requireAuth(), requireRole("tester"), upsertMyTesterProfile);
  *       - { in: query, name: page, schema: { type: integer } }
  *       - { in: query, name: limit, schema: { type: integer } }
  *     responses:
- *       200: { description: Paginated list of testers }
+ *       200:
+ *         description: Paginated list of testers
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data: { type: array, items: { $ref: '#/components/schemas/Tester' } }
+ *                 meta: { $ref: '#/components/schemas/PaginationMeta' }
  */
 router.get("/", requireAuth(), requireRole("admin"), listTesters);
 
@@ -78,7 +94,11 @@ router.get("/", requireAuth(), requireRole("admin"), listTesters);
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string } }
  *     responses:
- *       200: { description: Tester }
+ *       200:
+ *         description: Tester
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Tester' } } }
  *       404: { description: Not found }
  */
 router.get("/:id", requireAuth(), requireRole("admin"), getTesterById);
@@ -102,7 +122,11 @@ router.get("/:id", requireAuth(), requireRole("admin"), getTesterById);
  *             properties:
  *               status: { type: string, enum: [active, inactive, suspended] }
  *     responses:
- *       200: { description: Updated tester }
+ *       200:
+ *         description: Updated tester
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Tester' } } }
  */
 router.patch("/:id/status", requireAuth(), requireRole("admin"), updateTesterStatus);
 

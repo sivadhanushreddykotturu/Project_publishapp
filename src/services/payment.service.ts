@@ -96,17 +96,6 @@ export async function markInvoicePaidManually(invoiceId: Types.ObjectId, adminNo
   return invoice;
 }
 
-/**
- * UPI payout via Razorpay X for approved tester withdrawals. Stubbed gracefully if the
- * payout partner isn't wired yet (Tech Spec §14 risk register) — callers should catch
- * and leave the withdrawal in "approved" state for manual payout instead of failing hard.
- */
-export async function payoutViaUpi(_params: { vpa: string; amountPaise: number; reference: string }): Promise<never> {
-  if (!env.razorpay.xAccountNumber) {
-    throw new Error("UPI payout partner not configured — process this withdrawal manually");
-  }
-  // RazorpayX payouts API call (fund account + payout creation) goes here once the
-  // payout partner is onboarded — left as an explicit integration point rather than
-  // a fabricated response, per the risk register's "ledger ships regardless" plan.
-  throw new Error("RazorpayX payout integration pending partner onboarding");
-}
+// Tester payouts are deliberately NOT run through Razorpay (or any gateway payout API) —
+// a gateway takes a commission on payouts, so LaunchOps pays testers manually via UPI
+// instead and just records the transaction ID. See wallet.service#completeWithdrawal.

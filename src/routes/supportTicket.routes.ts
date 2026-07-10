@@ -29,7 +29,11 @@ const router = Router();
  *               message: { type: string }
  *               projectId: { type: string }
  *     responses:
- *       201: { description: Ticket created }
+ *       201:
+ *         description: Ticket created
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/SupportTicket' } } }
  *   get:
  *     tags: [Support]
  *     summary: List support tickets (own tickets, or all for admin)
@@ -37,7 +41,15 @@ const router = Router();
  *     parameters:
  *       - { in: query, name: status, schema: { type: string, enum: [open, in_progress, resolved, closed] } }
  *     responses:
- *       200: { description: Paginated support tickets }
+ *       200:
+ *         description: Paginated support tickets
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data: { type: array, items: { $ref: '#/components/schemas/SupportTicket' } }
+ *                 meta: { $ref: '#/components/schemas/PaginationMeta' }
  */
 router.post("/", requireAuth(), requireRole("client", "tester"), createSupportTicket);
 router.get("/", requireAuth(), listSupportTickets);
@@ -52,7 +64,11 @@ router.get("/", requireAuth(), listSupportTickets);
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string } }
  *     responses:
- *       200: { description: Support ticket with message thread }
+ *       200:
+ *         description: Support ticket with message thread
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/SupportTicket' } } }
  */
 router.get("/:id", requireAuth(), getSupportTicketById);
 
@@ -75,7 +91,11 @@ router.get("/:id", requireAuth(), getSupportTicketById);
  *             properties:
  *               body: { type: string }
  *     responses:
- *       200: { description: Message appended }
+ *       200:
+ *         description: Message appended
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/SupportTicket' } } }
  */
 router.post("/:id/messages", requireAuth(), addSupportTicketMessage);
 
@@ -98,7 +118,11 @@ router.post("/:id/messages", requireAuth(), addSupportTicketMessage);
  *             properties:
  *               status: { type: string, enum: [open, in_progress, resolved, closed] }
  *     responses:
- *       200: { description: Ticket status updated }
+ *       200:
+ *         description: Ticket status updated
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/SupportTicket' } } }
  */
 router.patch("/:id/status", requireAuth(), requireRole("admin"), updateSupportTicketStatus);
 

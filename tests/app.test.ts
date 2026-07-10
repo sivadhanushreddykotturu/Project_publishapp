@@ -28,6 +28,25 @@ describe("app boot", () => {
     expect(res.text).toContain("swagger-ui");
   });
 
+  it("gives every 2xx response a real JSON schema, not just a description — a frontend can codegen against this", async () => {
+    const res = await request(app).get("/api-docs.json");
+    const missingSchema: string[] = [];
+
+    for (const [path, methods] of Object.entries(res.body.paths as Record<string, Record<string, any>>)) {
+      for (const [method, operation] of Object.entries(methods)) {
+        for (const [code, response] of Object.entries(operation.responses ?? {})) {
+          if (!code.startsWith("2")) continue;
+          const hasSchema = Boolean((response as any)?.content?.["application/json"]?.schema);
+          if (!hasSchema) missingSchema.push(`${method.toUpperCase()} ${path} -> ${code}`);
+        }
+      }
+    }
+
+    // The Razorpay webhook is server-to-server (Razorpay calls us) — no frontend ever
+    // consumes its response, so it's the one deliberate exception.
+    expect(missingSchema).toEqual(["POST /payments/webhook -> 200"]);
+  });
+
   it("requires auth on protected routes", async () => {
     const res = await request(app).get("/api/v1/projects");
     expect(res.status).toBe(401);

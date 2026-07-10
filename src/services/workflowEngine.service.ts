@@ -8,20 +8,53 @@ import { creditEarning } from "./wallet.service";
 import { env } from "../config/env";
 
 /**
- * Step templates are keyed by projectType + package (Tech Spec §5). Phase 1 ships a single
- * template — the five-step Play Store flow — so new "testing types" in Phase 3/4 are added
- * here as new template entries, never as engine changes.
+ * Step template matching Google's actual closed-testing timeline (verified against
+ * real Play Console mechanics, not an idealized guess):
+ *
+ *   verification --------- LaunchOps checks each tester is real (project gate)
+ *   google_email_review -- Google reviews the submitted tester list, ~2-3h (admin/cron milestone)
+ *   play_store_invite ---- each tester accepts the invite / opts in (project gate)
+ *   testing_period -------- MANDATORY 14-day window, installs staggered ~2/day (time gate)
+ *   production_review ---- admin applies, Google reviews, commonly ~7d+ (admin milestone)
+ *   completion ------------ terminal
+ *
+ * ~2 + 14 + 7 ≈ 23 days end to end. Only verification / play_store_invite / testing_period
+ * carry individual tester actions (config.perTesterAction) — the other three are project-level
+ * milestones the admin advances directly (see playIntegration.service.ts), never something an
+ * individual tester's Assignment.currentStep passes through.
+ *
+ * Phase 1 ships this single template (Tech Spec §5); new "testing types" in Phase 3/4 are
+ * added here as new template entries, never as engine changes.
  */
 const PLAY_STORE_TEMPLATE: Array<{
   type: IStep["type"];
   deadlineHours: number;
   config: Record<string, unknown>;
 }> = [
-  { type: "verification", deadlineHours: 48, config: { gate: "project", payoutAmount: 0 } },
-  { type: "play_store_invite", deadlineHours: 72, config: { gate: "project", payoutAmount: 0 } },
-  { type: "app_usage", deadlineHours: 120, config: { gate: "tester", payoutAmount: 5000 } },
-  { type: "app_testing", deadlineHours: 168, config: { gate: "tester", payoutAmount: 10000 } },
-  { type: "completion", deadlineHours: 0, config: { gate: "tester", payoutAmount: 0 } },
+  { type: "verification", deadlineHours: 48, config: { gate: "project", perTesterAction: true, payoutAmount: 0 } },
+  {
+    type: "google_email_review",
+    deadlineHours: env.workflow.emailReviewHours,
+    config: { gate: "manual", perTesterAction: false, payoutAmount: 0 },
+  },
+  { type: "play_store_invite", deadlineHours: 48, config: { gate: "project", perTesterAction: true, payoutAmount: 0 } },
+  {
+    type: "testing_period",
+    deadlineHours: env.workflow.testingPeriodDays * 24,
+    config: {
+      gate: "time",
+      perTesterAction: true,
+      perTesterTerminal: true,
+      testingPeriodDays: env.workflow.testingPeriodDays,
+      payoutAmount: 15000,
+    },
+  },
+  {
+    type: "production_review",
+    deadlineHours: env.workflow.productionReviewDays * 24,
+    config: { gate: "manual", perTesterAction: false, payoutAmount: 0 },
+  },
+  { type: "completion", deadlineHours: 0, config: { gate: "manual", perTesterAction: false, payoutAmount: 0 } },
 ];
 
 export function getStepTemplate(_projectType: string, _pkg: string) {
@@ -35,15 +68,24 @@ export function createStepsFromTemplate(project: Pick<IProject, "projectType" | 
     order: idx + 1,
     type: step.type,
     state: "pending",
+    // An initial display estimate only. testing_period and production_review get their
+    // real, authoritative timestamps (testingPeriodStartAt / productionAppliedAt) stamped
+    // dynamically when those milestones actually happen — see maybeAdvanceProjectGate and
+    // playIntegration.service#applyForProduction.
     deadline: step.deadlineHours > 0 ? new Date(now + step.deadlineHours * 3_600_000) : undefined,
     config: step.config,
   }));
 }
 
-/** Steps 1–2 gate at the project level; every active assignment must clear the step. */
 function isProjectGatedStep(project: IProject, order: number): boolean {
   const step = project.steps.find((s) => s.order === order);
   return step?.config?.gate === "project";
+}
+
+/** Only verification / play_store_invite / testing_period ever appear as a tester's currentStep. */
+function nextTesterStep(project: IProject, fromOrder: number): number {
+  const next = project.steps.find((s) => s.order > fromOrder && s.config?.perTesterAction !== false);
+  return next ? next.order : fromOrder;
 }
 
 export async function submitProof(params: {
@@ -109,13 +151,15 @@ export async function verifyProof(params: {
       });
     }
 
-    const isLastStep = params.step === project.steps.length;
-    assignment.currentStep = isLastStep ? params.step : params.step + 1;
-    if (isLastStep) assignment.status = "completed";
+    // testing_period is the last step an individual tester ever acts on — production
+    // review and completion are project-level milestones the admin advances directly.
+    const isTerminalTesterStep = Boolean(stepConfig?.config?.perTesterTerminal);
+    assignment.currentStep = isTerminalTesterStep ? params.step : nextTesterStep(project, params.step);
+    if (isTerminalTesterStep) assignment.status = "completed";
 
-    // Persist before the gate/completion checks below — they re-query this same
-    // assignment from the database, so an unsaved in-memory currentStep would make
-    // this tester look like it's still on the old step to maybeAdvanceProjectGate.
+    // Persist before the gate check below — it re-queries this same assignment from the
+    // database, so an unsaved in-memory currentStep would make this tester look like it's
+    // still on the old step to maybeAdvanceProjectGate.
     await assignment.save();
 
     await MetricEvent.create({
@@ -127,9 +171,8 @@ export async function verifyProof(params: {
     if (isProjectGatedStep(project, params.step)) {
       await maybeAdvanceProjectGate(project._id, params.step);
     }
-    if (isLastStep) {
-      await maybeCompleteProject(project._id);
-    }
+    // Project completion is decided by playIntegration.service#confirmProductionApproved,
+    // not here — a tester finishing testing_period doesn't mean the project is done.
   } else {
     await MetricEvent.create({
       type: "step_rejected",
@@ -152,11 +195,13 @@ export async function verifyProof(params: {
 }
 
 /**
- * For project-gated steps (1–2), once every active assignment has cleared the step,
- * mark it verified at the project level. Advancing past Step 1 into Step 2 additionally
- * requires the admin to confirm tester emails were added to Play Console
- * (see playIntegration.service#markTestersInvited) — that is a distinct, explicit action,
- * not something this function does automatically, per PRD §4.3.
+ * For project-gated steps (verification, play_store_invite), once every active assignment
+ * has cleared the step, mark it verified at the project level. Advancing past
+ * google_email_review into play_store_invite additionally requires the admin to confirm
+ * tester emails were reviewed (see playIntegration.service#markTestersInvited /
+ * #confirmEmailReviewApproved) — that is a distinct, explicit action, per PRD §4.3.
+ * When play_store_invite itself closes, this also starts the mandatory 14-day testing
+ * clock and schedules staggered install reminders (~2 testers/day).
  */
 export async function maybeAdvanceProjectGate(projectId: Types.ObjectId, stepOrder: number) {
   const activeAssignments = await Assignment.find({ projectId, status: { $in: ["active", "completed"] } });
@@ -168,18 +213,61 @@ export async function maybeAdvanceProjectGate(projectId: Types.ObjectId, stepOrd
   const project = await Project.findById(projectId);
   if (!project) return;
   const step = project.steps.find((s) => s.order === stepOrder);
-  if (step && step.state !== "verified") {
-    step.state = "verified";
-    await project.save();
+  if (!step || step.state === "verified") return;
+
+  step.state = "verified";
+  await project.save();
+
+  if (step.type === "play_store_invite") {
+    await startTestingPeriodAndScheduleInstalls(projectId);
   }
 }
 
+/**
+ * Stamps testingPeriodStartAt (the authoritative clock the 14-day hard gate reads) and
+ * assigns every active tester a scheduledInstallDate — ~INSTALLS_PER_DAY per day — so
+ * installs land naturally over the window instead of all 14 testers hitting Play at once.
+ */
+export async function startTestingPeriodAndScheduleInstalls(projectId: Types.ObjectId) {
+  const project = await Project.findById(projectId);
+  if (!project) return;
+  if (project.playIntegration.testingPeriodStartAt) return; // already started — idempotent
+
+  const start = new Date();
+  project.playIntegration.testingPeriodStartAt = start;
+  await project.save();
+
+  const activeAssignments = await Assignment.find({
+    projectId,
+    status: { $in: ["active", "completed"] },
+  }).sort({ assignedAt: 1 });
+
+  const perDay = Math.max(1, env.workflow.installsPerDay);
+  for (let i = 0; i < activeAssignments.length; i++) {
+    const dayOffset = Math.floor(i / perDay);
+    activeAssignments[i].scheduledInstallDate = new Date(start.getTime() + dayOffset * 24 * 3_600_000);
+    await activeAssignments[i].save();
+  }
+
+  await MetricEvent.create({
+    type: "install_pacing_scheduled",
+    projectId,
+    meta: { testerCount: activeAssignments.length, perDay, testingPeriodStartAt: start },
+  });
+}
+
+/**
+ * Called once the admin confirms Google approved production (playIntegration.service
+ * #confirmProductionApproved) — a project is "done" once every tester who was ever
+ * active has reached "completed" (finished their testing_period proof) and none are
+ * still mid-flight.
+ */
 export async function maybeCompleteProject(projectId: Types.ObjectId) {
-  const [activeCount, incompleteCount] = await Promise.all([
+  const [everActiveCount, stillActiveCount] = await Promise.all([
     Assignment.countDocuments({ projectId, status: { $in: ["active", "completed"] } }),
     Assignment.countDocuments({ projectId, status: "active" }),
   ]);
-  if (activeCount === 0 || incompleteCount > 0) return;
+  if (everActiveCount === 0 || stillActiveCount > 0) return;
 
   await Project.findByIdAndUpdate(projectId, { status: "completed" });
   await MetricEvent.create({ type: "project_completed", projectId, meta: {} });
