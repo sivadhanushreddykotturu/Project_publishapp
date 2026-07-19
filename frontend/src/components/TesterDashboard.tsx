@@ -16,16 +16,13 @@ interface TesterDashboardProps {
   bugs: BugReport[];
   transactions: Transaction[];
   withdrawals: WithdrawalRequest[];
-  onUpdateTesterProfile: (updatedTester: Partial<Tester>) => void;
-  onJoinProject: (projectId: string) => void;
-  onSubmitStep1Email: (assignmentId: string, email: string, screenshotUrl?: string) => void;
-  onClickStep3Link: (assignmentId: string, screenshotUrl?: string) => void;
-  onLogStep4CheckIn: (assignmentId: string) => void;
-  onSubmitBugReport: (bugReport: Omit<BugReport, 'id' | 'createdAt' | 'testerName' | 'testerAvatar' | 'screenshot'> & { screenshot?: string }) => void;
-  onRequestWithdrawal: (amount: number, upiId: string) => { success: boolean; error?: string };
-  // Simulation Helpers
-  onSimulateAdminAdvanceStep: (assignmentId: string) => void;
-  onSimulateFastForwardDay: (assignmentId: string) => void;
+  onUpdateTesterProfile: (updatedTester: Partial<Tester>) => void | Promise<void>;
+  onJoinProject: (projectId: string) => void | Promise<void>;
+  onSubmitStep1Email: (assignmentId: string, email: string, screenshotUrl?: string) => void | Promise<void>;
+  onClickStep3Link: (assignmentId: string, screenshotUrl?: string) => void | Promise<void>;
+  onLogStep4CheckIn: (assignmentId: string, proofUrl: string) => void | Promise<void>;
+  onSubmitBugReport: (bugReport: Omit<BugReport, 'id' | 'createdAt' | 'testerName' | 'testerAvatar' | 'screenshot'> & { screenshot?: string }) => void | Promise<void>;
+  onRequestWithdrawal: (amount: number, upiId: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export default function TesterDashboard({
@@ -42,12 +39,11 @@ export default function TesterDashboard({
   onClickStep3Link,
   onLogStep4CheckIn,
   onSubmitBugReport,
-  onRequestWithdrawal,
-  onSimulateAdminAdvanceStep,
-  onSimulateFastForwardDay
+  onRequestWithdrawal
 }: TesterDashboardProps) {
   // Tabs: 'dashboard' (Active), 'explore' (Projects), 'wallet', 'bugs' (Support/Bugs), 'profile'
   const [activeTab, setActiveTab] = useState<'dashboard' | 'explore' | 'wallet' | 'bugs' | 'profile'>('dashboard');
+  const showDashboardOpportunityPanel = false;
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   
@@ -55,6 +51,7 @@ export default function TesterDashboard({
   const [googlePlayEmail, setGooglePlayEmail] = useState<string>('');
   const [step1ScreenshotFile, setStep1ScreenshotFile] = useState<string>('');
   const [step3ScreenshotFile, setStep3ScreenshotFile] = useState<string>('');
+  const [step4ProofFile, setStep4ProofFile] = useState<string>('');
   const [step4BugScreenshotFile, setStep4BugScreenshotFile] = useState<string>('');
   const [withdrawalAmount, setWithdrawalAmount] = useState<string>('');
   const [withdrawalUpi, setWithdrawalUpi] = useState<string>(activeTester.upiId || '');
@@ -105,6 +102,49 @@ export default function TesterDashboard({
 
   const selectedAssignment = activeAssignments.find(a => a.id === selectedAssignmentId);
   const selectedProject = selectedAssignment ? projects.find(p => p.id === selectedAssignment.projectId) : null;
+  const pendingWithdrawals = withdrawals.filter(w => w.testerId === activeTester.id && w.status === 'pending');
+  const nextPayoutDate = pendingWithdrawals[0]?.expectedCompletionAt ?? 'No pending payout';
+  const pendingVerificationCount = assignments.filter(a =>
+    a.testerId === activeTester.id &&
+    a.status === 'active' &&
+    (a.currentStep === 2 || (a.currentStep === 1 && Boolean(a.step1Screenshot)) || (a.currentStep === 3 && Boolean(a.step3Screenshot)))
+  ).length;
+  const totalEarnings = transactions
+    .filter(t => t.testerId === activeTester.id && t.type === 'credit')
+    .reduce((sum, transaction) => sum + transaction.amount, 0);
+  const recentActivity = [
+    ...assignments.slice(0, 1).map((assignment) => ({
+      id: `assignment-${assignment.id}`,
+      icon: <CheckCircle className="w-4 h-4" />,
+      iconClass: 'bg-emerald-500/10 text-emerald-505',
+      label: `${assignment.status === 'queued' ? 'Queued for' : 'Joined'} ${assignment.appName}`,
+      time: assignment.joinedAt,
+    })),
+    ...projects
+      .filter((project) => !assignments.some((assignment) => assignment.projectId === project.id && assignment.testerId === activeTester.id))
+      .slice(0, 1)
+      .map((project) => ({
+        id: `project-${project.id}`,
+        icon: <Compass className="w-4 h-4" />,
+        iconClass: 'bg-indigo-500/10 text-indigo-500',
+        label: `New opportunity available: ${project.name}`,
+        time: project.launchDate,
+      })),
+    ...transactions.slice(0, 2).map((transaction) => ({
+      id: `transaction-${transaction.id}`,
+      icon: <Wallet className="w-4 h-4" />,
+      iconClass: transaction.type === 'credit' ? 'bg-emerald-500/10 text-emerald-505' : 'bg-indigo-500/10 text-indigo-500',
+      label: `${transaction.type === 'credit' ? 'Wallet credited' : 'Withdrawal requested'}: ₹${transaction.amount.toFixed(2)}`,
+      time: transaction.createdAt,
+    })),
+    ...bugs.slice(0, 1).map((bug) => ({
+      id: `bug-${bug.id}`,
+      icon: <Bug className="w-4 h-4" />,
+      iconClass: 'bg-amber-500/10 text-amber-500',
+      label: `Bug report submitted for ${bug.appName}`,
+      time: bug.createdAt,
+    })),
+  ].slice(0, 4);
 
   // Derive Reward based on package tier
   const getRewardAmount = (tier?: string) => {
@@ -116,7 +156,7 @@ export default function TesterDashboard({
     }
   };
 
-  const handleWithdrawalSubmit = (e?: React.FormEvent) => {
+  const handleWithdrawalSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setWithdrawalError('');
     setWithdrawalSuccess(false);
@@ -137,7 +177,7 @@ export default function TesterDashboard({
       return;
     }
 
-    const res = onRequestWithdrawal(amount, withdrawalUpi);
+    const res = await onRequestWithdrawal(amount, withdrawalUpi);
     if (res.success) {
       setWithdrawalSuccess(true);
       setWithdrawalAmount('');
@@ -146,7 +186,7 @@ export default function TesterDashboard({
     }
   };
 
-  const handleBugSubmit = (e: React.FormEvent) => {
+  const handleBugSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBugSuccess(false);
 
@@ -159,7 +199,7 @@ export default function TesterDashboard({
     const targetProject = projects.find(p => p.id === bugAppId);
     if (!targetProject) return;
 
-    onSubmitBugReport({
+    await onSubmitBugReport({
       appId: bugAppId,
       appName: targetProject.name,
       title: bugTitle,
@@ -176,7 +216,7 @@ export default function TesterDashboard({
     setTimeout(() => setBugSuccess(false), 3000);
   };
 
-  const handleProfileSave = (e: React.FormEvent) => {
+  const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileSuccess(false);
 
@@ -185,7 +225,7 @@ export default function TesterDashboard({
       return;
     }
 
-    onUpdateTesterProfile({
+    await onUpdateTesterProfile({
       upiId: profileUpi,
       country: profileCountry,
       specialty: profileSpecialty,
@@ -239,18 +279,18 @@ export default function TesterDashboard({
     { id: 'dashboard', label: 'Dashboard', icon: <Compass className="w-5 h-5" /> },
     { id: 'explore', label: 'Projects', icon: <FolderCheck className="w-5 h-5" /> },
     { id: 'wallet', label: 'Wallet', icon: <Wallet className="w-5 h-5" /> },
-    { id: 'bugs', label: 'Notifications', icon: <Bell className="w-5 h-5" />, badge: 2 },
+    { id: 'bugs', label: 'Notifications', icon: <Bell className="w-5 h-5" />, badge: recentActivity.length || undefined },
     { id: 'bugs_tab', label: 'Support', icon: <MessageSquare className="w-5 h-5" /> },
     { id: 'profile', label: 'Profile', icon: <User className="w-5 h-5" /> },
     { id: 'profile_settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
   ];
 
   return (
-    <div className={`min-h-screen font-sans transition-colors duration-300 flex ${
+    <div className={`min-h-screen pt-20 font-sans transition-colors duration-300 flex ${
       isDarkMode ? 'bg-[#09090B] text-slate-100' : 'bg-slate-50 text-slate-900'
     }`}>
       {/* 1. Left Sidebar Navigation */}
-      <aside className={`w-[260px] border-r shrink-0 hidden md:flex flex-col justify-between p-6 sticky top-0 h-screen ${
+      <aside className={`w-[260px] border-r shrink-0 hidden md:flex flex-col justify-between p-6 sticky top-20 h-[calc(100vh-5rem)] ${
         isDarkMode ? 'bg-[#09090B] border-zinc-800' : 'bg-white border-slate-200'
       }`}>
         <div className="space-y-8">
@@ -302,37 +342,18 @@ export default function TesterDashboard({
           </nav>
         </div>
 
-        {/* Sidebar Bottom Box */}
-        <div className={`rounded-2xl p-4 text-center border relative overflow-hidden ${
-          isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-indigo-50/30 border-indigo-100/50'
-        }`}>
-          <span className="text-xs font-bold uppercase tracking-wider text-indigo-550 block mb-1">Available for Testing</span>
-          <p className={`text-[10px] leading-relaxed mb-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-550'}`}>
-            You will receive new opportunities here.
-          </p>
-          <button 
-            onClick={() => setActiveTab('explore')}
-            className={`w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider border transition-all cursor-pointer bg-transparent ${
-              isDarkMode
-                ? 'border-zinc-700 hover:border-zinc-600 text-white hover:bg-zinc-800/30'
-                : 'border-indigo-200 hover:border-indigo-305 text-indigo-600 hover:bg-indigo-50/50'
-            }`}
-          >
-            Refresh Opportunities
-          </button>
-        </div>
       </aside>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         
         {/* 2. Top Header Bar */}
-        <header className={`border-b px-6 py-4 flex items-center justify-between sticky top-0 z-40 backdrop-blur-xs ${
+        <header className={`border-b px-6 py-4 flex items-center justify-between sticky top-20 z-40 backdrop-blur-xs ${
           isDarkMode ? 'bg-[#09090B]/90 border-zinc-800' : 'bg-white/95 border-slate-200'
         }`}>
           <div>
             <h1 className={`text-xl font-extrabold flex items-center gap-1.5 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-              Welcome back, {activeTester.name.split(' ')[0]}! 👋
+              Welcome back, {activeTester.name.split(' ')[0]}! 
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">Ready to test amazing apps and earn rewards</p>
           </div>
@@ -440,8 +461,10 @@ export default function TesterDashboard({
                   </div>
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Next Payout</span>
-                    <h3 className={`text-lg font-black mt-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>15 May 2024</h3>
-                    <span className="text-[10px] text-slate-550 mt-1 block">Expected date of next payout</span>
+                    <h3 className={`text-lg font-black mt-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{nextPayoutDate}</h3>
+                    <span className="text-[10px] text-slate-550 mt-1 block">
+                      {pendingWithdrawals.length > 0 ? 'Expected date of next payout' : 'No withdrawal request pending'}
+                    </span>
                   </div>
                 </div>
 
@@ -456,8 +479,10 @@ export default function TesterDashboard({
                   </div>
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tester Status</span>
-                    <h3 className={`text-lg font-black mt-1 text-blue-500 ${isDarkMode ? 'text-white' : ''}`}>Active</h3>
-                    <span className="text-[10px] text-slate-550 mt-1 block">You are available for new projects</span>
+                    <h3 className={`text-lg font-black mt-1 text-blue-500 ${isDarkMode ? 'text-white' : ''}`}>{activeTester.status}</h3>
+                    <span className="text-[10px] text-slate-550 mt-1 block">
+                      {activeTester.status === 'Online' ? 'Tester profile is active' : 'Profile is not active'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -475,8 +500,8 @@ export default function TesterDashboard({
                   }`}>
                     <div>
                       <span className="text-[10px] font-bold text-slate-500 block">Projects Completed</span>
-                      <span className={`text-2xl font-black block mt-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>12</span>
-                      <span className="text-[9px] font-semibold text-emerald-500 mt-2 block">+2 this month</span>
+                      <span className={`text-2xl font-black block mt-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{completedAssignments.length}</span>
+                      <span className="text-[9px] font-semibold text-emerald-500 mt-2 block">Completed tracks</span>
                     </div>
                     <div className="p-2 rounded-lg bg-indigo-500/5 text-indigo-500"><FolderCheck className="w-4 h-4" /></div>
                   </div>
@@ -505,7 +530,7 @@ export default function TesterDashboard({
                   }`}>
                     <div>
                       <span className="text-[10px] font-bold text-slate-500 block">Pending Verification</span>
-                      <span className={`text-2xl font-black block mt-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>2</span>
+                      <span className={`text-2xl font-black block mt-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{pendingVerificationCount}</span>
                       <span className="text-[9px] font-semibold text-amber-505 mt-2 block">Awaiting admin review</span>
                     </div>
                     <div className="p-2 rounded-lg bg-amber-500/5 text-amber-500"><Clock className="w-4 h-4" /></div>
@@ -519,8 +544,8 @@ export default function TesterDashboard({
                   }`}>
                     <div>
                       <span className="text-[10px] font-bold text-slate-500 block">Total Earnings</span>
-                      <span className={`text-2xl font-black block mt-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>₹3,450</span>
-                      <span className="text-[9px] font-semibold text-emerald-555 mt-2 block">+₹450 this month</span>
+                      <span className={`text-2xl font-black block mt-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>₹{totalEarnings.toFixed(2)}</span>
+                      <span className="text-[9px] font-semibold text-emerald-555 mt-2 block">Backend ledger</span>
                     </div>
                     <div className="p-2 rounded-lg bg-emerald-500/5 text-emerald-500"><Landmark className="w-4 h-4" /></div>
                   </div>
@@ -534,7 +559,7 @@ export default function TesterDashboard({
                     <div>
                       <span className="text-[10px] font-bold text-slate-500 block">Bug Reports Submitted</span>
                       <span className={`text-2xl font-black block mt-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{activeTester.bugsFoundCount}</span>
-                      <span className="text-[9px] font-semibold text-indigo-555 mt-2 block">+5 this week</span>
+                      <span className="text-[9px] font-semibold text-indigo-555 mt-2 block">Submitted reports</span>
                     </div>
                     <div className="p-2 rounded-lg bg-indigo-500/5 text-indigo-500"><Bug className="w-4 h-4" /></div>
                   </div>
@@ -548,7 +573,9 @@ export default function TesterDashboard({
                     <div>
                       <span className="text-[10px] font-bold text-slate-500 block">Rating</span>
                       <span className={`text-2xl font-black block mt-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{activeTester.rating}</span>
-                      <span className="text-[9px] font-semibold text-slate-500 mt-2 block">Based on 18 reviews</span>
+                      <span className="text-[9px] font-semibold text-slate-500 mt-2 block">
+                        {activeTester.rating > 0 ? 'Backend rating' : 'No reviews yet'}
+                      </span>
                     </div>
                     <div className="p-2 rounded-lg bg-amber-500/5 text-amber-500"><Star className="w-4 h-4 fill-amber-500 stroke-amber-500" /></div>
                   </div>
@@ -590,7 +617,7 @@ export default function TesterDashboard({
                             </div>
                             <div>
                               <h4 className={`font-extrabold text-sm ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{selectedAssignment.appName}</h4>
-                              <span className="text-[10px] text-slate-500">By {selectedAssignment.appName} Inc.</span>
+                              <span className="text-[10px] text-slate-500">{selectedProject.category}</span>
                             </div>
                           </div>
                           <span className="bg-emerald-500/10 text-emerald-600 text-[10px] font-black px-2.5 py-0.5 rounded-full">
@@ -614,11 +641,13 @@ export default function TesterDashboard({
                           </div>
                           <div>
                             <span className="text-[9px] uppercase tracking-wider text-slate-500 block">Deadline</span>
-                            <span className={`text-sm font-black mt-1 block ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>20 May 2024</span>
+                            <span className={`text-sm font-black mt-1 block ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{selectedProject.launchDate}</span>
                           </div>
                           <div>
                             <span className="text-[9px] uppercase tracking-wider text-slate-500 block">Slots</span>
-                            <span className={`text-sm font-black mt-1 block ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>10/14</span>
+                            <span className={`text-sm font-black mt-1 block ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                              {selectedProject.testersCount}/{selectedProject.testersRequired ?? 0}
+                            </span>
                           </div>
                         </div>
 
@@ -714,7 +743,7 @@ export default function TesterDashboard({
                                     </span>
                                     <input 
                                       type="text" 
-                                      placeholder="Simulate proof file..."
+                                      placeholder="Paste uploaded proof URL..."
                                       value={step1ScreenshotFile}
                                       onChange={(e) => setStep1ScreenshotFile(e.target.value)}
                                       className="mt-1 w-full text-center border-0 bg-transparent text-[9px] text-indigo-550 outline-hidden font-bold"
@@ -723,12 +752,16 @@ export default function TesterDashboard({
                                 </div>
                               </div>
                               <button
-                                onClick={() => {
+                                onClick={async () => {
                                   if (!googlePlayEmail.includes('@')) {
                                     alert('Please enter a valid email address.');
                                     return;
                                   }
-                                  onSubmitStep1Email(selectedAssignment.id, googlePlayEmail, step1ScreenshotFile || 'play-profile-proof.png');
+                                  if (!step1ScreenshotFile.trim()) {
+                                    alert('Please paste the uploaded proof URL.');
+                                    return;
+                                  }
+                                  await onSubmitStep1Email(selectedAssignment.id, googlePlayEmail, step1ScreenshotFile);
                                 }}
                                 className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-wider py-2.5 rounded-xl cursor-pointer border-0 shadow-md"
                               >
@@ -750,15 +783,6 @@ export default function TesterDashboard({
                                   Verification File: <span className="text-indigo-405 font-bold">{selectedAssignment.step1Screenshot}</span>
                                 </div>
                               )}
-                              <div className="p-3 rounded-lg border border-indigo-500/10 bg-indigo-500/5 text-center">
-                                <span className="text-[10px] font-mono text-indigo-405 block font-bold mb-1">🎮 DEV SIMULATOR CONTROL</span>
-                                <button
-                                  onClick={() => onSimulateAdminAdvanceStep(selectedAssignment.id)}
-                                  className="px-3 py-1 rounded-sm bg-indigo-600 text-white text-[10px] font-bold border-0 cursor-pointer"
-                                >
-                                  Simulate Admin Approves Email
-                                </button>
-                              </div>
                             </div>
                           )}
 
@@ -797,15 +821,19 @@ export default function TesterDashboard({
                                     </span>
                                     <input 
                                       type="text" 
-                                      placeholder="Simulate proof file..."
+                                      placeholder="Paste uploaded proof URL..."
                                       value={step3ScreenshotFile}
                                       onChange={(e) => setStep3ScreenshotFile(e.target.value)}
                                       className="mt-1.5 w-full text-center border-0 bg-transparent text-[10px] text-indigo-550 outline-hidden font-bold"
                                     />
                                   </div>
                                   <button
-                                    onClick={() => {
-                                      onClickStep3Link(selectedAssignment.id, step3ScreenshotFile || 'app-install-proof.png');
+                                    onClick={async () => {
+                                      if (!step3ScreenshotFile.trim()) {
+                                        alert('Please paste the uploaded proof URL.');
+                                        return;
+                                      }
+                                      await onClickStep3Link(selectedAssignment.id, step3ScreenshotFile);
                                     }}
                                     className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider py-2.5 rounded-xl cursor-pointer border-0 shadow-md"
                                   >
@@ -813,67 +841,54 @@ export default function TesterDashboard({
                                   </button>
                                 </div>
                               )}
-
-                              <div className="p-3 rounded-lg border border-indigo-500/10 bg-indigo-500/5 text-center">
-                                <span className="text-[10px] font-mono text-indigo-405 block font-bold mb-1">🎮 DEV SIMULATOR CONTROL</span>
-                                <button
-                                  onClick={() => onSimulateAdminAdvanceStep(selectedAssignment.id)}
-                                  className="px-3 py-1 rounded-sm bg-indigo-600 text-white text-[10px] font-bold border-0 cursor-pointer"
-                                >
-                                  Simulate Download & Accept Track
-                                </button>
-                              </div>
                             </div>
                           )}
 
                           {/* 14-Day closed-testing (Step 4) */}
                           {selectedAssignment.currentStep === 4 && (
                             <div className="space-y-5">
-                              {/* Check-in Logs timeline */}
-                              <div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-550 block mb-2 font-mono">Check-in Logs</span>
-                                <div className="grid grid-cols-7 gap-2">
-                                  {[...Array(14)].map((_, index) => {
-                                    const dayNum = index + 1;
-                                    const isDone = selectedAssignment.step4CheckInsCompleted >= dayNum;
-                                    const isCurrent = selectedAssignment.step4CheckInsCompleted === index;
-                                    return (
-                                      <div
-                                        key={index}
-                                        className={`border rounded-lg p-2 text-center flex flex-col items-center justify-center ${
-                                          isDone
-                                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
-                                            : isCurrent
-                                              ? 'bg-indigo-600/10 border-indigo-500 text-indigo-500 font-bold animate-pulse'
-                                              : isDarkMode ? 'bg-zinc-900 border-zinc-800 text-slate-700' : 'bg-white border-slate-200 text-slate-400'
-                                        }`}
-                                      >
-                                        <span className="text-[8px] font-mono">D{dayNum}</span>
-                                        <span className="mt-1.5">
-                                          {isDone ? <Check className="w-3 h-3 text-emerald-500 font-bold" /> : <Calendar className="w-3 h-3 text-slate-550" />}
-                                        </span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-
-                              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                                <button
-                                  onClick={() => onLogStep4CheckIn(selectedAssignment.id)}
-                                  disabled={selectedAssignment.step4CheckInsCompleted >= 14}
-                                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border-0 shadow-md shadow-indigo-500/5"
-                                >
-                                  {selectedAssignment.step4CheckInsCompleted >= 14
-                                    ? 'All 14 Days Completed'
-                                    : `Log Check-In (Day ${selectedAssignment.step4CheckInsCompleted + 1})`}
-                                </button>
-                                <button
-                                  onClick={() => onSimulateFastForwardDay(selectedAssignment.id)}
-                                  className="px-4 py-2.5 rounded-xl text-xs font-bold border border-indigo-500/25 bg-indigo-950/20 text-indigo-400 cursor-pointer"
-                                >
-                                  Simulate Fast Forward Day ⏩
-                                </button>
+                              <div className={`p-4 rounded-xl border ${isDarkMode ? 'bg-zinc-900/50 border-zinc-800' : 'bg-slate-100/50 border-slate-200'}`}>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-550 block mb-2 font-mono">
+                                  Testing Period Proof
+                                </span>
+                                {selectedAssignment.step4Proof ? (
+                                  <div className="space-y-2">
+                                    <p className="text-xs text-slate-500">
+                                      Testing-period proof submitted and awaiting admin verification.
+                                    </p>
+                                    <div className="text-[10px] font-mono text-slate-500 truncate">
+                                      Proof File: <span className="text-indigo-405 font-bold">{selectedAssignment.step4Proof}</span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    <p className="text-xs text-slate-500">
+                                      Submit proof after completing the required testing window.
+                                    </p>
+                                    <input
+                                      type="text"
+                                      placeholder="Paste uploaded testing-period proof URL..."
+                                      value={step4ProofFile}
+                                      onChange={(e) => setStep4ProofFile(e.target.value)}
+                                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:border-indigo-500/50 ${
+                                        isDarkMode ? 'bg-zinc-900/50 border-zinc-805 text-white' : 'bg-white border-slate-200 text-slate-900'
+                                      }`}
+                                    />
+                                    <button
+                                      onClick={async () => {
+                                        if (!step4ProofFile.trim()) {
+                                          alert('Please paste the uploaded proof URL.');
+                                          return;
+                                        }
+                                        await onLogStep4CheckIn(selectedAssignment.id, step4ProofFile);
+                                        setStep4ProofFile('');
+                                      }}
+                                      className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2.5 rounded-xl cursor-pointer border-0 shadow-md shadow-indigo-500/5"
+                                    >
+                                      Submit Testing Proof
+                                    </button>
+                                  </div>
+                                )}
                               </div>
 
                               {/* Inline Bug Reporting Module */}
@@ -938,7 +953,7 @@ export default function TesterDashboard({
                                         </span>
                                         <input
                                           type="text"
-                                          placeholder="Simulate bug proof file..."
+                                          placeholder="Paste uploaded bug proof URL..."
                                           value={step4BugScreenshotFile}
                                           onChange={(e) => setStep4BugScreenshotFile(e.target.value)}
                                           className="mt-1 w-full text-center border-0 bg-transparent text-[9px] text-indigo-550 outline-hidden font-bold"
@@ -946,11 +961,11 @@ export default function TesterDashboard({
                                       </div>
                                     </div>
                                     <button
-                                      onClick={() => {
+                                      onClick={async () => {
                                         if (!inlineBugTitle.trim()) return alert('Please enter a bug title.');
                                         if (!inlineBugSteps.trim()) return alert('Please describe reproduction steps.');
 
-                                        onSubmitBugReport({
+                                        await onSubmitBugReport({
                                           appId: selectedProject.id,
                                           appName: selectedProject.name,
                                           title: inlineBugTitle,
@@ -958,7 +973,7 @@ export default function TesterDashboard({
                                           device: activeTester.devices[0] || 'Google Pixel 8',
                                           osVersion: 'Android 14',
                                           reproductionSteps: [inlineBugSteps],
-                                          screenshot: step4BugScreenshotFile || 'bug-screenshot.png',
+                                          screenshot: step4BugScreenshotFile || undefined,
                                           status: 'Open'
                                         });
 
@@ -991,15 +1006,6 @@ export default function TesterDashboard({
                                   Installation Proof: <span className="text-indigo-405 font-bold">{selectedAssignment.step3Screenshot}</span>
                                 </div>
                               )}
-                              <div className="pt-2">
-                                <span className="text-[10px] font-mono text-indigo-405 block font-bold mb-1">🎮 DEV SIMULATOR CONTROL</span>
-                                <button
-                                  onClick={() => onSimulateAdminAdvanceStep(selectedAssignment.id)}
-                                  className="px-3 py-1 rounded-sm bg-indigo-600 text-white text-[10px] font-bold border-0 cursor-pointer"
-                                >
-                                  Simulate Google Approves App Release
-                                </button>
-                              </div>
                             </div>
                           )}
 
@@ -1037,57 +1043,23 @@ export default function TesterDashboard({
                     </div>
 
                     <div className="space-y-4">
-                      {/* Item 1 */}
-                      <div className="flex items-start justify-between gap-4 text-xs">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-505 flex items-center justify-center shrink-0">
-                            <CheckCircle className="w-4 h-4" />
+                      {recentActivity.length === 0 ? (
+                        <p className="text-xs text-slate-500 py-4 text-center">No recent backend activity yet.</p>
+                      ) : (
+                        recentActivity.map((activity) => (
+                          <div key={activity.id} className="flex items-start justify-between gap-4 text-xs">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${activity.iconClass}`}>
+                                {activity.icon}
+                              </div>
+                              <span className={`font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                {activity.label}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-medium">{activity.time}</span>
                           </div>
-                          <span className={`font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                            Verification approved for FitLife - Health & Fitness
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-slate-500 font-medium">2h ago</span>
-                      </div>
-
-                      {/* Item 2 */}
-                      <div className="flex items-start justify-between gap-4 text-xs">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
-                            <Compass className="w-4 h-4" />
-                          </div>
-                          <span className={`font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                            New opportunity available: QuickCart - Shopping App
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-slate-500 font-medium">5h ago</span>
-                      </div>
-
-                      {/* Item 3 */}
-                      <div className="flex items-start justify-between gap-4 text-xs">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-505 flex items-center justify-center shrink-0">
-                            <Wallet className="w-4 h-4" />
-                          </div>
-                          <span className={`font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                            Wallet credited: ₹300 from FitLife - Health & Fitness
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-slate-500 font-medium">1d ago</span>
-                      </div>
-
-                      {/* Item 4 */}
-                      <div className="flex items-start justify-between gap-4 text-xs">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
-                            <Bug className="w-4 h-4" />
-                          </div>
-                          <span className={`font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                            Bug report submitted for FitLife - Health & Fitness
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-slate-500 font-medium">1d ago</span>
-                      </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1096,6 +1068,7 @@ export default function TesterDashboard({
                 <div className="lg:col-span-5 space-y-8">
                   
                   {/* 1. Available Opportunities */}
+                  {showDashboardOpportunityPanel && (
                   <div className={`border rounded-2xl p-6 ${
                     isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200 shadow-xs'
                   }`}>
@@ -1152,7 +1125,9 @@ export default function TesterDashboard({
                     </div>
                   </div>
 
-                  {/* 2. Wallet Summary */}
+                  )}
+
+                  {/* Wallet Summary */}
                   <div className={`border rounded-2xl p-6 ${
                     isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200 shadow-xs'
                   }`}>
@@ -1271,15 +1246,15 @@ export default function TesterDashboard({
                                     <Check className="w-3.5 h-3.5 text-emerald-500 font-bold shrink-0" />
                                   ) : isStepActive ? (
                                     <span className="flex items-center gap-1 text-indigo-600 font-bold uppercase text-[9px] tracking-wider shrink-0">
-                                      🔓 Unlocked
+                                      Unlocked
                                     </span>
                                   ) : isStepLocked ? (
                                     <span className="flex items-center gap-1 text-[10px] text-slate-500 font-bold shrink-0">
-                                      🔒 Locked
+                                      Locked
                                     </span>
                                   ) : (
                                     <span className="flex items-center gap-1 text-[10px] text-slate-450 font-bold shrink-0">
-                                      🔓 Unlocked
+                                      Unlocked
                                     </span>
                                   )}
                                 </div>
@@ -1597,7 +1572,7 @@ export default function TesterDashboard({
                                 onClick={() => setBugReproductionSteps(bugReproductionSteps.filter((_, i) => i !== index))}
                                 className="text-red-500 text-xs font-bold bg-transparent border-none cursor-pointer"
                               >
-                                ✕
+                                x
                               </button>
                             )}
                           </div>

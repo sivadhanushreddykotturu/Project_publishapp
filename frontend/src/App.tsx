@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { TestApp, BugReport, Tester, AndroidDevice, TesterAssignment, WithdrawalRequest, Transaction } from './types';
-import { INITIAL_APPS, INITIAL_BUGS, MOCK_DEVICES, MOCK_TESTERS } from './mockData';
+import { useCallback, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { TestApp, BugReport, Tester, TesterAssignment, WithdrawalRequest, Transaction } from './types';
 import Navbar from './components/Navbar';
 import HeroSection from './components/HeroSection';
 import SolutionsScreen from './components/SolutionsScreen';
@@ -15,32 +15,101 @@ import BuiltForEveryone from './components/BuiltForEveryone';
 import Testimonials from './components/Testimonials';
 import CallToAction from './components/CallToAction';
 import Footer from './components/Footer';
-import AuthScreen from './components/AuthScreen';
 
 import { MapPin, Users, Heart, ShieldCheck, Sparkles, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_BASE_URL, ApiRequestError } from './lib/api';
+import {
+  getCurrentLaunchOpsUser,
+  getMyTesterProfile,
+  getMyWallet,
+  joinTesterProject,
+  listMyAssignments,
+  listMyBugReports,
+  listTesterOpportunities,
+  requestWalletWithdrawal,
+  submitAssignmentProof,
+  submitProjectBugReport,
+  updateMyTesterProfile,
+  type UpsertTesterProfileInput,
+} from './lib/launchops-api';
+import {
+  mapAssignment,
+  mapBugReport,
+  mapProject,
+  mapTesterProfile,
+  mapWallet,
+  paiseToRupees,
+  rupeesToPaise,
+} from './lib/launchops-mappers';
 
-const ENHANCED_INITIAL_APPS: TestApp[] = INITIAL_APPS.map(app => ({
-  ...app,
-  packageTier: 'managed_testing' as const,
-  testersRequired: 35,
-  verificationRequired: true,
-  verificationStatus: 'approved' as const,
-  invoiceStatus: 'paid' as const
-}));
+const emptyTester: Tester = {
+  id: '',
+  name: 'Tester',
+  avatar: '',
+  country: 'India',
+  devices: [],
+  bugsFoundCount: 0,
+  rating: 0,
+  specialty: 'General Testing',
+  status: 'Idle',
+  upiId: '',
+  walletBalance: 0
+};
 
-export default function App() {
-  // Data version guard — bump this whenever mock data schema changes to clear stale localStorage
-  const DATA_VERSION = 'v2';
-  if (typeof window !== 'undefined') {
-    const storedVersion = localStorage.getItem('launchtest_data_version');
-    if (storedVersion !== DATA_VERSION) {
-      ['launchtest_apps', 'launchtest_bugs', 'launchtest_assignments',
-       'launchtest_withdrawals', 'launchtest_transactions', 'launchtest_active_tester'].forEach(k => localStorage.removeItem(k));
-      localStorage.setItem('launchtest_data_version', DATA_VERSION);
-    }
-  }
+const staleDashboardKeys = [
+  'launchtest_data_version',
+  'launchtest_apps',
+  'launchtest_bugs',
+  'launchtest_assignments',
+  'launchtest_withdrawals',
+  'launchtest_transactions',
+  'launchtest_active_tester'
+];
 
+function formatError(error: unknown) {
+  if (error instanceof ApiRequestError) return error.message;
+  if (error instanceof Error) return error.message;
+  return 'Something went wrong while contacting the backend.';
+}
+
+function fingerprintForDevice(testerId: string, model: string, index: number) {
+  return `${testerId || 'tester'}-${model.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'device'}-${index}`;
+}
+
+function profilePayloadFromTester(tester: Tester, updated: Partial<Tester>): UpsertTesterProfileInput {
+  const nextDevices = updated.devices ?? tester.devices;
+  const devices = (nextDevices.length > 0 ? nextDevices : ['Android Device']).map((model, index) => ({
+    model,
+    androidVersion: 'Android 14',
+    fingerprint: fingerprintForDevice(tester.id, model, index),
+  }));
+  const rawExperience = `${updated.experience ?? updated.specialty ?? tester.experience ?? tester.specialty}`.toLowerCase();
+  const experienceLevel: UpsertTesterProfileInput['experienceLevel'] = rawExperience.includes('expert')
+    ? 'expert'
+    : rawExperience.includes('intermediate')
+      ? 'intermediate'
+      : 'beginner';
+
+  return {
+    devices,
+    experienceLevel,
+    upi: { vpa: updated.upiId ?? tester.upiId ?? '' },
+  };
+}
+
+type AuthScreenRenderProps = {
+  isDarkMode: boolean;
+  onLoginSuccess: (testerName?: string) => void;
+  onBackToHome: () => void;
+};
+
+type AppProps = {
+  getAuthToken?: () => Promise<string | null>;
+  renderAuthScreen: (props: AuthScreenRenderProps) => ReactNode;
+};
+
+export default function App({ getAuthToken, renderAuthScreen }: AppProps) {
   // Navigation State
   const [currentTab, setCurrentTab] = useState<string>('home');
 
@@ -63,479 +132,232 @@ export default function App() {
     });
   };
 
-  // Core Data States with robust key deduplication
-  const [apps, setApps] = useState<TestApp[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchtest_apps');
-      if (saved) {
-        try {
-          const parsed: TestApp[] = JSON.parse(saved);
-          const seen = new Set<string>();
-          const uniqueApps: TestApp[] = [];
-          parsed.forEach((app) => {
-            let uniqueId = app.id;
-            if (!uniqueId || seen.has(uniqueId)) {
-              uniqueId = `${uniqueId || 'app'}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-            }
-            seen.add(uniqueId);
-            uniqueApps.push({ ...app, id: uniqueId });
-          });
-          return uniqueApps;
-        } catch (e) {
-          return ENHANCED_INITIAL_APPS;
-        }
-      }
-    }
-    return ENHANCED_INITIAL_APPS;
-  });
+  // Backend-backed dashboard state
+  const [apps, setApps] = useState<TestApp[]>([]);
 
-  const [bugs, setBugs] = useState<BugReport[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchtest_bugs');
-      if (saved) {
-        try {
-          const parsed: BugReport[] = JSON.parse(saved);
-          const seen = new Set<string>();
-          const uniqueBugs: BugReport[] = [];
-          parsed.forEach((bug) => {
-            let uniqueId = bug.id;
-            if (!uniqueId || seen.has(uniqueId)) {
-              uniqueId = `${uniqueId || 'bug'}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-            }
-            seen.add(uniqueId);
-            uniqueBugs.push({ ...bug, id: uniqueId });
-          });
-          return uniqueBugs;
-        } catch (e) {
-          return INITIAL_BUGS;
-        }
-      }
-    }
-    return INITIAL_BUGS;
-  });
-
-  const [devices] = useState<AndroidDevice[]>(MOCK_DEVICES);
+  const [bugs, setBugs] = useState<BugReport[]>([]);
 
   // Tester Flow Data States
-  const [activeTester, setActiveTester] = useState<Tester>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchtest_active_tester');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
-      }
-    }
-    return {
-      id: 'tester-123',
-      name: 'Deven Patel',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAd4DobtQhtBLqI2y6OKlewxLeYjt-2dWb4zwElRSw3AkyelrVX03GtqcPvaHfiHqBmJ0Vx1zl7HAPThzZFmtQMgzZtTneML_NYjSYU4vG6RBX4fSntKJVcLe6LynQ6fA_uX-2DwS17Tmhy_HeV9OTXke2fR_wxp0Hd8o2jQ8o_JyxlSk8JWlPZB0xIZZFOIlL_M7TFexHbiDgLji027458If5kijP8M31CdMtcgRKCfBSIWIi36ck6kA',
-      country: 'India',
-      devices: ['Google Pixel 8 Pro'],
-      bugsFoundCount: 0,
-      rating: 5.0,
-      specialty: 'General Testing',
-      status: 'Idle',
-      upiId: '',
-      walletBalance: 0
-    };
-  });
+  const [activeTester, setActiveTester] = useState<Tester>(emptyTester);
 
-  const [assignments, setAssignments] = useState<TesterAssignment[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchtest_assignments');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
-      }
-    }
-    return [];
-  });
-
-  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchtest_withdrawals');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
-      }
-    }
-    return [];
-  });
-
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchtest_transactions');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
-      }
-    }
-    return [];
-  });
+  const [assignments, setAssignments] = useState<TesterAssignment[]>([]);
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [dashboardError, setDashboardError] = useState<string>('');
+  const [isDashboardLoading, setIsDashboardLoading] = useState<boolean>(false);
 
   // Modals Controller State
   const [isWatchWorksOpen, setIsWatchWorksOpen] = useState(false);
 
-  // Save changes to LocalStorage
   useEffect(() => {
-    localStorage.setItem('launchtest_apps', JSON.stringify(apps));
-  }, [apps]);
-
-  useEffect(() => {
-    localStorage.setItem('launchtest_bugs', JSON.stringify(bugs));
-  }, [bugs]);
-
-  useEffect(() => {
-    localStorage.setItem('launchtest_active_tester', JSON.stringify(activeTester));
-  }, [activeTester]);
-
-  useEffect(() => {
-    localStorage.setItem('launchtest_assignments', JSON.stringify(assignments));
-  }, [assignments]);
-
-  useEffect(() => {
-    localStorage.setItem('launchtest_withdrawals', JSON.stringify(withdrawals));
-  }, [withdrawals]);
-
-  useEffect(() => {
-    localStorage.setItem('launchtest_transactions', JSON.stringify(transactions));
-  }, [transactions]);
-
-  // Keep refs to avoid stale closures in the simulation interval
-  const appsRef = useRef(apps);
-  const bugsRef = useRef(bugs);
-
-  useEffect(() => {
-    appsRef.current = apps;
-  }, [apps]);
-
-  useEffect(() => {
-    bugsRef.current = bugs;
-  }, [bugs]);
-
-  // Live Simulation Progress Loop for apps under test
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const currentApps = appsRef.current;
-      let appsUpdated = false;
-      const generatedBugs: BugReport[] = [];
-
-      const newApps = currentApps.map((app) => {
-        if (app.status === 'Testing' && app.progress < 100) {
-          appsUpdated = true;
-          const nextProgress = Math.min(app.progress + 4, 100);
-          const isCompleted = nextProgress === 100;
-
-          // Chance to spawn a simulated bug as testing advances
-          const shouldAddBug = Math.random() < 0.22 && nextProgress < 95;
-          let updatedBugsFound = app.bugsFound;
-
-          if (shouldAddBug) {
-            const deviceModels = [
-              'Google Pixel 8 Pro',
-              'Samsung Galaxy S24 Ultra',
-              'OnePlus 12',
-              'Galaxy Z Fold 5'
-            ];
-            const targetDevice = deviceModels[Math.floor(Math.random() * deviceModels.length)];
-            const bugTitles = [
-              'NullPointerException in state restoration on background pause',
-              'Thread sync issue during multi-page animation transit',
-              'Asset scaling cut off on Foldable Inner flex ratio',
-              'BLE sensor pairing timeout error'
-            ];
-            const randomTitle = bugTitles[Math.floor(Math.random() * bugTitles.length)];
-            
-            const testNames = ['Sarah Jenkins', 'Marcus Vance', 'David Kim', 'Elena Rostova'];
-            const randomTesterName = testNames[Math.floor(Math.random() * testNames.length)];
-            const matchingTester = MOCK_TESTERS.find(t => t.name === randomTesterName) || MOCK_TESTERS[0];
-
-            const newBug: BugReport = {
-              id: `bug-gen-${Date.now()}-${app.id}-${Math.floor(Math.random() * 1000000)}`,
-              appId: app.id,
-              appName: app.name,
-              title: `${randomTitle} on ${targetDevice}`,
-              severity: Math.random() < 0.4 ? 'Critical' : 'High',
-              status: 'Open',
-              testerName: matchingTester.name,
-              testerAvatar: matchingTester.avatar,
-              device: targetDevice,
-              osVersion: 'Android 14 (API 34)',
-              reproductionSteps: [
-                `Launch ${app.name} v${app.version}`,
-                'Perform intensive testing scenarios in settings block',
-                'Trigger connection handshake or screen layout rotate',
-                'Verify system crash logs and logcat output'
-              ],
-              createdAt: 'Just now'
-            };
-
-            generatedBugs.push(newBug);
-            updatedBugsFound += 1;
-          }
-
-          return {
-            ...app,
-            progress: nextProgress,
-            bugsFound: updatedBugsFound,
-            status: (isCompleted ? 'Completed' : 'Testing') as 'Completed' | 'Testing'
-          };
-        }
-        return app;
-      });
-
-      if (appsUpdated) {
-        setApps(newApps);
-        if (generatedBugs.length > 0) {
-          setBugs((prevBugs) => {
-            const existingIds = new Set(prevBugs.map((b) => b.id));
-            const uniqueNewBugs = generatedBugs.filter((b) => !existingIds.has(b.id));
-            return [...uniqueNewBugs, ...prevBugs];
-          });
-        }
-      }
-    }, 4500);
-
-    return () => clearInterval(interval);
+    if (typeof window === 'undefined') return;
+    staleDashboardKeys.forEach((key) => localStorage.removeItem(key));
   }, []);
 
-
-
-  const handleUpdateBugStatus = (bugId: string, status: BugReport['status']) => {
-    setBugs((prev) =>
-      prev.map((bug) => (bug.id === bugId ? { ...bug, status } : bug))
-    );
-  };
-
-  const handleUpdateTesterProfile = (updated: Partial<Tester>) => {
-    setActiveTester(prev => ({
-      ...prev,
-      ...updated
-    }));
-  };
-
-  const handleJoinProject = (projectId: string) => {
-    const exists = assignments.some(a => a.projectId === projectId && a.testerId === activeTester.id);
-    if (exists) return;
-
-    const project = apps.find(p => p.id === projectId);
-    if (!project) return;
-
-    const joinedCount = assignments.filter(a => a.projectId === projectId && a.status === 'active').length;
-    const required = project.testersRequired || 20;
-    const isFull = joinedCount >= required;
-
-    const newAssignment: TesterAssignment = {
-      id: `assign-${Date.now()}`,
-      testerId: activeTester.id,
-      projectId: projectId,
-      appName: project.name,
-      status: isFull ? 'queued' : 'active',
-      queuePosition: isFull ? assignments.filter(a => a.projectId === projectId && a.status === 'queued').length + 1 : undefined,
-      currentStep: 1,
-      step3Clicked: false,
-      step4CheckInsCompleted: 0,
-      inactivityFlag: false,
-      joinedAt: new Date().toISOString().split('T')[0]
-    };
-
-    setAssignments(prev => [...prev, newAssignment]);
-
-    if (!isFull) {
-      setApps(prev => prev.map(p => p.id === projectId ? { ...p, testersCount: p.testersCount + 1 } : p));
+  const getTokenOrThrow = useCallback(async () => {
+    const token = await getAuthToken?.();
+    if (!token) {
+      throw new Error('Sign in with Clerk before loading tester data.');
     }
-  };
+    return token;
+  }, [getAuthToken]);
 
-  const handleSubmitStep1Email = (assignmentId: string, email: string, screenshotUrl?: string) => {
-    setAssignments(prev => prev.map(a => {
-      if (a.id === assignmentId) {
-        return {
-          ...a,
-          currentStep: 2,
-          testerEmail: email,
-          step1Screenshot: screenshotUrl || 'google-profile.png'
-        };
-      }
-      return a;
-    }));
+  const refreshTesterDashboard = useCallback(async () => {
+    setIsDashboardLoading(true);
+    setDashboardError('');
 
-    // Credit ₹50
-    setActiveTester(prev => ({
-      ...prev,
-      walletBalance: prev.walletBalance + 50
-    }));
+    try {
+      const token = await getTokenOrThrow();
+      const [
+        currentUserResponse,
+        testerProfileResponse,
+        opportunitiesResponse,
+        assignmentsResponse,
+        walletResponse,
+        bugReportsResponse,
+      ] = await Promise.all([
+        getCurrentLaunchOpsUser(token),
+        getMyTesterProfile(token),
+        listTesterOpportunities(token),
+        listMyAssignments(token),
+        getMyWallet(token),
+        listMyBugReports(token),
+      ]);
 
-    setTransactions(prev => [
-      {
-        id: `tx-${Date.now()}`,
-        testerId: activeTester.id,
-        amount: 50,
-        type: 'credit',
-        description: `Registered Google Play email address for ${assignments.find(a => a.id === assignmentId)?.appName}`,
-        createdAt: new Date().toLocaleTimeString()
-      },
-      ...prev
-    ]);
-  };
+      const user = currentUserResponse.data.user;
+      const tester = mapTesterProfile(testerProfileResponse.data, user);
+      tester.walletBalance = paiseToRupees(walletResponse.data.balance);
+      tester.bugsFoundCount = bugReportsResponse.data.length;
 
-  const handleClickStep3Link = (assignmentId: string, screenshotUrl?: string) => {
-    setAssignments(prev => prev.map(a => {
-      if (a.id === assignmentId) {
-        // If screenshot provided, advance to step 4
-        if (screenshotUrl) {
-          return {
-            ...a,
-            currentStep: 4,
-            step3Clicked: true,
-            step3Screenshot: screenshotUrl
-          };
+      const projectsById = new Map<string, TestApp>();
+      opportunitiesResponse.data.map(mapProject).forEach((project) => projectsById.set(project.id, project));
+      assignmentsResponse.data.forEach((assignment) => {
+        if (typeof assignment.projectId === 'object') {
+          const project = mapProject(assignment.projectId);
+          projectsById.set(project.id, project);
         }
-        // First click: just mark link as clicked, stay on step 3 so user can upload screenshot
-        return {
-          ...a,
-          step3Clicked: true
-        };
+      });
+
+      const wallet = mapWallet(walletResponse.data, tester.id);
+
+      setActiveTester(tester);
+      setApps([...projectsById.values()]);
+      setAssignments(assignmentsResponse.data.map((assignment) => mapAssignment(assignment, user)));
+      setWithdrawals(wallet.withdrawals);
+      setTransactions(wallet.transactions);
+      setBugs(bugReportsResponse.data.map((report) => mapBugReport(report, tester)));
+    } catch (error) {
+      setDashboardError(formatError(error));
+    } finally {
+      setIsDashboardLoading(false);
+    }
+  }, [getTokenOrThrow]);
+
+  useEffect(() => {
+    if (currentTab === 'tester') {
+      void refreshTesterDashboard();
+    }
+  }, [currentTab, refreshTesterDashboard]);
+
+  const handleUpdateTesterProfile = async (updated: Partial<Tester>) => {
+    try {
+      const payload = profilePayloadFromTester(activeTester, updated);
+      if (!payload.upi.vpa.trim()) {
+        throw new Error('UPI ID is required before saving your tester profile.');
       }
-      return a;
-    }));
-  };
 
-  const handleLogStep4CheckIn = (assignmentId: string) => {
-    const assignment = assignments.find(a => a.id === assignmentId);
-    if (!assignment) return;
-
-    const nextCheckIns = assignment.step4CheckInsCompleted + 1;
-    const isCompleted = nextCheckIns >= 14;
-
-    setAssignments(prev => prev.map(a => {
-      if (a.id === assignmentId) {
-        return {
-          ...a,
-          step4CheckInsCompleted: nextCheckIns,
-          currentStep: isCompleted ? 5 : 4,
-          status: isCompleted ? 'active' : a.status
-        };
-      }
-      return a;
-    }));
-
-    if (isCompleted) {
-      // Completed payout: ₹500
-      setActiveTester(prev => ({
-        ...prev,
-        walletBalance: prev.walletBalance + 500
-      }));
-
-      setTransactions(prev => [
-        {
-          id: `tx-${Date.now()}`,
-          testerId: activeTester.id,
-          amount: 500,
-          type: 'credit',
-          description: `14-Day closed testing track completed for ${assignment.appName}`,
-          createdAt: new Date().toLocaleTimeString()
-        },
-        ...prev
-      ]);
-    } else {
-      // Daily check-in: ₹50
-      setActiveTester(prev => ({
-        ...prev,
-        walletBalance: prev.walletBalance + 50
-      }));
-
-      setTransactions(prev => [
-        {
-          id: `tx-${Date.now()}`,
-          testerId: activeTester.id,
-          amount: 50,
-          type: 'credit',
-          description: `Logged Day ${nextCheckIns} test check-in for ${assignment.appName}`,
-          createdAt: new Date().toLocaleTimeString()
-        },
-        ...prev
-      ]);
+      const token = await getTokenOrThrow();
+      await updateMyTesterProfile(payload, token);
+      await refreshTesterDashboard();
+    } catch (error) {
+      const message = formatError(error);
+      setDashboardError(message);
+      alert(message);
     }
   };
 
-  const handleSubmitBugReport = (bugReport: Omit<BugReport, 'id' | 'createdAt' | 'testerName' | 'testerAvatar' | 'screenshot'> & { screenshot?: string }) => {
-    const newBug: BugReport = {
-      ...bugReport,
-      id: `bug-gen-${Date.now()}`,
-      createdAt: 'Just now',
-      testerName: activeTester.name,
-      testerAvatar: activeTester.avatar,
-      isPublished: false
-    };
-
-    setBugs(prev => [newBug, ...prev]);
-
-    // Increment tester bug count
-    setActiveTester(prev => ({
-      ...prev,
-      bugsFoundCount: prev.bugsFoundCount + 1
-    }));
-
-    // Increment project bug count
-    setApps(prev => prev.map(p => p.id === bugReport.appId ? { ...p, bugsFound: p.bugsFound + 1 } : p));
+  const handleJoinProject = async (projectId: string) => {
+    try {
+      const token = await getTokenOrThrow();
+      await joinTesterProject(projectId, token);
+      await refreshTesterDashboard();
+    } catch (error) {
+      const message = formatError(error);
+      setDashboardError(message);
+      alert(message);
+    }
   };
 
-  const handleRequestWithdrawal = (amount: number, upiId: string) => {
+  const handleSubmitStep1Email = async (assignmentId: string, email: string, screenshotUrl?: string) => {
+    try {
+      const token = await getTokenOrThrow();
+      await submitAssignmentProof(assignmentId, {
+        step: 1,
+        fileUrl: screenshotUrl ?? email,
+      }, token);
+      await refreshTesterDashboard();
+    } catch (error) {
+      const message = formatError(error);
+      setDashboardError(message);
+      alert(message);
+    }
+  };
+
+  const handleClickStep3Link = async (assignmentId: string, screenshotUrl?: string) => {
+    try {
+      const token = await getTokenOrThrow();
+
+      if (!screenshotUrl) {
+        window.open(`${API_BASE_URL}/t/${assignmentId}`, '_blank', 'noopener,noreferrer');
+        setAssignments((prev) =>
+          prev.map((assignment) =>
+            assignment.id === assignmentId ? { ...assignment, step3Clicked: true } : assignment
+          )
+        );
+        return;
+      }
+
+      await submitAssignmentProof(assignmentId, {
+        step: 3,
+        fileUrl: screenshotUrl,
+      }, token);
+      await refreshTesterDashboard();
+    } catch (error) {
+      const message = formatError(error);
+      setDashboardError(message);
+      alert(message);
+    }
+  };
+
+  const handleLogStep4CheckIn = async (assignmentId: string, proofUrl: string) => {
+    try {
+      const token = await getTokenOrThrow();
+      await submitAssignmentProof(assignmentId, {
+        step: 4,
+        fileUrl: proofUrl,
+      }, token);
+      await refreshTesterDashboard();
+    } catch (error) {
+      const message = formatError(error);
+      setDashboardError(message);
+      alert(message);
+    }
+  };
+
+  const handleSubmitBugReport = async (
+    bugReport: Omit<BugReport, 'id' | 'createdAt' | 'testerName' | 'testerAvatar' | 'screenshot'> & { screenshot?: string }
+  ) => {
+    try {
+      const token = await getTokenOrThrow();
+      await submitProjectBugReport(bugReport.appId, {
+        title: bugReport.title,
+        description: bugReport.title,
+        category: 'functional',
+        severity: bugReport.severity.toLowerCase() as 'low' | 'medium' | 'high' | 'critical',
+        device: bugReport.device,
+        appVersion: bugReport.osVersion,
+        expectedResult: 'Expected the app to work without this issue.',
+        actualResult: bugReport.title,
+        stepsToReproduce: bugReport.reproductionSteps,
+        attachments: bugReport.screenshot ? [bugReport.screenshot] : [],
+      }, token);
+      await refreshTesterDashboard();
+    } catch (error) {
+      const message = formatError(error);
+      setDashboardError(message);
+      alert(message);
+    }
+  };
+
+  const handleRequestWithdrawal = async (amount: number, upiId: string) => {
     if (amount > activeTester.walletBalance) {
       return { success: false, error: 'Amount exceeds balance' };
     }
 
-    // Deduct balance
-    setActiveTester(prev => ({
-      ...prev,
-      walletBalance: prev.walletBalance - amount
-    }));
-
-    const expectedDate = new Date();
-    expectedDate.setHours(expectedDate.getHours() + 48);
-    const expectedStr = expectedDate.toLocaleString();
-
-    const newReq: WithdrawalRequest = {
-      id: `withdraw-${Date.now()}`,
-      testerId: activeTester.id,
-      amount,
-      upiId,
-      status: 'pending',
-      createdAt: 'Just now',
-      expectedCompletionAt: expectedStr
-    };
-
-    setWithdrawals(prev => [newReq, ...prev]);
-
-    setTransactions(prev => [
-      {
-        id: `tx-${Date.now()}`,
-        testerId: activeTester.id,
-        amount,
-        type: 'debit',
-        description: 'UPI Cashout Requested',
-        createdAt: new Date().toLocaleTimeString()
-      },
-      ...prev
-    ]);
-
-    return { success: true };
-  };
-
-  const handleSimulateAdminAdvanceStep = (assignmentId: string) => {
-    setAssignments(prev => prev.map(a => {
-      if (a.id === assignmentId) {
-        const nextStep = a.currentStep + 1;
-        const isFinished = nextStep > 6;
-        return {
-          ...a,
-          currentStep: isFinished ? 6 : (nextStep as any),
-          status: isFinished ? 'completed' : a.status
-        };
+    try {
+      const token = await getTokenOrThrow();
+      if (upiId && upiId !== activeTester.upiId) {
+        await updateMyTesterProfile(profilePayloadFromTester(activeTester, { upiId }), token);
       }
-      return a;
-    }));
+      await requestWalletWithdrawal(rupeesToPaise(amount), token);
+      await refreshTesterDashboard();
+      return { success: true };
+    } catch (error) {
+      const message = formatError(error);
+      setDashboardError(message);
+      return { success: false, error: message };
+    }
   };
 
-  const handleSimulateFastForwardDay = (assignmentId: string) => {
-    handleLogStep4CheckIn(assignmentId);
-  };
+  const handleLoginSuccess = useCallback((testerName?: string) => {
+    if (testerName) {
+      setActiveTester(prev => ({ ...prev, name: testerName }));
+    }
+    setCurrentTab('tester');
+    void refreshTesterDashboard();
+  }, [refreshTesterDashboard]);
+
+  const isTesterExperience = currentTab === 'tester' || Boolean(activeTester.id);
 
   return (
     <div className={`min-h-screen font-sans antialiased overflow-x-hidden selection:bg-indigo-600/10 selection:text-indigo-900 transition-colors duration-300 ${
@@ -546,6 +368,8 @@ export default function App() {
         currentTab={currentTab} 
         onTabChange={setCurrentTab} 
         onStartTesting={() => setCurrentTab('auth')} 
+        showStartTestingAction={!isTesterExperience}
+        isTesterExperience={isTesterExperience}
         isDarkMode={isDarkMode}
         onToggleDarkMode={toggleDarkMode}
       />
@@ -566,11 +390,12 @@ export default function App() {
                 onWatchVideo={() => setIsWatchWorksOpen(true)} 
                 onTabChange={setCurrentTab}
                 isDarkMode={isDarkMode}
+                showStartTestingAction={!isTesterExperience}
               />
               <HowItWorks isDarkMode={isDarkMode} />
               <BuiltForEveryone isDarkMode={isDarkMode} />
               <Testimonials isDarkMode={isDarkMode} />
-              <CallToAction onStartTesting={() => setCurrentTab('auth')} isDarkMode={isDarkMode} />
+              {!isTesterExperience && <CallToAction onStartTesting={() => setCurrentTab('auth')} isDarkMode={isDarkMode} />}
             </motion.div>
           )}
 
@@ -582,16 +407,11 @@ export default function App() {
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             >
-              <AuthScreen 
-                isDarkMode={isDarkMode}
-                onLoginSuccess={(testerName) => {
-                  if (testerName) {
-                    setActiveTester(prev => ({ ...prev, name: testerName }));
-                  }
-                  setCurrentTab('tester');
-                }}
-                onBackToHome={() => setCurrentTab('home')}
-              />
+              {renderAuthScreen({
+                isDarkMode,
+                onLoginSuccess: handleLoginSuccess,
+                onBackToHome: () => setCurrentTab('home'),
+              })}
             </motion.div>
           )}
 
@@ -603,24 +423,41 @@ export default function App() {
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             >
-              <TesterDashboard
-                isDarkMode={isDarkMode}
-                activeTester={activeTester}
-                projects={apps}
-                assignments={assignments}
-                bugs={bugs}
-                transactions={transactions}
-                withdrawals={withdrawals}
-                onUpdateTesterProfile={handleUpdateTesterProfile}
-                onJoinProject={handleJoinProject}
-                onSubmitStep1Email={handleSubmitStep1Email}
-                onClickStep3Link={handleClickStep3Link}
-                onLogStep4CheckIn={handleLogStep4CheckIn}
-                onSubmitBugReport={handleSubmitBugReport}
-                onRequestWithdrawal={handleRequestWithdrawal}
-                onSimulateAdminAdvanceStep={handleSimulateAdminAdvanceStep}
-                onSimulateFastForwardDay={handleSimulateFastForwardDay}
-              />
+              {isDashboardLoading && !activeTester.id ? (
+                <div className="min-h-screen pt-28 flex items-center justify-center">
+                  <div className={`border rounded-2xl px-6 py-5 text-sm font-bold ${
+                    isDarkMode ? 'bg-[#18181B] border-zinc-800 text-slate-200' : 'bg-white border-slate-200 text-slate-700'
+                  }`}>
+                    Loading tester dashboard...
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {dashboardError && (
+                    <div className="pt-24 px-6">
+                      <div className="max-w-5xl mx-auto rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-500">
+                        {dashboardError}
+                      </div>
+                    </div>
+                  )}
+                  <TesterDashboard
+                    isDarkMode={isDarkMode}
+                    activeTester={activeTester}
+                    projects={apps}
+                    assignments={assignments}
+                    bugs={bugs}
+                    transactions={transactions}
+                    withdrawals={withdrawals}
+                    onUpdateTesterProfile={handleUpdateTesterProfile}
+                    onJoinProject={handleJoinProject}
+                    onSubmitStep1Email={handleSubmitStep1Email}
+                    onClickStep3Link={handleClickStep3Link}
+                    onLogStep4CheckIn={handleLogStep4CheckIn}
+                    onSubmitBugReport={handleSubmitBugReport}
+                    onRequestWithdrawal={handleRequestWithdrawal}
+                  />
+                </>
+              )}
             </motion.div>
           )}
 

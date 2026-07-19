@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { ClerkProvider, useAuth } from "@clerk/nextjs";
 import App from "../src/App";
+import ClerkAuthScreen from "../src/integration/ClerkAuthScreen";
+import AuthConfigurationScreen from "../src/integration/AuthConfigurationScreen";
+
+const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 export default function ClientWrapper() {
   const [mounted, setMounted] = useState(false);
@@ -18,5 +23,32 @@ export default function ClientWrapper() {
     );
   }
 
-  return <App />;
+  if (!clerkPublishableKey) {
+    return (
+      <App
+        getAuthToken={async () => null}
+        renderAuthScreen={(props) => (
+          <AuthConfigurationScreen isDarkMode={props.isDarkMode} onBackToHome={props.onBackToHome} />
+        )}
+      />
+    );
+  }
+
+  return (
+    <ClerkProvider publishableKey={clerkPublishableKey}>
+      <LaunchOpsApp />
+    </ClerkProvider>
+  );
+}
+
+function LaunchOpsApp() {
+  const { getToken } = useAuth();
+  const getAuthToken = useCallback(() => getToken(), [getToken]);
+
+  return (
+    <App
+      getAuthToken={getAuthToken}
+      renderAuthScreen={(props) => <ClerkAuthScreen {...props} />}
+    />
+  );
 }

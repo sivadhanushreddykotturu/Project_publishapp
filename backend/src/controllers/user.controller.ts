@@ -1,9 +1,11 @@
 import { Request, Response } from "express";
-import { getAuth } from "@clerk/express";
+import { clerkClient, getAuth } from "@clerk/express";
 import { z } from "zod";
+import { logger } from "../config/logger";
 import { User } from "../models/User";
 import { Client } from "../models/Client";
 import { Tester } from "../models/Tester";
+import { Role } from "../models/enums";
 import { ApiError } from "../utils/apiError";
 import { asyncHandler } from "../utils/asyncHandler";
 
@@ -13,6 +15,19 @@ const syncSchema = z.object({
   email: z.string().email(),
   phone: z.string().optional(),
 });
+
+async function syncClerkRoleMetadata(clerkUserId: string, role: Role) {
+  try {
+    await clerkClient.users.updateUserMetadata(clerkUserId, {
+      publicMetadata: {
+        role,
+        launchOpsRole: role,
+      },
+    });
+  } catch (err) {
+    logger.warn({ err, clerkUserId, role }, "Unable to mirror LaunchOps role into Clerk metadata");
+  }
+}
 
 /**
  * Called by the frontend right after Clerk sign-in/sign-up. Admin is invite-only
@@ -34,6 +49,8 @@ export const syncUser = asyncHandler(async (req: Request, res: Response) => {
       await Tester.create({ userId: user._id });
     }
   }
+
+  await syncClerkRoleMetadata(userId, user.role);
 
   res.status(200).json({ data: user });
 });

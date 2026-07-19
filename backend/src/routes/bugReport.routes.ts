@@ -1,5 +1,11 @@
 import { Router } from "express";
-import { submitBugReport, listBugReports, mergeBugReports, publishBugReports } from "../controllers/bugReport.controller";
+import {
+  submitBugReport,
+  listBugReports,
+  listMyBugReports,
+  mergeBugReports,
+  publishBugReports,
+} from "../controllers/bugReport.controller";
 import { requireAuth, requireRole } from "../middleware/auth";
 
 const router = Router();
@@ -57,6 +63,7 @@ const router = Router();
  */
 router.post("/projects/:projectId/bug-reports", requireAuth(), requireRole("tester"), submitBugReport);
 router.get("/projects/:projectId/bug-reports", requireAuth(), requireRole("client", "admin"), listBugReports);
+router.get("/bug-reports/me", requireAuth(), requireRole("tester"), listMyBugReports);
 
 /**
  * @openapi

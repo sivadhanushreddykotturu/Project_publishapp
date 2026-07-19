@@ -5,6 +5,8 @@ interface NavbarProps {
   currentTab: string;
   onTabChange: (tab: string) => void;
   onStartTesting: () => void;
+  showStartTestingAction?: boolean;
+  isTesterExperience?: boolean;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
 }
@@ -13,18 +15,23 @@ export default function Navbar({
   currentTab, 
   onTabChange, 
   onStartTesting,
+  showStartTestingAction = true,
+  isTesterExperience = false,
   isDarkMode,
   onToggleDarkMode
 }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const navItems = [
+  const clientNavItems = [
     { label: 'Tester Hub', hasDropdown: false },
     { label: 'Solutions', hasDropdown: true },
     { label: 'Resources', hasDropdown: true },
     { label: 'Pricing', hasDropdown: false },
     { label: 'Company', hasDropdown: true }
   ];
+  const navItems = isTesterExperience
+    ? clientNavItems.filter((item) => item.label === 'Tester Hub')
+    : clientNavItems;
 
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b font-sans shadow-xs transition-colors duration-300 ${
@@ -97,14 +104,16 @@ export default function Navbar({
           </button>
 
 
-          <button 
-            onClick={onStartTesting}
-            className="bg-indigo-600 hover:bg-indigo-500 px-6 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 transition hover:shadow-lg hover:shadow-indigo-500/20 cursor-pointer text-white border-0"
-            id="nav-start-testing-btn"
-          >
-            Start Testing 
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          {showStartTestingAction && (
+            <button
+              onClick={onStartTesting}
+              className="bg-indigo-600 hover:bg-indigo-500 px-6 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 transition hover:shadow-lg hover:shadow-indigo-500/20 cursor-pointer text-white border-0"
+              id="nav-start-testing-btn"
+            >
+              Start Testing
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Mobile menu button */}
@@ -167,18 +176,20 @@ export default function Navbar({
             })}
           </div>
 
-          <div className="pt-4 border-t border-slate-200 flex flex-col gap-3">
-            <button
-              onClick={() => {
-                onStartTesting();
-                setIsOpen(false);
-              }}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 text-white shadow-md shadow-indigo-500/10"
-            >
-              Start Testing
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          {showStartTestingAction && (
+            <div className="pt-4 border-t border-slate-200 flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  onStartTesting();
+                  setIsOpen(false);
+                }}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 text-white shadow-md shadow-indigo-500/10"
+              >
+                Start Testing
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </header>

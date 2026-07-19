@@ -106,6 +106,20 @@ export const listProjects = asyncHandler(async (req: Request, res: Response) => 
   res.status(200).json({ data: items, meta: buildPageMeta(page, limit, total) });
 });
 
+export const listTesterOpportunities = asyncHandler(async (req: Request, res: Response) => {
+  const { page, limit, skip } = getPagination(req);
+  const filter = {
+    status: { $in: ["active", "full"] },
+    joinState: { $in: ["open", "full"] },
+  };
+
+  const [items, total] = await Promise.all([
+    Project.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    Project.countDocuments(filter),
+  ]);
+  res.status(200).json({ data: items, meta: buildPageMeta(page, limit, total) });
+});
+
 async function assertProjectVisible(req: Request, project: InstanceType<typeof Project>) {
   if (req.dbUser!.role === "admin") return;
   if (req.dbUser!.role === "client") {

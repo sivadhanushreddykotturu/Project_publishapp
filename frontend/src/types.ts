@@ -73,8 +73,9 @@ export interface TesterAssignment {
   step1Screenshot?: string; // Step 1: Verification Profile screenshot
   step3Clicked: boolean; // Step 3: Play Store Invite click
   step3Screenshot?: string; // Step 3: Download/Installation screenshot proof
-  step4CheckInsCompleted: number; // Step 4: 0 to 14 days
+  step4CheckInsCompleted: number; // Derived count of submitted Step 4 proofs
   step4LastCheckIn?: string; // Date string
+  step4Proof?: string; // Step 4: Testing-period completion proof
   inactivityFlag: boolean;
   joinedAt: string;
 }

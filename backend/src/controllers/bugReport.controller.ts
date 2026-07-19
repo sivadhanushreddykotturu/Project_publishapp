@@ -73,6 +73,18 @@ export const listBugReports = asyncHandler(async (req: Request, res: Response) =
   res.status(200).json({ data: items, meta: buildPageMeta(page, limit, total) });
 });
 
+export const listMyBugReports = asyncHandler(async (req: Request, res: Response) => {
+  const tester = await Tester.findOne({ userId: req.dbUser!._id });
+  if (!tester) throw ApiError.notFound("Tester profile not found");
+
+  const { page, limit, skip } = getPagination(req);
+  const [items, total] = await Promise.all([
+    BugReport.find({ testerId: tester._id }).populate("projectId").sort({ createdAt: -1 }).skip(skip).limit(limit),
+    BugReport.countDocuments({ testerId: tester._id }),
+  ]);
+  res.status(200).json({ data: items, meta: buildPageMeta(page, limit, total) });
+});
+
 const mergeSchema = z.object({
   canonicalId: z.string().min(1),
   duplicateIds: z.array(z.string().min(1)).min(1),

@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   createProject,
   listProjects,
+  listTesterOpportunities,
   getProjectById,
   joinProjectAsTester,
   getProjectQueue,
@@ -82,6 +83,7 @@ const router = Router();
  */
 router.post("/", requireAuth(), requireRole("client"), createProject);
 router.get("/", requireAuth(), requireRole("client", "admin"), listProjects);
+router.get("/opportunities", requireAuth(), requireRole("tester"), listTesterOpportunities);
 
 /**
  * @openapi

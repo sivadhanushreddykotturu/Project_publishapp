@@ -12,9 +12,16 @@ interface HeroSectionProps {
   onWatchVideo: () => void;
   onTabChange: (tab: string) => void;
   isDarkMode: boolean;
+  showStartTestingAction?: boolean;
 }
 
-export default function HeroSection({ onStartTesting, onWatchVideo, onTabChange, isDarkMode }: HeroSectionProps) {
+export default function HeroSection({
+  onStartTesting,
+  onWatchVideo,
+  onTabChange,
+  isDarkMode,
+  showStartTestingAction = true,
+}: HeroSectionProps) {
   const avatars = [
     'https://lh3.googleusercontent.com/aida-public/AB6AXuAd4DobtQhtBLqI2y6OKlewxLeYjt-2dWb4zwElRSw3AkyelrVX03GtqcPvaHfiHqBmJ0Vx1zl7HAPThzZFmtQMgzZtTneML_NYjSYU4vG6RBX4fSntKJVcLe6LynQ6fA_uX-2DwS17Tmhy_HeV9OTXke2fR_wxp0Hd8o2jQ8o_JyxlSk8JWlPZB0xIZZFOIlL_M7TFexHbiDgLji027458If5kijP8M31CdMtcgRKCfBSIWIi36ck6kA',
     'https://lh3.googleusercontent.com/aida-public/AB6AXuCeMnJ14jr0V7SzwZ3U_jeyckwZi76p7GcAEq3ZycZ-ceuZRsxMwM907WEBtixD_b2Ouq4NkJZhu5rHOc96167FPyHwUD9EXlTjbcYiPA1S9XV-6kl3A54M3kzVuOc0O-YnD876Jn5fZiRXN1lH0aXpzBhaJ93hGE_LJJoM4JUXlsDAiDrRtfGCIS24veeL4w0ehNMEwgkh2eO1QEhrR0MlzzJ7eF-cPzcAr-UPZ1LIh-U91qjaidXjKg',
@@ -127,14 +134,16 @@ export default function HeroSection({ onStartTesting, onWatchVideo, onTabChange,
 
             {/* Calls to Action */}
             <div className="flex flex-wrap items-center gap-6 mb-12">
-              <button 
-                onClick={onStartTesting}
-                className="bg-indigo-600 hover:bg-indigo-500 px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg shadow-indigo-600/20 transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer text-white border-0 text-sm md:text-base"
-                id="hero-primary-cta"
-              >
-                Start Your First Test 
-                <ArrowRight className="w-5 h-5" />
-              </button>
+              {showStartTestingAction && (
+                <button
+                  onClick={onStartTesting}
+                  className="bg-indigo-600 hover:bg-indigo-500 px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg shadow-indigo-600/20 transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer text-white border-0 text-sm md:text-base"
+                  id="hero-primary-cta"
+                >
+                  Start Your First Test
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              )}
 
               <button 
                 onClick={onWatchVideo}
