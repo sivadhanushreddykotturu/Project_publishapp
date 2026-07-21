@@ -3,12 +3,13 @@ import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, Sparkles } from 'lucide-react
 
 interface AuthScreenProps {
   isDarkMode: boolean;
-  onLoginSuccess: (testerName?: string) => void;
+  onLoginSuccess: (name: string, role: 'tester' | 'client' | 'admin') => void;
   onBackToHome: () => void;
 }
 
 export default function AuthScreen({ isDarkMode, onLoginSuccess, onBackToHome }: AuthScreenProps) {
   const [isSignUp, setIsSignUp] = useState(false);
+  const [role, setRole] = useState<'tester' | 'client' | 'admin'>('tester');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,8 +38,14 @@ export default function AuthScreen({ isDarkMode, onLoginSuccess, onBackToHome }:
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
-      // Simulate successful auth
-      onLoginSuccess(isSignUp ? name : email.split('@')[0]);
+      // Automatic role overrides based on email
+      let finalRole = role;
+      if (email.toLowerCase() === 'admin@launchops.com') {
+        finalRole = 'admin';
+      } else if (email.toLowerCase() === 'client@launchops.com') {
+        finalRole = 'client';
+      }
+      onLoginSuccess(isSignUp ? name : email.split('@')[0], finalRole);
     }
   };
 
@@ -68,7 +75,7 @@ export default function AuthScreen({ isDarkMode, onLoginSuccess, onBackToHome }:
             <span className="font-extrabold italic text-lg">LT</span>
           </div>
           <h2 className={`text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-950'}`}>
-            {isSignUp ? 'Create your account' : 'Sign in to LaunchTest'}
+            {isSignUp ? 'Create your account' : 'Sign in to LaunchOps'}
           </h2>
           <p className={`mt-2 text-sm font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
             {isSignUp ? 'Start earning as an Android Tester today' : 'Access your dashboard & pending tasks'}
@@ -82,31 +89,56 @@ export default function AuthScreen({ isDarkMode, onLoginSuccess, onBackToHome }:
             ? 'bg-[#0C0C0F]/90 border-white/5 shadow-indigo-500/5' 
             : 'bg-white border-slate-100 shadow-slate-200/50'
         }`}>
-          {/* Tabs */}
-          <div className={`flex p-1 rounded-xl mb-8 ${isDarkMode ? 'bg-white/5' : 'bg-slate-100'}`}>
-            <button
-              type="button"
-              onClick={() => { setIsSignUp(false); setErrors({}); }}
-              className={`flex-1 py-2 text-center text-xs font-bold rounded-lg cursor-pointer transition-all ${
-                !isSignUp
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
-                  : isDarkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-950'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => { setIsSignUp(true); setErrors({}); }}
-              className={`flex-1 py-2 text-center text-xs font-bold rounded-lg cursor-pointer transition-all ${
-                isSignUp
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
-                  : isDarkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-950'
-              }`}
-            >
-              Create Account
-            </button>
+          {/* Role Selector */}
+          <div className="mb-6">
+            <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              Select Console Role
+            </label>
+            <div className={`grid grid-cols-3 gap-2 p-1 rounded-xl ${isDarkMode ? 'bg-white/5' : 'bg-slate-100'}`}>
+              {(['tester', 'client', 'admin'] as const).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => {
+                    setRole(r);
+                    if (r === 'client' || r === 'admin') setIsSignUp(false); // Force login for client/admin
+                  }}
+                  className={`py-1.5 text-center text-[10px] font-extrabold uppercase rounded-lg cursor-pointer transition-all ${
+                    role === r
+                      ? 'bg-[#4F46E5] text-white shadow-sm'
+                      : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-white/5' : 'text-slate-600 hover:text-slate-950 hover:bg-black/5'
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-500 mt-2">
+              Tip: Login with <span className="font-mono text-indigo-500">client@launchops.com</span> or <span className="font-mono text-indigo-500">admin@launchops.com</span> to mock route.
+            </p>
           </div>
+
+          {/* Toggle Sign Up / Login (only if Tester) */}
+          {role === 'tester' && (
+            <div className="flex justify-center mb-6">
+              <div className={`inline-flex p-1 rounded-xl border ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-slate-100 border-slate-200'}`}>
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(false)}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${!isSignUp ? (isDarkMode ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 shadow-sm') : 'text-slate-500'}`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(true)}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${isSignUp ? (isDarkMode ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 shadow-sm') : 'text-slate-500'}`}
+                >
+                  Register
+                </button>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {isSignUp && (
@@ -125,8 +157,8 @@ export default function AuthScreen({ isDarkMode, onLoginSuccess, onBackToHome }:
                     placeholder="Enter your name"
                     className={`block w-full pl-10 pr-3 py-3 text-sm rounded-xl border transition-all focus:outline-hidden focus:ring-2 focus:ring-indigo-500/25 ${
                       isDarkMode 
-                        ? 'bg-white/5 border-white/10 text-white placeholder-slate-500 focus:border-indigo-500' 
-                        : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-indigo-500'
+                        ? `${errors.name ? 'border-red-500 bg-red-500/5' : 'border-white/10'} text-white placeholder-slate-500 focus:border-indigo-500` 
+                        : `${errors.name ? 'border-red-500 bg-red-500/5' : 'border-slate-200'} text-slate-900 placeholder-slate-400 focus:border-indigo-500`
                     }`}
                   />
                 </div>
@@ -149,8 +181,8 @@ export default function AuthScreen({ isDarkMode, onLoginSuccess, onBackToHome }:
                   placeholder="name@example.com"
                   className={`block w-full pl-10 pr-3 py-3 text-sm rounded-xl border transition-all focus:outline-hidden focus:ring-2 focus:ring-indigo-500/25 ${
                     isDarkMode 
-                      ? 'bg-white/5 border-white/10 text-white placeholder-slate-500 focus:border-indigo-500' 
-                      : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-indigo-500'
+                      ? `${errors.email ? 'border-red-500 bg-red-500/5' : 'border-white/10'} text-white placeholder-slate-500 focus:border-indigo-500` 
+                      : `${errors.email ? 'border-red-500 bg-red-500/5' : 'border-slate-200'} text-slate-900 placeholder-slate-400 focus:border-indigo-500`
                   }`}
                 />
               </div>
@@ -172,8 +204,8 @@ export default function AuthScreen({ isDarkMode, onLoginSuccess, onBackToHome }:
                   placeholder="Min 6 characters"
                   className={`block w-full pl-10 pr-10 py-3 text-sm rounded-xl border transition-all focus:outline-hidden focus:ring-2 focus:ring-indigo-500/25 ${
                     isDarkMode 
-                      ? 'bg-white/5 border-white/10 text-white placeholder-slate-500 focus:border-indigo-500' 
-                      : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-indigo-500'
+                      ? `${errors.password ? 'border-red-500 bg-red-500/5' : 'border-white/10'} text-white placeholder-slate-500 focus:border-indigo-500` 
+                      : `${errors.password ? 'border-red-500 bg-red-500/5' : 'border-slate-200'} text-slate-900 placeholder-slate-400 focus:border-indigo-500`
                   }`}
                 />
                 <button
@@ -189,15 +221,13 @@ export default function AuthScreen({ isDarkMode, onLoginSuccess, onBackToHome }:
 
             <button
               type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition hover:shadow-lg hover:shadow-indigo-500/20 cursor-pointer border-0 mt-8"
+              className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-xl text-sm font-extrabold text-white transition-all transform hover:scale-[1.01] ${
+                isDarkMode 
+                  ? 'bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-500/25' 
+                  : 'bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20'
+              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
             >
-              {isSignUp ? (
-                <>
-                  Create Account 🚀
-                </>
-              ) : (
-                'Sign In'
-              )}
+              {isSignUp ? 'Create tester account 🚀' : 'Sign In'}
             </button>
           </form>
 
@@ -218,7 +248,7 @@ export default function AuthScreen({ isDarkMode, onLoginSuccess, onBackToHome }:
             type="button"
             onClick={() => {
               // Simulate successful login with Google
-              onLoginSuccess(isSignUp ? 'Google Tester' : 'google_user');
+              onLoginSuccess(isSignUp ? 'Google Tester' : 'google_user', role);
             }}
             className={`w-full py-3.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-3 transition border cursor-pointer ${
               isDarkMode 

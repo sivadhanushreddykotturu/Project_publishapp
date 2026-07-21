@@ -5,7 +5,7 @@ import { Star, ChevronLeft, ChevronRight } from 'lucide-react';
 const testimonials = [
   {
     id: 1,
-    quote: "LaunchTest helped us find critical issues we missed internally. Our crash rate dropped by 42% after launch.",
+    quote: "LaunchOps helped us find critical issues we missed internally. Our crash rate dropped by 42% after launch.",
     author: "Rohit Sharma",
     role: "CTO, FitTrack",
     avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&fit=crop&q=80"
@@ -58,9 +58,9 @@ export default function Testimonials({ isDarkMode = false }: TestimonialsProps) 
   };
 
   return (
-    <section className={`py-24 relative overflow-hidden transition-colors duration-300 ${
-      isDarkMode ? 'bg-[#0a0a0c] border-t border-white/5' : 'bg-slate-50 border-t border-slate-200'
-    }`} id="testimonials-block">
+    <section className={`py-24 relative overflow-hidden transition-colors duration-500 ${
+      isDarkMode ? 'bg-[#050505]' : 'bg-slate-50'
+    }`} id="testimonials-section">
       <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 blur-3xl rounded-full pointer-events-none z-0 ${
         isDarkMode ? 'bg-indigo-500/5' : 'bg-indigo-50/50'
       }`} />
@@ -75,7 +75,7 @@ export default function Testimonials({ isDarkMode = false }: TestimonialsProps) 
           <h2 className={`text-3xl md:text-4xl font-black tracking-tight ${
             isDarkMode ? 'text-white' : 'text-slate-900'
           }`}>
-            Trust LaunchTest to ship perfection
+            Trust LaunchOps to ship perfection
           </h2>
         </div>
 
@@ -104,7 +104,7 @@ export default function Testimonials({ isDarkMode = false }: TestimonialsProps) 
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.4 }}
-                  className={`border rounded-3xl p-6 lg:p-8 flex flex-col justify-between h-80 transition-all duration-300 relative ${
+                  className={`border rounded-3xl p-6 lg:p-8 flex flex-col justify-between min-h-[320px] h-full transition-all duration-300 relative ${
                     isDarkMode 
                       ? 'bg-[#0f0f13] border-white/5 hover:border-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/5' 
                       : 'bg-white border-slate-200 hover:border-indigo-200 hover:shadow-lg hover:shadow-slate-100'

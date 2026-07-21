@@ -3,7 +3,7 @@ import {
   Wallet, Shield, Smartphone, Plus, Bug, Check, AlertCircle, 
   ArrowRight, Landmark, ExternalLink, Calendar, Hourglass, 
   User, CheckCircle, Clock, ChevronDown, Upload, Sparkles, MapPin, Award,
-  Compass, Bell, Settings, LogOut, MessageSquare, Star, FolderCheck, ListFilter
+  Compass, Bell, Settings, LogOut, MessageSquare, Star, FolderCheck, ListFilter, Home, CheckSquare
 } from 'lucide-react';
 import { Tester, TestApp, TesterAssignment, BugReport, Transaction, WithdrawalRequest } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -26,6 +26,9 @@ interface TesterDashboardProps {
   // Simulation Helpers
   onSimulateAdminAdvanceStep: (assignmentId: string) => void;
   onSimulateFastForwardDay: (assignmentId: string) => void;
+  onLogout: () => void;
+  initialTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
 export default function TesterDashboard({
@@ -44,10 +47,18 @@ export default function TesterDashboard({
   onSubmitBugReport,
   onRequestWithdrawal,
   onSimulateAdminAdvanceStep,
-  onSimulateFastForwardDay
+  onSimulateFastForwardDay,
+  onLogout,
+  initialTab,
+  onTabChange
 }: TesterDashboardProps) {
   // Tabs: 'dashboard' (Active), 'explore' (Projects), 'wallet', 'bugs' (Support/Bugs), 'profile'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'explore' | 'wallet' | 'bugs' | 'profile'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'explore' | 'wallet' | 'bugs' | 'profile'>(() => {
+    if (initialTab && ['dashboard', 'explore', 'wallet', 'bugs', 'profile'].includes(initialTab)) {
+      return initialTab as any;
+    }
+    return 'dashboard';
+  });
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   
@@ -91,6 +102,19 @@ export default function TesterDashboard({
       setProfileDevices(activeTester.devices || []);
     }
   }, [activeTester]);
+
+  useEffect(() => {
+    if (initialTab && ['dashboard', 'explore', 'wallet', 'bugs', 'profile'].includes(initialTab)) {
+      setActiveTab(initialTab as any);
+    }
+  }, [initialTab]);
+
+  const handleTabSelect = (tab: 'dashboard' | 'explore' | 'wallet' | 'bugs' | 'profile') => {
+    setActiveTab(tab);
+    if (onTabChange) {
+      onTabChange(tab);
+    }
+  };
 
   // Derive active testing tasks
   const activeAssignments = assignments.filter(a => a.testerId === activeTester.id && a.status !== 'completed');
@@ -146,15 +170,24 @@ export default function TesterDashboard({
     }
   };
 
+  const [bugErrors, setBugErrors] = useState<{ bugAppId?: string; bugTitle?: string; bugSteps?: string }>({});
+
   const handleBugSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setBugSuccess(false);
+    setBugErrors({});
 
-    if (!bugAppId) return alert('Please select an application.');
-    if (!bugTitle.trim()) return alert('Please provide a bug summary.');
+    const errs: typeof bugErrors = {};
+    if (!bugAppId) errs.bugAppId = 'Please select an application.';
+    if (!bugTitle.trim()) errs.bugTitle = 'Please provide a bug summary.';
     
     const stepsFiltered = bugReproductionSteps.filter(s => s.trim() !== '');
-    if (stepsFiltered.length === 0) return alert('Please provide at least one reproduction step.');
+    if (stepsFiltered.length === 0) errs.bugSteps = 'Please provide at least one reproduction step.';
+
+    if (Object.keys(errs).length > 0) {
+      setBugErrors(errs);
+      return;
+    }
 
     const targetProject = projects.find(p => p.id === bugAppId);
     if (!targetProject) return;
@@ -173,6 +206,7 @@ export default function TesterDashboard({
     setBugSuccess(true);
     setBugTitle('');
     setBugReproductionSteps(['']);
+    setBugErrors({});
     setTimeout(() => setBugSuccess(false), 3000);
   };
 
@@ -239,14 +273,12 @@ export default function TesterDashboard({
     { id: 'dashboard', label: 'Dashboard', icon: <Compass className="w-5 h-5" /> },
     { id: 'explore', label: 'Projects', icon: <FolderCheck className="w-5 h-5" /> },
     { id: 'wallet', label: 'Wallet', icon: <Wallet className="w-5 h-5" /> },
-    { id: 'bugs', label: 'Notifications', icon: <Bell className="w-5 h-5" />, badge: 2 },
-    { id: 'bugs_tab', label: 'Support', icon: <MessageSquare className="w-5 h-5" /> },
-    { id: 'profile', label: 'Profile', icon: <User className="w-5 h-5" /> },
-    { id: 'profile_settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
+    { id: 'bugs', label: 'Support', icon: <MessageSquare className="w-5 h-5" /> },
+    { id: 'profile', label: 'Profile Settings', icon: <User className="w-5 h-5" /> },
   ];
 
   return (
-    <div className={`min-h-screen font-sans transition-colors duration-300 flex ${
+    <div className={`h-screen overflow-hidden font-sans transition-colors duration-300 flex ${
       isDarkMode ? 'bg-[#09090B] text-slate-100' : 'bg-slate-50 text-slate-900'
     }`}>
       {/* 1. Left Sidebar Navigation */}
@@ -257,7 +289,7 @@ export default function TesterDashboard({
           {/* Logo */}
           <div className="flex items-center gap-2 px-2">
             <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center transform rotate-12">
-              <span className="text-white font-extrabold italic text-sm">LT</span>
+              <span className="text-white font-extrabold italic text-sm">LO</span>
             </div>
             <span className="font-black tracking-wider text-lg uppercase">
               Launch<span className="text-indigo-600">Ops</span>
@@ -267,15 +299,13 @@ export default function TesterDashboard({
           {/* Navigation Links */}
           <nav className="space-y-1.5">
             {sidebarLinks.map((link) => {
-              // Map settings / notifications into active tabs
-              const targetTab = link.id === 'bugs_tab' ? 'bugs' : link.id === 'profile_settings' ? 'profile' : link.id === 'explore' ? 'explore' : link.id === 'wallet' ? 'wallet' : link.id === 'profile' ? 'profile' : 'dashboard';
-              const isActive = activeTab === targetTab && (link.id !== 'bugs_tab' && link.id !== 'profile_settings');
+              const isActive = activeTab === link.id;
               
               return (
                 <button
                   key={link.id}
                   onClick={() => {
-                    setActiveTab(targetTab);
+                    setActiveTab(link.id as any);
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all border border-transparent cursor-pointer bg-transparent text-left ${
                     isActive
@@ -291,11 +321,6 @@ export default function TesterDashboard({
                     {link.icon}
                     <span>{link.label}</span>
                   </div>
-                  {link.badge && (
-                    <span className="bg-indigo-600 text-white text-[10px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center">
-                      {link.badge}
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -306,8 +331,8 @@ export default function TesterDashboard({
         <div className={`rounded-2xl p-4 text-center border relative overflow-hidden ${
           isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-indigo-50/30 border-indigo-100/50'
         }`}>
-          <span className="text-xs font-bold uppercase tracking-wider text-indigo-550 block mb-1">Available for Testing</span>
-          <p className={`text-[10px] leading-relaxed mb-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-550'}`}>
+          <span className="text-xs font-bold uppercase tracking-wider text-indigo-500 block mb-1">Available for Testing</span>
+          <p className={`text-[10px] leading-relaxed mb-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
             You will receive new opportunities here.
           </p>
           <button 
@@ -315,7 +340,7 @@ export default function TesterDashboard({
             className={`w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider border transition-all cursor-pointer bg-transparent ${
               isDarkMode
                 ? 'border-zinc-700 hover:border-zinc-600 text-white hover:bg-zinc-800/30'
-                : 'border-indigo-200 hover:border-indigo-305 text-indigo-600 hover:bg-indigo-50/50'
+                : 'border-indigo-200 hover:border-indigo-300 text-indigo-600 hover:bg-indigo-50/50'
             }`}
           >
             Refresh Opportunities
@@ -324,7 +349,7 @@ export default function TesterDashboard({
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
         
         {/* 2. Top Header Bar */}
         <header className={`border-b px-6 py-4 flex items-center justify-between sticky top-0 z-40 backdrop-blur-xs ${
@@ -384,7 +409,7 @@ export default function TesterDashboard({
                 </button>
                 <div className="border-t my-1 opacity-10" />
                 <button
-                  onClick={() => window.location.reload()}
+                  onClick={onLogout}
                   className="w-full text-left px-3 py-2 rounded-lg text-xs font-bold text-red-500 hover:bg-red-500/10 cursor-pointer border-0 bg-transparent"
                 >
                   Logout
@@ -395,7 +420,7 @@ export default function TesterDashboard({
         </header>
 
         {/* Outer Dashboard Scroll Container */}
-        <main className="p-6 flex-grow overflow-y-auto space-y-8">
+        <div className="p-4 md:p-6 pb-24 md:pb-6 flex-grow overflow-y-auto space-y-8">
           
           {/* Tab Content Router */}
 
@@ -413,17 +438,18 @@ export default function TesterDashboard({
                 }`}>
                   <div className="flex items-center gap-4">
                     <div className="w-11 h-11 bg-indigo-500/10 rounded-xl flex items-center justify-center shrink-0">
-                      <Wallet className="w-6 h-6 text-indigo-550 animate-float" />
+                      <Wallet className="w-6 h-6 text-indigo-500 animate-float" />
                     </div>
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Wallet Balance</span>
                       <h3 className={`text-2xl font-black mt-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>₹{activeTester.walletBalance.toFixed(2)}</h3>
-                      <span className="text-[10px] text-slate-550 mt-1 block">Withdrawable Balance: ₹{activeTester.walletBalance.toFixed(2)}</span>
+                      <span className="text-[10px] text-slate-500 mt-1 block">Withdrawable Balance: ₹{activeTester.walletBalance.toFixed(2)}</span>
                     </div>
                   </div>
                   <button 
-                    onClick={() => { setActiveTab('wallet'); }}
-                    className="px-4 py-2 bg-indigo-650 hover:bg-indigo-550 text-white rounded-xl text-xs font-bold transition-all border-0 shadow-md shadow-indigo-650/10 cursor-pointer"
+                    onClick={() => { handleTabSelect('wallet'); }}
+                    className="px-4 py-2 text-white rounded-xl text-xs font-bold transition-all border-0 shadow-md cursor-pointer hover:opacity-90"
+                    style={{ backgroundColor: '#4F46E5' }}
                   >
                     Withdraw
                   </button>
@@ -440,8 +466,10 @@ export default function TesterDashboard({
                   </div>
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Next Payout</span>
-                    <h3 className={`text-lg font-black mt-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>15 May 2024</h3>
-                    <span className="text-[10px] text-slate-550 mt-1 block">Expected date of next payout</span>
+                    <h3 className={`text-lg font-black mt-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                      {new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </h3>
+                    <span className="text-[10px] text-slate-500 mt-1 block">Expected date of next payout</span>
                   </div>
                 </div>
 
@@ -457,7 +485,7 @@ export default function TesterDashboard({
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tester Status</span>
                     <h3 className={`text-lg font-black mt-1 text-blue-500 ${isDarkMode ? 'text-white' : ''}`}>Active</h3>
-                    <span className="text-[10px] text-slate-550 mt-1 block">You are available for new projects</span>
+                    <span className="text-[10px] text-slate-500 mt-1 block">You are available for new projects</span>
                   </div>
                 </div>
               </div>
@@ -492,7 +520,7 @@ export default function TesterDashboard({
                       <span className={`text-2xl font-black block mt-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                         {activeAssignments.filter(a => a.status === 'active').length}
                       </span>
-                      <span className="text-[9px] font-semibold text-indigo-550 mt-2 block">Currently in progress</span>
+                      <span className="text-[9px] font-semibold text-indigo-500 mt-2 block">Currently in progress</span>
                     </div>
                     <div className="p-2 rounded-lg bg-indigo-500/5 text-indigo-555"><Calendar className="w-4 h-4" /></div>
                   </div>
@@ -566,10 +594,10 @@ export default function TesterDashboard({
                     isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200 shadow-xs'
                   }`}>
                     <div className="flex items-center justify-between border-b pb-4 mb-5">
-                      <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-slate-805'}`}>Current Project</h3>
+                      <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Current Project</h3>
                       <button 
                         onClick={() => setActiveTab('explore')}
-                        className="text-xs font-bold text-indigo-650 hover:underline bg-transparent border-none cursor-pointer p-0"
+                        className="text-xs font-bold text-indigo-600 hover:underline bg-transparent border-none cursor-pointer p-0"
                       >
                         View All
                       </button>
@@ -610,7 +638,7 @@ export default function TesterDashboard({
                           </div>
                           <div>
                             <span className="text-[9px] uppercase tracking-wider text-slate-500 block">Progress</span>
-                            <span className="text-sm font-black mt-1 text-indigo-550 block">Step {selectedAssignment.currentStep} of 6</span>
+                            <span className="text-sm font-black mt-1 text-indigo-500 block">Step {selectedAssignment.currentStep} of 6</span>
                           </div>
                           <div>
                             <span className="text-[9px] uppercase tracking-wider text-slate-500 block">Deadline</span>
@@ -630,7 +658,7 @@ export default function TesterDashboard({
                               isDarkMode ? 'bg-zinc-800' : 'bg-slate-200'
                             }`} />
                             <div 
-                              className="absolute top-4 left-0 h-0.5 bg-indigo-650 transition-all duration-500 z-0" 
+                              className="absolute top-4 left-0 h-0.5 bg-indigo-600 transition-all duration-500 z-0" 
                               style={{ width: `${((selectedAssignment.currentStep - 1) / 5) * 100}%` }}
                             />
 
@@ -645,7 +673,7 @@ export default function TesterDashboard({
                                     isCompleted
                                       ? 'bg-emerald-500 border-emerald-500 text-white'
                                       : isActive
-                                        ? 'bg-indigo-650 border-indigo-650 text-white shadow-md shadow-indigo-605/20'
+                                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/20'
                                         : isDarkMode
                                           ? 'bg-zinc-900 border-zinc-800 text-slate-500'
                                           : 'bg-white border-slate-200 text-slate-450'
@@ -672,8 +700,8 @@ export default function TesterDashboard({
                           isDarkMode ? 'bg-zinc-950/40 border-zinc-800' : 'bg-white border-slate-200'
                         }`}>
                           <div className="flex items-center gap-2 mb-2.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-650 animate-pulse" />
-                            <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-550">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse" />
+                            <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-500">
                               Current Step: {getStepDetails(selectedAssignment.currentStep).title}
                             </h5>
                           </div>
@@ -717,7 +745,7 @@ export default function TesterDashboard({
                                       placeholder="Simulate proof file..."
                                       value={step1ScreenshotFile}
                                       onChange={(e) => setStep1ScreenshotFile(e.target.value)}
-                                      className="mt-1 w-full text-center border-0 bg-transparent text-[9px] text-indigo-550 outline-hidden font-bold"
+                                      className="mt-1 w-full text-center border-0 bg-transparent text-[9px] text-indigo-500 outline-hidden font-bold"
                                     />
                                   </div>
                                 </div>
@@ -789,7 +817,7 @@ export default function TesterDashboard({
                                     Upload App Installation Proof Screenshot
                                   </label>
                                   <div className={`border border-dashed rounded-xl p-4 text-center cursor-pointer hover:border-indigo-500/50 transition-colors ${
-                                    isDarkMode ? 'bg-zinc-900/40 border-zinc-800' : 'bg-slate-550/5 border-slate-200'
+                                    isDarkMode ? 'bg-zinc-900/40 border-zinc-800' : 'bg-slate-500/5 border-slate-200'
                                   }`}>
                                     <Upload className="w-5 h-5 text-slate-500 mx-auto mb-1" />
                                     <span className="text-[11px] block font-bold text-slate-400 truncate">
@@ -800,7 +828,7 @@ export default function TesterDashboard({
                                       placeholder="Simulate proof file..."
                                       value={step3ScreenshotFile}
                                       onChange={(e) => setStep3ScreenshotFile(e.target.value)}
-                                      className="mt-1.5 w-full text-center border-0 bg-transparent text-[10px] text-indigo-550 outline-hidden font-bold"
+                                      className="mt-1.5 w-full text-center border-0 bg-transparent text-[10px] text-indigo-500 outline-hidden font-bold"
                                     />
                                   </div>
                                   <button
@@ -831,7 +859,7 @@ export default function TesterDashboard({
                             <div className="space-y-5">
                               {/* Check-in Logs timeline */}
                               <div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-550 block mb-2 font-mono">Check-in Logs</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-2 font-mono">Check-in Logs</span>
                                 <div className="grid grid-cols-7 gap-2">
                                   {[...Array(14)].map((_, index) => {
                                     const dayNum = index + 1;
@@ -850,7 +878,7 @@ export default function TesterDashboard({
                                       >
                                         <span className="text-[8px] font-mono">D{dayNum}</span>
                                         <span className="mt-1.5">
-                                          {isDone ? <Check className="w-3 h-3 text-emerald-500 font-bold" /> : <Calendar className="w-3 h-3 text-slate-550" />}
+                                          {isDone ? <Check className="w-3 h-3 text-emerald-500 font-bold" /> : <Calendar className="w-3 h-3 text-slate-500" />}
                                         </span>
                                       </div>
                                     );
@@ -879,7 +907,7 @@ export default function TesterDashboard({
                               {/* Inline Bug Reporting Module */}
                               <div className={`mt-5 pt-5 border-t border-dashed ${isDarkMode ? 'border-zinc-800' : 'border-slate-105'}`}>
                                 <div className="flex items-center gap-2 mb-3">
-                                  <Bug className="w-4 h-4 text-indigo-550" />
+                                  <Bug className="w-4 h-4 text-indigo-500" />
                                   <h6 className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                                     Found a bug? Submit it here for payout bonus!
                                   </h6>
@@ -941,7 +969,7 @@ export default function TesterDashboard({
                                           placeholder="Simulate bug proof file..."
                                           value={step4BugScreenshotFile}
                                           onChange={(e) => setStep4BugScreenshotFile(e.target.value)}
-                                          className="mt-1 w-full text-center border-0 bg-transparent text-[9px] text-indigo-550 outline-hidden font-bold"
+                                          className="mt-1 w-full text-center border-0 bg-transparent text-[9px] text-indigo-500 outline-hidden font-bold"
                                         />
                                       </div>
                                     </div>
@@ -1030,8 +1058,8 @@ export default function TesterDashboard({
                     isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200 shadow-xs'
                   }`}>
                     <div className="flex items-center justify-between border-b pb-4 mb-5">
-                      <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-slate-805'}`}>Recent Activity</h3>
-                      <button className="text-xs font-bold text-indigo-650 hover:underline bg-transparent border-none cursor-pointer p-0">
+                      <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Recent Activity</h3>
+                      <button className="text-xs font-bold text-indigo-600 hover:underline bg-transparent border-none cursor-pointer p-0">
                         View All
                       </button>
                     </div>
@@ -1100,10 +1128,10 @@ export default function TesterDashboard({
                     isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200 shadow-xs'
                   }`}>
                     <div className="flex items-center justify-between border-b pb-4 mb-5">
-                      <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-slate-805'}`}>Available Opportunities</h3>
+                      <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Available Opportunities</h3>
                       <button 
                         onClick={() => setActiveTab('explore')}
-                        className="text-xs font-bold text-indigo-650 hover:underline bg-transparent border-none cursor-pointer p-0"
+                        className="text-xs font-bold text-indigo-600 hover:underline bg-transparent border-none cursor-pointer p-0"
                       >
                         View All
                       </button>
@@ -1118,7 +1146,7 @@ export default function TesterDashboard({
                           return (
                             <div key={p.id} className="py-4 first:pt-0 last:pb-0 flex items-center justify-between gap-4 text-xs">
                               <div>
-                                <h4 className={`font-extrabold text-sm ${isDarkMode ? 'text-white' : 'text-slate-905'}`}>
+                                <h4 className={`font-extrabold text-sm ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                                   {p.name}
                                 </h4>
                                 <div className="flex items-center gap-2 text-slate-500 mt-1 font-semibold">
@@ -1138,8 +1166,8 @@ export default function TesterDashboard({
                                   onClick={() => onJoinProject(p.id)}
                                   className={`px-4 py-2 border rounded-xl text-xs font-extrabold transition-all cursor-pointer bg-transparent ${
                                     isDarkMode
-                                      ? 'border-zinc-700 hover:border-zinc-650 text-white hover:bg-zinc-800/30'
-                                      : 'border-indigo-550 hover:bg-indigo-50/20 text-indigo-650'
+                                      ? 'border-zinc-700 hover:border-zinc-600 text-white hover:bg-zinc-800/30'
+                                      : 'border-indigo-500 hover:bg-indigo-50/20 text-indigo-600'
                                   }`}
                                 >
                                   Join
@@ -1157,10 +1185,10 @@ export default function TesterDashboard({
                     isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200 shadow-xs'
                   }`}>
                     <div className="flex items-center justify-between border-b pb-4 mb-5">
-                      <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-slate-805'}`}>Wallet Summary</h3>
+                      <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Wallet Summary</h3>
                       <button 
                         onClick={() => setActiveTab('wallet')}
-                        className="text-xs font-bold text-indigo-650 hover:underline bg-transparent border-none cursor-pointer p-0"
+                        className="text-xs font-bold text-indigo-600 hover:underline bg-transparent border-none cursor-pointer p-0"
                       >
                         View All
                       </button>
@@ -1260,10 +1288,10 @@ export default function TesterDashboard({
                                     isStepDone
                                       ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-500'
                                       : isStepActive
-                                        ? 'bg-indigo-650/5 border-indigo-500/20 text-indigo-500'
+                                        ? 'bg-indigo-600/5 border-indigo-500/20 text-indigo-500'
                                         : isDarkMode
                                           ? 'bg-zinc-900/40 border-zinc-800/40 text-slate-500'
-                                          : 'bg-slate-50 border-slate-150 text-slate-555'
+                                          : 'bg-slate-50 border-slate-150 text-slate-500'
                                   }`}
                                 >
                                   <span>{stepItem.title}</span>
@@ -1308,6 +1336,56 @@ export default function TesterDashboard({
                   );
                 })}
               </div>
+
+              {/* Previous Works / Completed Campaigns */}
+              <div className="mt-12 pt-8 border-t border-slate-200/40">
+                <h3 className={`text-lg font-black mb-4 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Previous Works (Completed Campaigns)</h3>
+                
+                {completedAssignments.length === 0 ? (
+                  <div className={`p-8 border rounded-2xl text-center ${isDarkMode ? 'border-zinc-850 bg-zinc-950/20' : 'border-slate-200 bg-white'}`}>
+                    <p className="text-xs text-slate-400">No completed campaigns yet.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {completedAssignments.map((ass) => {
+                      const p = projects.find(proj => proj.id === ass.projectId);
+                      return (
+                        <div 
+                          key={ass.id}
+                          className={`p-6 border rounded-2xl ${
+                            isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <h4 className={`font-extrabold text-sm ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{ass.appName}</h4>
+                              <span className="text-[10px] text-slate-500 block mt-0.5">{p?.category || 'Utility'}</span>
+                            </div>
+                            <span className="px-2.5 py-1 rounded-xl text-[10px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-1">
+                              <CheckCircle className="w-3 h-3" /> Completed
+                            </span>
+                          </div>
+                          
+                          <div className="space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
+                            <div className="flex justify-between">
+                              <span>Reward Earned:</span>
+                              <span className="font-bold text-indigo-500">₹{getRewardAmount(p?.packageTier)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Closed Testing Runs:</span>
+                              <span className="font-semibold">{ass.step4CheckInsCompleted}/14 Days Logged</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Testing Device:</span>
+                              <span className="font-semibold">{activeTester.devices[0] || 'Mobile Device'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1347,8 +1425,8 @@ export default function TesterDashboard({
                         onChange={(e) => setWithdrawalAmount(e.target.value)}
                         className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500/50 ${
                           isDarkMode 
-                            ? 'bg-zinc-950/60 border-zinc-800 text-white' 
-                            : 'bg-white border-slate-200 text-slate-900'
+                            ? `${withdrawalError && (withdrawalError.includes('amount') || withdrawalError.includes('balance') || withdrawalError.includes('valid')) ? 'border-red-500 bg-red-500/5' : 'bg-zinc-950/60 border-zinc-800'} text-white` 
+                            : `${withdrawalError && (withdrawalError.includes('amount') || withdrawalError.includes('balance') || withdrawalError.includes('valid')) ? 'border-red-500 bg-red-500/5' : 'bg-white border-slate-200'} text-slate-900`
                         }`}
                       />
                       <span className="text-[10px] text-slate-500 mt-1 block">Available balance: ₹{activeTester.walletBalance}</span>
@@ -1365,21 +1443,21 @@ export default function TesterDashboard({
                         onChange={(e) => setWithdrawalUpi(e.target.value)}
                         className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500/50 ${
                           isDarkMode 
-                            ? 'bg-zinc-950/60 border-zinc-800 text-white' 
-                            : 'bg-white border-slate-200 text-slate-900'
+                            ? `${withdrawalError && withdrawalError.includes('UPI') ? 'border-red-500 bg-red-500/5' : 'bg-zinc-950/60 border-zinc-800'} text-white` 
+                            : `${withdrawalError && withdrawalError.includes('UPI') ? 'border-red-500 bg-red-500/5' : 'bg-white border-slate-200'} text-slate-900`
                         }`}
                       />
                     </div>
 
                     <button
                       type="submit"
-                      disabled={activeTester.walletBalance <= 0}
-                      className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-xl font-bold text-xs border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-indigo-500/5"
+                      className="w-full text-white py-2.5 rounded-xl font-bold text-xs border-0 cursor-pointer shadow-md hover:opacity-90 transition-all"
+                      style={{ backgroundColor: '#4F46E5' }}
                     >
                       Request Payout (UPI)
                     </button>
 
-                    <p className="text-[10px] text-slate-550 text-center mt-2 leading-relaxed">
+                    <p className="text-[10px] text-slate-500 text-center mt-2 leading-relaxed">
                       *Payouts are manual UPI transfers processed directly by admins. Withdrawal request has an SLA of **48 hours**.
                     </p>
                   </form>
@@ -1391,7 +1469,7 @@ export default function TesterDashboard({
                 {/* Active Withdrawals Countdown */}
                 {withdrawals.filter(w => w.testerId === activeTester.id).length > 0 && (
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-550 block mb-2 font-mono">Pending Payout SLA</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-2 font-mono">Pending Payout SLA</span>
                     <div className="space-y-3">
                       {withdrawals
                         .filter(w => w.testerId === activeTester.id)
@@ -1429,7 +1507,7 @@ export default function TesterDashboard({
                                   </span>
                                 )}
                                 {w.transactionId && (
-                                  <span className="text-[9px] block mt-1.5 font-mono text-slate-550">
+                                  <span className="text-[9px] block mt-1.5 font-mono text-slate-500">
                                     Txn ID: {w.transactionId}
                                   </span>
                                 )}
@@ -1448,7 +1526,7 @@ export default function TesterDashboard({
                     isDarkMode ? 'bg-slate-900/20 border-zinc-800' : 'bg-white border-slate-200'
                   }`}>
                     {transactions.filter(t => t.testerId === activeTester.id).length === 0 ? (
-                      <p className="text-xs text-slate-550 p-6 text-center">No ledger transactions found.</p>
+                      <p className="text-xs text-slate-500 p-6 text-center">No ledger transactions found.</p>
                     ) : (
                       <div className="divide-y divide-slate-100 dark:divide-zinc-800/60">
                         {transactions
@@ -1494,7 +1572,7 @@ export default function TesterDashboard({
 
                   <form onSubmit={handleBugSubmit} className="space-y-4">
                     <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-550 block mb-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
                         Select App Under Test
                       </label>
                       <select
@@ -1502,8 +1580,8 @@ export default function TesterDashboard({
                         onChange={(e) => setBugAppId(e.target.value)}
                         className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500/50 ${
                           isDarkMode 
-                            ? 'bg-zinc-950/60 border-zinc-800 text-white' 
-                            : 'bg-white border-slate-200 text-slate-900'
+                            ? `${bugErrors.bugAppId ? 'border-red-500 bg-red-500/5' : 'bg-zinc-950/60 border-zinc-800'} text-white` 
+                            : `${bugErrors.bugAppId ? 'border-red-500 bg-red-500/5' : 'bg-white border-slate-200'} text-slate-900`
                         }`}
                       >
                         <option value="">-- Choose App --</option>
@@ -1511,14 +1589,15 @@ export default function TesterDashboard({
                           .filter(a => a.status === 'active')
                           .map((a) => (
                             <option key={a.id} value={a.projectId}>
-                              {a.appName}
+                                {a.appName}
                             </option>
                           ))}
                       </select>
+                      {bugErrors.bugAppId && <p className="mt-1 text-xs font-bold text-red-500">{bugErrors.bugAppId}</p>}
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-555 block mb-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
                         Bug Summary
                       </label>
                       <input
@@ -1528,14 +1607,16 @@ export default function TesterDashboard({
                         onChange={(e) => setBugTitle(e.target.value)}
                         className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500/50 ${
                           isDarkMode 
-                            ? 'bg-zinc-950/60 border-zinc-800 text-white' 
-                            : 'bg-white border-slate-200 text-slate-900'
+                            ? `${bugErrors.bugTitle ? 'border-red-500 bg-red-500/5' : 'bg-zinc-950/60 border-zinc-800'} text-white` 
+                            : `${bugErrors.bugTitle ? 'border-red-500 bg-red-500/5' : 'bg-white border-slate-200'} text-slate-900`
                         }`}
-                      />
+                      >
+                      </input>
+                      {bugErrors.bugTitle && <p className="mt-1 text-xs font-bold text-red-500">{bugErrors.bugTitle}</p>}
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-555 block mb-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
                         Severity Tier
                       </label>
                       <div className="flex gap-2">
@@ -1546,7 +1627,7 @@ export default function TesterDashboard({
                             onClick={() => setBugSeverity(sev)}
                             className={`flex-1 py-1.5 border rounded-lg text-[10px] font-bold uppercase cursor-pointer transition-all ${
                               bugSeverity === sev
-                                ? 'bg-purple-650 border-purple-650 text-white shadow-md'
+                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
                                 : isDarkMode
                                   ? 'bg-transparent text-slate-500 border-white/5 hover:text-white'
                                   : 'bg-transparent text-slate-500 border-slate-200 hover:text-slate-800'
@@ -1560,13 +1641,13 @@ export default function TesterDashboard({
 
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-555 block font-mono">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block font-mono">
                           Reproduction Steps
                         </label>
                         <button
                           type="button"
                           onClick={() => setBugReproductionSteps([...bugReproductionSteps, ''])}
-                          className="text-[9px] font-bold text-purple-400 hover:underline bg-transparent border-none cursor-pointer flex items-center gap-1"
+                          className="text-[9px] font-bold text-indigo-500 hover:underline bg-transparent border-none cursor-pointer flex items-center gap-1"
                         >
                           <Plus className="w-3 h-3" /> Add Step
                         </button>
@@ -1580,17 +1661,18 @@ export default function TesterDashboard({
                               type="text"
                               value={step}
                               onChange={(e) => {
-                                const newSteps = [...bugReproductionSteps];
-                                newSteps[index] = e.target.value;
-                                setBugReproductionSteps(newSteps);
+                                  const newSteps = [...bugReproductionSteps];
+                                  newSteps[index] = e.target.value;
+                                  setBugReproductionSteps(newSteps);
                               }}
                               placeholder="Action taken..."
                               className={`flex-grow border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500/50 ${
                                 isDarkMode 
-                                  ? 'bg-zinc-950/60 border-zinc-800 text-white' 
-                                  : 'bg-white border-slate-200 text-slate-900'
+                                  ? `${bugErrors.bugSteps ? 'border-red-500 bg-red-500/5' : 'bg-zinc-950/60 border-zinc-800'} text-white` 
+                                  : `${bugErrors.bugSteps ? 'border-red-500 bg-red-500/5' : 'bg-white border-slate-200'} text-slate-900`
                               }`}
                             />
+                            {bugErrors.bugSteps && <p className="mt-1 text-xs font-bold text-red-500">{bugErrors.bugSteps}</p>}
                             {bugReproductionSteps.length > 1 && (
                               <button
                                 type="button"
@@ -1620,7 +1702,7 @@ export default function TesterDashboard({
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-2 font-mono">My Filed Bugs</span>
                 <div className="space-y-4">
                   {bugs.filter(b => b.testerName === activeTester.name).length === 0 ? (
-                    <p className="text-xs text-slate-550 p-6 text-center border border-dashed rounded-xl">No bugs submitted yet.</p>
+                    <p className="text-xs text-slate-500 p-6 text-center border border-dashed rounded-xl">No bugs submitted yet.</p>
                   ) : (
                     bugs
                       .filter(b => b.testerName === activeTester.name)
@@ -1674,7 +1756,7 @@ export default function TesterDashboard({
               <form onSubmit={handleProfileSave} className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-550 block mb-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
                       Full Name
                     </label>
                     <input
@@ -1705,7 +1787,7 @@ export default function TesterDashboard({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-550 block mb-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
                       Country Location
                     </label>
                     <input
@@ -1721,7 +1803,7 @@ export default function TesterDashboard({
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-555 block mb-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
                       QA Testing Specialty
                     </label>
                     <select
@@ -1765,7 +1847,7 @@ export default function TesterDashboard({
                           }}
                           className={`border p-3 rounded-xl cursor-pointer flex items-center justify-between text-xs font-semibold select-none ${
                             isChecked
-                              ? 'bg-indigo-650/10 border-indigo-500 text-indigo-505'
+                              ? 'bg-indigo-600/10 border-indigo-500 text-indigo-500'
                               : isDarkMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700' : 'bg-slate-50 border-slate-200 hover:border-slate-350'
                           }`}
                         >
@@ -1786,7 +1868,32 @@ export default function TesterDashboard({
               </form>
             </div>
           )}
-        </main>
+        </div>
+      </div>
+
+      {/* ================= MOBILE BOTTOM NAV ================= */}
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 h-16 border-t flex items-center justify-around z-50 ${
+        isDarkMode ? 'bg-[#09090B] border-zinc-800' : 'bg-white border-slate-200'
+      }`}>
+        {[
+          { id: 'dashboard', label: 'Home', icon: <Home className="w-5 h-5" /> },
+          { id: 'tasks', label: 'Tests', icon: <CheckSquare className="w-5 h-5" /> },
+          { id: 'wallet', label: 'Wallet', icon: <Wallet className="w-5 h-5" /> },
+          { id: 'profile', label: 'Profile', icon: <User className="w-5 h-5" /> }
+        ].map(link => (
+          <button
+            key={link.id}
+            onClick={() => handleTabSelect(link.id as any)}
+            className={`flex flex-col items-center justify-center w-full h-full space-y-1 border-0 bg-transparent cursor-pointer ${
+              activeTab === link.id 
+                ? 'text-indigo-500' 
+                : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            {link.icon}
+            <span className="text-[10px] font-bold">{link.label}</span>
+          </button>
+        ))}
       </div>
     </div>
   );

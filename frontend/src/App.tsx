@@ -16,6 +16,8 @@ import Testimonials from './components/Testimonials';
 import CallToAction from './components/CallToAction';
 import Footer from './components/Footer';
 import AuthScreen from './components/AuthScreen';
+import ClientDashboard from './components/ClientDashboard';
+import AdminConsole from './components/AdminConsole';
 
 import { MapPin, Users, Heart, ShieldCheck, Sparkles, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -33,21 +35,72 @@ export default function App() {
   // Data version guard — bump this whenever mock data schema changes to clear stale localStorage
   const DATA_VERSION = 'v2';
   if (typeof window !== 'undefined') {
-    const storedVersion = localStorage.getItem('launchtest_data_version');
+    const storedVersion = localStorage.getItem('launchops_data_version');
     if (storedVersion !== DATA_VERSION) {
-      ['launchtest_apps', 'launchtest_bugs', 'launchtest_assignments',
-       'launchtest_withdrawals', 'launchtest_transactions', 'launchtest_active_tester'].forEach(k => localStorage.removeItem(k));
-      localStorage.setItem('launchtest_data_version', DATA_VERSION);
+      ['launchops_apps', 'launchops_bugs', 'launchops_assignments',
+       'launchops_withdrawals', 'launchops_transactions', 'launchops_active_tester'].forEach(k => localStorage.removeItem(k));
+      localStorage.setItem('launchops_data_version', DATA_VERSION);
     }
   }
 
   // Navigation State
   const [currentTab, setCurrentTab] = useState<string>('home');
+  const [initialSubTab, setInitialSubTab] = useState<string>('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      if (parts.length > 0) {
+        const mainTab = parts[0];
+        if (['home', 'auth', 'tester', 'client', 'admin', 'solutions', 'resources', 'pricing', 'company'].includes(mainTab)) {
+          setCurrentTab(mainTab);
+          if (parts[1]) {
+            setInitialSubTab(parts[1]);
+          }
+        }
+      } else {
+        const saved = localStorage.getItem('launchops_current_tab');
+        if (saved) {
+          setCurrentTab(saved);
+        }
+      }
+
+      const handlePopState = () => {
+        const subparts = window.location.pathname.split('/').filter(Boolean);
+        const p = subparts[0] || 'home';
+        setCurrentTab(p);
+        if (subparts[1]) {
+          setInitialSubTab(subparts[1]);
+        }
+      };
+      window.addEventListener('popstate', handlePopState);
+      return () => window.removeEventListener('popstate', handlePopState);
+    }
+  }, []);
+
+  const handleSetTab = (tab: string, subtab?: string) => {
+    setCurrentTab(tab);
+    if (subtab) {
+      setInitialSubTab(subtab);
+    }
+    if (typeof window !== 'undefined') {
+      if (tab === 'home' || tab === 'solutions' || tab === 'pricing' || tab === 'resources') {
+        localStorage.removeItem('launchops_current_tab');
+      } else {
+        localStorage.setItem('launchops_current_tab', tab);
+      }
+      
+      const targetPath = '/' + (tab === 'home' ? '' : tab) + (subtab ? '/' + subtab : '');
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState(null, '', targetPath);
+      }
+    }
+  };
 
   // Theme State (Dark vs Light)
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('launchtest_darkmode');
+      const savedTheme = localStorage.getItem('launchops_darkmode');
       return savedTheme ? savedTheme === 'true' : false;
     }
     return false;
@@ -57,7 +110,7 @@ export default function App() {
     setIsDarkMode((prev) => {
       const next = !prev;
       if (typeof window !== 'undefined') {
-        localStorage.setItem('launchtest_darkmode', String(next));
+        localStorage.setItem('launchops_darkmode', String(next));
       }
       return next;
     });
@@ -66,7 +119,7 @@ export default function App() {
   // Core Data States with robust key deduplication
   const [apps, setApps] = useState<TestApp[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchtest_apps');
+      const saved = localStorage.getItem('launchops_apps');
       if (saved) {
         try {
           const parsed: TestApp[] = JSON.parse(saved);
@@ -91,7 +144,7 @@ export default function App() {
 
   const [bugs, setBugs] = useState<BugReport[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchtest_bugs');
+      const saved = localStorage.getItem('launchops_bugs');
       if (saved) {
         try {
           const parsed: BugReport[] = JSON.parse(saved);
@@ -119,7 +172,7 @@ export default function App() {
   // Tester Flow Data States
   const [activeTester, setActiveTester] = useState<Tester>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchtest_active_tester');
+      const saved = localStorage.getItem('launchops_active_tester');
       if (saved) {
         try { return JSON.parse(saved); } catch (e) {}
       }
@@ -141,7 +194,7 @@ export default function App() {
 
   const [assignments, setAssignments] = useState<TesterAssignment[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchtest_assignments');
+      const saved = localStorage.getItem('launchops_assignments');
       if (saved) {
         try { return JSON.parse(saved); } catch (e) {}
       }
@@ -151,7 +204,7 @@ export default function App() {
 
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchtest_withdrawals');
+      const saved = localStorage.getItem('launchops_withdrawals');
       if (saved) {
         try { return JSON.parse(saved); } catch (e) {}
       }
@@ -161,7 +214,7 @@ export default function App() {
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchtest_transactions');
+      const saved = localStorage.getItem('launchops_transactions');
       if (saved) {
         try { return JSON.parse(saved); } catch (e) {}
       }
@@ -174,27 +227,27 @@ export default function App() {
 
   // Save changes to LocalStorage
   useEffect(() => {
-    localStorage.setItem('launchtest_apps', JSON.stringify(apps));
+    localStorage.setItem('launchops_apps', JSON.stringify(apps));
   }, [apps]);
 
   useEffect(() => {
-    localStorage.setItem('launchtest_bugs', JSON.stringify(bugs));
+    localStorage.setItem('launchops_bugs', JSON.stringify(bugs));
   }, [bugs]);
 
   useEffect(() => {
-    localStorage.setItem('launchtest_active_tester', JSON.stringify(activeTester));
+    localStorage.setItem('launchops_active_tester', JSON.stringify(activeTester));
   }, [activeTester]);
 
   useEffect(() => {
-    localStorage.setItem('launchtest_assignments', JSON.stringify(assignments));
+    localStorage.setItem('launchops_assignments', JSON.stringify(assignments));
   }, [assignments]);
 
   useEffect(() => {
-    localStorage.setItem('launchtest_withdrawals', JSON.stringify(withdrawals));
+    localStorage.setItem('launchops_withdrawals', JSON.stringify(withdrawals));
   }, [withdrawals]);
 
   useEffect(() => {
-    localStorage.setItem('launchtest_transactions', JSON.stringify(transactions));
+    localStorage.setItem('launchops_transactions', JSON.stringify(transactions));
   }, [transactions]);
 
   // Keep refs to avoid stale closures in the simulation interval
@@ -318,7 +371,7 @@ export default function App() {
     if (!project) return;
 
     const joinedCount = assignments.filter(a => a.projectId === projectId && a.status === 'active').length;
-    const required = project.testersRequired || 20;
+    const required = project.testersRequired || 14;
     const isFull = joinedCount >= required;
 
     const newAssignment: TesterAssignment = {
@@ -347,7 +400,6 @@ export default function App() {
       if (a.id === assignmentId) {
         return {
           ...a,
-          currentStep: 2,
           testerEmail: email,
           step1Screenshot: screenshotUrl || 'google-profile.png'
         };
@@ -372,6 +424,18 @@ export default function App() {
       },
       ...prev
     ]);
+  };
+
+  const handleApproveTesterStep1 = (projectId: string, testerId: string) => {
+    setAssignments(prev => prev.map(a => {
+      if (a.projectId === projectId && a.testerId === testerId) {
+        return {
+          ...a,
+          currentStep: 2 // Advance to Google Email Review!
+        };
+      }
+      return a;
+    }));
   };
 
   const handleClickStep3Link = (assignmentId: string, screenshotUrl?: string) => {
@@ -537,18 +601,214 @@ export default function App() {
     handleLogStep4CheckIn(assignmentId);
   };
 
+  // Client Onboarding / Create project handler
+  const handleCreateProject = (projectData: Omit<TestApp, 'id' | 'testersCount' | 'bugsFound' | 'progress' | 'status'>) => {
+    const isTestersOnly = projectData.packageTier === 'testers_only';
+    const newProj: TestApp = {
+      ...projectData,
+      id: `app-${Date.now()}`,
+      testersCount: 0,
+      bugsFound: 0,
+      progress: 0,
+      status: 'Draft',
+      verificationRequired: !isTestersOnly,
+      verificationStatus: isTestersOnly ? 'none' : 'pending',
+      invoiceStatus: isTestersOnly ? 'awaiting_payment' : 'none'
+    };
+    setApps(prev => [...prev, newProj]);
+  };
+
+  // Client Submit Verification proof screenshot handler
+  const handleSubmitVerification = (projectId: string, proofUrl: string) => {
+    setApps(prev => prev.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          verificationStatus: 'pending',
+          whatsappGroupLink: proofUrl // store screenshot url in this field dynamically for MVP preview
+        };
+      }
+      return p;
+    }));
+  };
+
+  // Client simulated invoice Razorpay checkout payment handler
+  const handlePayInvoice = (projectId: string) => {
+    setApps(prev => prev.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          invoiceStatus: 'paid',
+          status: 'Testing',
+          progress: 16.6 // Immediately start step 1: Verification
+        };
+      }
+      return p;
+    }));
+  };
+
+  // Admin Approve Verification proof screenshot handler
+  const handleApproveVerification = (projectId: string, customAmount?: number) => {
+    setApps(prev => prev.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          verificationStatus: 'approved',
+          invoiceStatus: 'awaiting_payment',
+          whatsappGroupLink: customAmount ? `Custom price set: ₹${customAmount}` : p.whatsappGroupLink
+        };
+      }
+      return p;
+    }));
+  };
+
+  // Admin Reject Verification proof screenshot handler
+  const handleRejectVerification = (projectId: string) => {
+    setApps(prev => prev.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          verificationStatus: 'rejected'
+        };
+      }
+      return p;
+    }));
+  };
+
+  // Admin advance project-level step workflow milestones handler
+  const handleAdvanceMilestone = (projectId: string, step: number, payload?: any) => {
+    setApps(prev => prev.map(p => {
+      if (p.id === projectId) {
+        const nextProgress = Math.min(step * 16.6, 100);
+        return {
+          ...p,
+          progress: nextProgress,
+          optInUrl: payload?.optInUrl || p.optInUrl,
+          status: step === 6 ? 'Completed' : p.status
+        };
+      }
+      return p;
+    }));
+
+    // Advance all testers assigned to this project to the designated step
+    setAssignments(prev => prev.map(a => {
+      if (a.projectId === projectId) {
+        return {
+          ...a,
+          currentStep: step as any,
+          status: step === 6 ? 'completed' : a.status
+        };
+      }
+      return a;
+    }));
+  };
+
+  // Admin replace inactive tester with queued tester
+  const handleReplaceTester = (assignmentId: string) => {
+    const targetAssignment = assignments.find(a => a.id === assignmentId);
+    if (!targetAssignment) return;
+
+    // Set target assignment status to completed/removed
+    setAssignments(prev => prev.filter(a => a.id !== assignmentId));
+
+    // Promote first queued tester for this project
+    setAssignments(prev => {
+      const projectQueue = prev.filter(a => a.projectId === targetAssignment.projectId && a.status === 'queued');
+      if (projectQueue.length > 0) {
+        const firstInQueue = projectQueue[0];
+        return prev.map(a => {
+          if (a.id === firstInQueue.id) {
+            return { ...a, status: 'active', queuePosition: undefined };
+          }
+          return a;
+        });
+      }
+      return prev;
+    });
+  };
+
+  const handleAddTesterToProject = (projectId: string, testerId: string) => {
+    const proj = apps.find(p => p.id === projectId);
+    if (!proj) return;
+
+    const newAssignment: TesterAssignment = {
+      id: `ass-${Date.now()}`,
+      projectId,
+      testerId,
+      appName: proj.name,
+      currentStep: 1,
+      status: 'active',
+      step3Clicked: false,
+      step4CheckInsCompleted: 0,
+      inactivityFlag: false,
+      joinedAt: new Date().toISOString().split('T')[0]
+    };
+
+    setAssignments(prev => [...prev, newAssignment]);
+    setApps(prev => prev.map(p => p.id === projectId ? { ...p, testersCount: p.testersCount + 1 } : p));
+  };
+
+  const handleRemoveTesterFromProject = (projectId: string, testerId: string) => {
+    setAssignments(prev => prev.filter(a => !(a.projectId === projectId && a.testerId === testerId)));
+    setApps(prev => prev.map(p => p.id === projectId ? { ...p, testersCount: Math.max(0, p.testersCount - 1) } : p));
+  };
+
+  // Admin merge duplicate bug reports
+  const handleMergeBugs = (canonicalId: string, duplicateId: string) => {
+    setBugs(prev => prev.map(b => {
+      if (b.id === duplicateId) {
+        return { ...b, status: 'Resolved', title: `[Duplicate of ${canonicalId.slice(-6)}] ${b.title}` };
+      }
+      return b;
+    }));
+  };
+
+  // Admin publish bug report to client dashboard
+  const handlePublishBug = (bugId: string, adminNotes?: string) => {
+    setBugs(prev => prev.map(b => {
+      if (b.id === bugId) {
+        return { ...b, isPublished: true, adminNotes };
+      }
+      return b;
+    }));
+  };
+
+  // Admin Complete UPI Payout Cashout Request
+  const handleCompleteWithdrawal = (withdrawalId: string, txnId: string) => {
+    setWithdrawals(prev => prev.map(w => {
+      if (w.id === withdrawalId) {
+        return { ...w, status: 'completed', transactionId: txnId };
+      }
+      return w;
+    }));
+  };
+
+  // Admin Reject UPI Payout Cashout Request
+  const handleRejectWithdrawal = (withdrawalId: string, reason: string) => {
+    setWithdrawals(prev => prev.map(w => {
+      if (w.id === withdrawalId) {
+        return { ...w, status: 'rejected', rejectionReason: reason };
+      }
+      return w;
+    }));
+  };
+
+  const isDashboard = ['tester', 'client', 'admin'].includes(currentTab);
+
   return (
     <div className={`min-h-screen font-sans antialiased overflow-x-hidden selection:bg-indigo-600/10 selection:text-indigo-900 transition-colors duration-300 ${
       isDarkMode ? 'bg-[#050505] text-slate-100' : 'bg-slate-50 text-slate-900'
     }`}>
       {/* Universal Header Nav */}
-      <Navbar 
-        currentTab={currentTab} 
-        onTabChange={setCurrentTab} 
-        onStartTesting={() => setCurrentTab('auth')} 
-        isDarkMode={isDarkMode}
-        onToggleDarkMode={toggleDarkMode}
-      />
+      {!isDashboard && (
+        <Navbar 
+          currentTab={currentTab} 
+          onTabChange={handleSetTab} 
+          onStartTesting={() => handleSetTab('auth')} 
+          isDarkMode={isDarkMode}
+          onToggleDarkMode={toggleDarkMode}
+        />
+      )}
 
       {/* Main Screen Router */}
       <main className="relative min-h-screen">
@@ -562,15 +822,15 @@ export default function App() {
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             >
               <HeroSection 
-                onStartTesting={() => setCurrentTab('auth')} 
+                onStartTesting={() => handleSetTab('auth')} 
                 onWatchVideo={() => setIsWatchWorksOpen(true)} 
-                onTabChange={setCurrentTab}
+                onTabChange={handleSetTab}
                 isDarkMode={isDarkMode}
               />
               <HowItWorks isDarkMode={isDarkMode} />
               <BuiltForEveryone isDarkMode={isDarkMode} />
               <Testimonials isDarkMode={isDarkMode} />
-              <CallToAction onStartTesting={() => setCurrentTab('auth')} isDarkMode={isDarkMode} />
+              <CallToAction onStartTesting={() => handleSetTab('auth')} isDarkMode={isDarkMode} />
             </motion.div>
           )}
 
@@ -584,13 +844,22 @@ export default function App() {
             >
               <AuthScreen 
                 isDarkMode={isDarkMode}
-                onLoginSuccess={(testerName) => {
-                  if (testerName) {
-                    setActiveTester(prev => ({ ...prev, name: testerName }));
+                onLoginSuccess={(name, role) => {
+                  if (role === 'admin') {
+                    handleSetTab('admin');
+                  } else if (role === 'client') {
+                    handleSetTab('client');
+                  } else {
+                    const existingTester = MOCK_TESTERS.find(t => t.name.toLowerCase() === name.toLowerCase());
+                    if (existingTester) {
+                      setActiveTester(existingTester);
+                    } else {
+                      setActiveTester(MOCK_TESTERS[0]); 
+                    }
+                    handleSetTab('tester');
                   }
-                  setCurrentTab('tester');
                 }}
-                onBackToHome={() => setCurrentTab('home')}
+                onBackToHome={() => handleSetTab('home')}
               />
             </motion.div>
           )}
@@ -620,6 +889,64 @@ export default function App() {
                 onRequestWithdrawal={handleRequestWithdrawal}
                 onSimulateAdminAdvanceStep={handleSimulateAdminAdvanceStep}
                 onSimulateFastForwardDay={handleSimulateFastForwardDay}
+                onLogout={() => handleSetTab('home')}
+                initialTab={initialSubTab}
+                onTabChange={(tab) => handleSetTab('tester', tab)}
+              />
+            </motion.div>
+          )}
+
+          {currentTab === 'client' && (
+            <motion.div
+              key="client"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <ClientDashboard
+                isDarkMode={isDarkMode}
+                projects={apps}
+                bugs={bugs}
+                onCreateProject={handleCreateProject}
+                onSubmitVerification={handleSubmitVerification}
+                onPayInvoice={handlePayInvoice}
+                onLogout={() => handleSetTab('home')}
+                initialTab={initialSubTab}
+                onTabChange={(tab) => handleSetTab('client', tab)}
+              />
+            </motion.div>
+          )}
+
+          {currentTab === 'admin' && (
+            <motion.div
+              key="admin"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <AdminConsole
+                isDarkMode={isDarkMode}
+                projects={apps}
+                bugs={bugs}
+                assignments={assignments}
+                testers={MOCK_TESTERS}
+                withdrawals={withdrawals}
+                onApproveVerification={handleApproveVerification}
+                onRejectVerification={handleRejectVerification}
+                onAdvanceMilestone={handleAdvanceMilestone}
+                onReplaceTester={handleReplaceTester}
+                onMergeBugs={handleMergeBugs}
+                onPublishBug={handlePublishBug}
+                onCompleteWithdrawal={handleCompleteWithdrawal}
+                onRejectWithdrawal={handleRejectWithdrawal}
+                onLogout={() => handleSetTab('home')}
+                onAddTesterToProject={handleAddTesterToProject}
+                onRemoveTesterFromProject={handleRemoveTesterFromProject}
+                onApproveTesterStep1={handleApproveTesterStep1}
+                initialTab={initialSubTab}
+                onTabChange={(tab) => handleSetTab('admin', tab)}
               />
             </motion.div>
           )}
@@ -676,7 +1003,7 @@ export default function App() {
                     ? 'border-indigo-500/20 bg-indigo-950/40 text-indigo-400' 
                     : 'border-indigo-150 bg-indigo-50 text-indigo-600'
                 }`}>
-                  Meet LaunchTest
+                  Meet LaunchOps
                 </span>
                 <h1 className={`text-4xl font-black mb-6 tracking-tight ${
                   isDarkMode ? 'text-white' : 'text-slate-900'
@@ -697,7 +1024,7 @@ export default function App() {
                   <p className={`text-sm leading-relaxed mb-6 font-medium ${
                     isDarkMode ? 'text-slate-400' : 'text-slate-500'
                   }`}>
-                    In an era dominated by simulated emulators and AI-generated logs, LaunchTest remains fiercely committed to human authenticity. We believe that critical connection anomalies, BLE packet losses, tactile layout errors, and battery drain anomalies can only be authentically audited on real physical hardware.
+                    In an era dominated by simulated emulators and AI-generated logs, LaunchOps remains fiercely committed to human authenticity. We believe that critical connection anomalies, BLE packet losses, tactile layout errors, and battery drain anomalies can only be authentically audited on real physical hardware.
                   </p>
                   <div className={`space-y-3 text-sm font-semibold ${
                     isDarkMode ? 'text-slate-300' : 'text-slate-600'
@@ -722,45 +1049,15 @@ export default function App() {
                   }`} />
                   <h3 className={`font-bold text-lg mb-6 relative z-10 ${
                     isDarkMode ? 'text-white' : 'text-slate-900'
-                  }`}>Global Lab Locations</h3>
+                  }`}>Headquarters</h3>
                   <div className="space-y-4 relative z-10 text-xs">
-                    <div className={`flex items-center justify-between border-b pb-2 ${
-                      isDarkMode ? 'border-white/5' : 'border-slate-200/60'
-                    }`}>
-                      <span className={`font-bold flex items-center gap-2 ${
-                        isDarkMode ? 'text-slate-300' : 'text-slate-800'
-                      }`}>
-                        <MapPin className="w-4 h-4 text-indigo-600" /> San Francisco, CA
-                      </span>
-                      <span className="text-slate-400 font-bold font-mono">Headquarters & BLE Lab</span>
-                    </div>
-                    <div className={`flex items-center justify-between border-b pb-2 ${
-                      isDarkMode ? 'border-white/5' : 'border-slate-200/60'
-                    }`}>
-                      <span className={`font-bold flex items-center gap-2 ${
-                        isDarkMode ? 'text-slate-300' : 'text-slate-800'
-                      }`}>
-                        <MapPin className="w-4 h-4 text-indigo-600" /> Tokyo, Japan
-                      </span>
-                      <span className="text-slate-400 font-bold font-mono">Foldable device specialists</span>
-                    </div>
-                    <div className={`flex items-center justify-between border-b pb-2 ${
-                      isDarkMode ? 'border-white/5' : 'border-slate-200/60'
-                    }`}>
-                      <span className={`font-bold flex items-center gap-2 ${
-                        isDarkMode ? 'text-slate-300' : 'text-slate-800'
-                      }`}>
-                        <MapPin className="w-4 h-4 text-indigo-600" /> London, UK
-                      </span>
-                      <span className="text-slate-400 font-bold font-mono">Localization & Accents QA</span>
-                    </div>
                     <div className="flex items-center justify-between">
                       <span className={`font-bold flex items-center gap-2 ${
                         isDarkMode ? 'text-slate-300' : 'text-slate-800'
                       }`}>
-                        <MapPin className="w-4 h-4 text-indigo-600" /> Seoul, South Korea
+                        <MapPin className="w-4 h-4 text-indigo-600" /> Hyderabad, Telangana
                       </span>
-                      <span className="text-slate-400 font-bold font-mono">High-throughput network QA</span>
+                      <span className="text-slate-400 font-bold font-mono">Main Office</span>
                     </div>
                   </div>
                 </div>
@@ -780,7 +1077,9 @@ export default function App() {
       />
 
       {/* Complete Site Footer */}
-      <Footer onTabChange={setCurrentTab} isDarkMode={isDarkMode} onToggleDarkMode={toggleDarkMode} />
+      {!isDashboard && (
+        <Footer onTabChange={handleSetTab} isDarkMode={isDarkMode} onToggleDarkMode={toggleDarkMode} />
+      )}
     </div>
   );
 }

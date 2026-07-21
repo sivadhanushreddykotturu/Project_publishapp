@@ -120,10 +120,10 @@ function Footerdemo({ isDarkMode: parentDarkMode, onToggleDarkMode, onTabChange 
           <div>
             <h3 className={`mb-4 text-lg font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Contact Us</h3>
             <address className={`space-y-2 text-sm not-italic ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-              <p>HSR Layout, Sector 3</p>
-              <p>Bengaluru, Karnataka 560102</p>
-              <p>Phone: +91 80 4567 8900</p>
-              <p>Email: hello@launchtest.in</p>
+              <p>HITEC City, Madhapur</p>
+              <p>Hyderabad, Telangana 500081</p>
+              <p>Phone: +91 40 4567 8900</p>
+              <p>Email: hello@launchops.com</p>
             </address>
           </div>
           <div className="relative">
@@ -199,9 +199,14 @@ function Footerdemo({ isDarkMode: parentDarkMode, onToggleDarkMode, onTabChange 
         <div className={`mt-12 flex flex-col items-center justify-between gap-4 border-t pt-8 text-center md:flex-row ${
           isDark ? 'border-white/5' : 'border-slate-200'
         }`}>
-          <p className={`text-sm ${isDark ? 'text-gray-500' : 'text-slate-500'}`}>
-            © 2026 LaunchTest. All rights reserved.
-          </p>
+          <div>
+            <p className={`text-sm ${isDark ? 'text-gray-500' : 'text-slate-500'}`}>
+              © 2026 LaunchOps. All rights reserved.
+            </p>
+            <p className={`text-xs mt-1 ${isDark ? 'text-gray-600' : 'text-slate-400'}`}>
+              Founded by Nandha Kishore · Hyderabad, India
+            </p>
+          </div>
           <nav className="flex gap-4 text-sm">
             <a href="#" className={`transition-colors ${isDark ? 'text-gray-500 hover:text-white' : 'text-slate-500 hover:text-indigo-600'}`}>
               Privacy Policy
