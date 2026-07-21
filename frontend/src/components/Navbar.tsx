@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { Menu, X, ChevronDown, ArrowRight, Sun, Moon } from 'lucide-react';
 
 interface NavbarProps {
@@ -34,7 +35,11 @@ export default function Navbar({
     : clientNavItems;
 
   return (
-    <header className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b font-sans shadow-xs transition-colors duration-300 ${
+    <motion.header 
+      initial={{ y: -20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b font-sans shadow-xs transition-colors duration-300 ${
       isDarkMode 
         ? 'bg-[#050505]/90 border-white/5 text-white' 
         : 'bg-white/90 border-slate-200 text-slate-900'
@@ -52,7 +57,7 @@ export default function Navbar({
           <span className={`font-extrabold tracking-widest text-xl uppercase transition-colors ${
             isDarkMode ? 'text-white' : 'text-slate-900'
           } group-hover:text-indigo-600`}>
-            Launch<span className="text-indigo-600">Test</span>
+            Launch<span className="text-indigo-600">Ops</span>
           </span>
         </button>
 
@@ -61,7 +66,7 @@ export default function Navbar({
           isDarkMode ? 'text-slate-300' : 'text-slate-600'
         }`}>
           {navItems.map((item) => {
-            const mappedTab = item.label === 'Tester Hub' ? 'tester' : item.label.toLowerCase();
+            const mappedTab = item.label === 'Tester Hub' ? 'tester' : item.label === 'Client Room' ? 'client' : item.label === 'Ops Bridge' ? 'admin' : item.label.toLowerCase();
             const isActive = currentTab === mappedTab;
             
             return (
@@ -192,6 +197,6 @@ export default function Navbar({
           )}
         </div>
       )}
-    </header>
+    </motion.header>
   );
 }

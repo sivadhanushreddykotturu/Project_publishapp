@@ -23,6 +23,11 @@ export interface TestApp {
     packageName: string;
     lastApiError?: string;
   };
+  projectName?: string;
+  apkUrl?: string;
+  releaseNotes?: string;
+  demoCredentials?: string;
+  instructions?: string;
 }
 
 export interface BugReport {
@@ -30,16 +35,50 @@ export interface BugReport {
   appId: string;
   appName: string;
   title: string;
+  category?: 'UI/UX' | 'Crash' | 'Functionality' | 'Performance' | 'Other';
   severity: 'Critical' | 'High' | 'Medium' | 'Low';
   status: 'Open' | 'Investigating' | 'Resolved';
   testerName: string;
   testerAvatar: string;
   device: string;
   osVersion: string;
+  expectedResult?: string;
+  actualResult?: string;
   reproductionSteps: string[];
   createdAt: string;
   isPublished?: boolean; // Admin publishing filter
+  adminNotes?: string; // Admin notes added before publishing
   screenshot?: string; // Bug proof screenshot
+  screenRecordingUrl?: string; // Bug proof video
+}
+
+export interface Client {
+  id: string;
+  companyName: string;
+  contactName: string;
+  email: string;
+  packageTier: 'testers_only' | 'managed_testing' | 'launch_ready' | 'custom';
+  status: 'active' | 'inactive';
+}
+
+export interface Invoice {
+  id: string;
+  clientId: string;
+  projectId: string;
+  amount: number;
+  status: 'unpaid' | 'paid' | 'overdue';
+  dueDate: string;
+  issuedAt: string;
+}
+
+export interface Notification {
+  id: string;
+  recipientId: string; // testerId or clientId
+  type: 'reminder' | 'update' | 'alert';
+  channel: 'in_app' | 'whatsapp' | 'email';
+  content: string;
+  createdAt: string;
+  isRead: boolean;
 }
 
 export interface Tester {

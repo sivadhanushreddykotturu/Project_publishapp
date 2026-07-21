@@ -81,7 +81,7 @@ export default function HeroSection({
           <motion.div 
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
             data-purpose="hero-text-block"
           >
             {/* Top Indicator Pill */}
@@ -101,7 +101,7 @@ export default function HeroSection({
                 delay={35}
                 animateBy="letters"
                 direction="top"
-                className={`text-4xl md:text-5xl xl:text-6xl font-black tracking-tight ${
+                className={`text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight break-words ${
                   isDarkMode ? 'text-white' : 'text-slate-900'
                 }`}
               />
@@ -110,7 +110,7 @@ export default function HeroSection({
                 delay={35}
                 animateBy="letters"
                 direction="top"
-                className={`text-4xl md:text-5xl xl:text-6xl font-black tracking-tight ${
+                className={`text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight break-words ${
                   isDarkMode ? 'text-white' : 'text-slate-900'
                 }`}
               />
@@ -119,7 +119,7 @@ export default function HeroSection({
                 delay={35}
                 animateBy="letters"
                 direction="bottom"
-                className={`text-4xl md:text-5xl xl:text-6xl font-black tracking-tight ${
+                className={`text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight break-words ${
                   isDarkMode ? 'text-indigo-400' : 'text-indigo-600'
                 }`}
               />
@@ -134,16 +134,14 @@ export default function HeroSection({
 
             {/* Calls to Action */}
             <div className="flex flex-wrap items-center gap-6 mb-12">
-              {showStartTestingAction && (
-                <button
-                  onClick={onStartTesting}
-                  className="bg-indigo-600 hover:bg-indigo-500 px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg shadow-indigo-600/20 transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer text-white border-0 text-sm md:text-base"
-                  id="hero-primary-cta"
-                >
-                  Start Your First Test
-                  <ArrowRight className="w-5 h-5" />
-                </button>
-              )}
+              <button 
+                onClick={onStartTesting}
+                className="bg-indigo-600 hover:bg-indigo-500 px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg shadow-indigo-600/20 transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer text-white border-0 text-sm md:text-base animate-glow-pulse"
+                id="hero-primary-cta"
+              >
+                Start Your First Test 
+                <ArrowRight className="w-5 h-5" />
+              </button>
 
               <button 
                 onClick={onWatchVideo}
@@ -176,7 +174,7 @@ export default function HeroSection({
                   <img
                     key={i}
                     alt={`Verified QA Tester ${i+1}`}
-                    className={`w-10 h-10 rounded-full border-2 object-cover hover:translate-y-[-4px] transition-transform duration-200 cursor-pointer ${
+                    className={`w-10 h-10 rounded-full border-2 object-cover shrink-0 hover:translate-y-[-4px] transition-transform duration-200 cursor-pointer ${
                       isDarkMode ? 'border-[#050505]' : 'border-white'
                     }`}
                     src={url}
@@ -269,7 +267,7 @@ export default function HeroSection({
             {/* Visual Phone Model Overlay */}
             <div className="relative z-20 w-full max-w-[580px] drop-shadow-[0_20px_50px_rgba(99,102,241,0.08)] hover:scale-[1.01] transition-transform duration-500">
               <img
-                alt="LaunchTest Interactive Android Performance Dashboard Graphic"
+                alt="LaunchOps Interactive Android Performance Dashboard Graphic"
                 className="w-full h-auto rounded-2xl"
                 style={{
                   WebkitMaskImage: 'radial-gradient(ellipse, rgba(0,0,0,1) 75%, rgba(0,0,0,0) 100%)',
@@ -289,8 +287,8 @@ export default function HeroSection({
         <motion.div 
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.4 }}
-          className={`w-full mt-24 border rounded-3xl p-8 md:p-10 transition-all duration-300 ${
+          transition={{ duration: 0.8, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className={`w-full mt-16 md:mt-24 border rounded-3xl p-6 md:p-10 transition-all duration-300 ${
             isDarkMode 
               ? 'bg-[#0F0F12]/80 border-white/5 shadow-none' 
               : 'bg-white border-slate-100 shadow-xl shadow-slate-100'

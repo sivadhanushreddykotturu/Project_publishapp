@@ -14,8 +14,8 @@ export default function BuiltForEveryone({ isDarkMode = false }: BuiltForEveryon
 
   return (
     <section 
-      className={`py-28 relative overflow-hidden transition-colors duration-500 ${
-        isDarkMode ? 'bg-[#030305] text-slate-300' : 'bg-[#fafafc] text-slate-800'
+      className={`py-24 transition-colors duration-500 ${
+        isDarkMode ? 'bg-[#050505] text-slate-300' : 'bg-white text-slate-800'
       }`} 
       id="solutions-features-block"
     >
@@ -49,7 +49,7 @@ export default function BuiltForEveryone({ isDarkMode = false }: BuiltForEveryon
           <p className={`text-sm md:text-base leading-relaxed max-w-2xl mx-auto font-medium ${
             isDarkMode ? 'text-slate-400' : 'text-slate-500'
           }`}>
-            Whether you own an app or love testing new ones, LaunchTest <br className="hidden md:inline" />
+            Whether you own an app or love testing new ones, LaunchOps <br className="hidden md:inline" />
             gives you the tools, people, and platform to succeed.
           </p>
         </div>
@@ -63,19 +63,19 @@ export default function BuiltForEveryone({ isDarkMode = false }: BuiltForEveryon
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className={`rounded-3xl border p-8 md:p-10 relative overflow-hidden flex flex-col justify-between group transition-all duration-300 ${
+            className={`rounded-3xl border p-6 md:p-10 relative overflow-hidden flex flex-col justify-between group transition-all duration-300 ${
               isDarkMode 
                 ? 'bg-[#09090f]/90 border-indigo-500/10 hover:border-indigo-500/20 shadow-[0_15px_50px_rgba(99,102,241,0.04)]' 
-                : 'bg-[#e3ecf7] border-indigo-500/10 hover:border-indigo-500/20 shadow-[0_15px_50px_rgba(99,102,241,0.02)]'
+                : 'bg-white border-indigo-500/10 hover:border-indigo-500/20 shadow-[0_15px_50px_rgba(99,102,241,0.02)]'
             }`}
           >
             {/* Soft background glow */}
             <div className="absolute top-0 right-0 w-72 h-72 rounded-full blur-[80px] pointer-events-none -z-10 bg-indigo-500/[0.03] dark:bg-indigo-500/[0.02]" />
 
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
               
               {/* Left Column of Card 1: Text & Features */}
-              <div className="md:col-span-7 space-y-6">
+              <div className="md:col-span-6 space-y-6">
                 
                 {/* Header Icon Block */}
                 <div className="space-y-4">
@@ -91,7 +91,7 @@ export default function BuiltForEveryone({ isDarkMode = false }: BuiltForEveryon
                       For App Owners
                     </h3>
                     <p className={`text-xs md:text-sm font-medium leading-relaxed mt-1.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      Upload your app, get it tested by real users, and release with confidence.
+                      Monitor your testing progress, review detailed bug reports, and contact our admin team to publish new apps. Full project visibility from day one.
                     </p>
                   </div>
                 </div>
@@ -99,7 +99,7 @@ export default function BuiltForEveryone({ isDarkMode = false }: BuiltForEveryon
                 {/* Features Bullet List */}
                 <ul className="space-y-3.5 pt-2">
                   {[
-                    'Upload APK / AAB Files',
+                    'Request app publication via admin',
                     'Choose Test Types & Devices',
                     'Get Real User Feedback',
                     'Detailed Bug Reports',
@@ -131,17 +131,17 @@ export default function BuiltForEveryone({ isDarkMode = false }: BuiltForEveryon
 
               </div>
 
-              {/* Right Column of Card 1: Beautiful Static Mockup Image */}
-              <div className="md:col-span-5 relative flex flex-col justify-center items-center pt-8 md:pt-0">
-                <img 
+              {/* Right Column of Card 1: Beautiful Enlarged Mockup Image */}
+              <div className="md:col-span-6 relative flex flex-col justify-center items-center pt-8 md:pt-0">
+                <motion.img 
                   src={ownerImage.src} 
                   alt="Upload Dashboard"
                   referrerPolicy="no-referrer"
-                  className="rounded-2xl max-w-full h-auto brightness-[0.95] dark:brightness-[0.85]"
-                  style={{
-                    WebkitMaskImage: 'radial-gradient(ellipse, rgba(0,0,0,1) 75%, rgba(0,0,0,0) 100%)',
-                    maskImage: 'radial-gradient(ellipse, rgba(0,0,0,1) 75%, rgba(0,0,0,0) 100%)'
-                  }}
+                  initial={{ opacity: 0, x: 50 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                  className="rounded-2xl w-[220px] sm:w-[260px] md:w-[280px] lg:w-[320px] h-auto object-contain scale-110 md:scale-125 transform transition-transform duration-500 group-hover:scale-130 drop-shadow-2xl brightness-[0.98] dark:brightness-[0.9]"
                 />
               </div>
 
@@ -154,19 +154,19 @@ export default function BuiltForEveryone({ isDarkMode = false }: BuiltForEveryon
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-            className={`rounded-3xl border p-8 md:p-10 relative overflow-hidden flex flex-col justify-between group transition-all duration-300 ${
+            className={`rounded-3xl border p-6 md:p-10 relative overflow-hidden flex flex-col justify-between group transition-all duration-300 ${
               isDarkMode 
                 ? 'bg-[#050b07]/90 border-emerald-500/10 hover:border-emerald-500/20 shadow-[0_15px_50px_rgba(16,185,129,0.04)]' 
-                : 'bg-[#eefff3] border-emerald-500/10 hover:border-emerald-500/20 shadow-[0_15px_50px_rgba(16,185,129,0.02)]'
+                : 'bg-white border-emerald-500/10 hover:border-emerald-500/20 shadow-[0_15px_50px_rgba(16,185,129,0.02)]'
             }`}
           >
             {/* Soft background glow */}
             <div className="absolute top-0 right-0 w-72 h-72 rounded-full blur-[80px] pointer-events-none -z-10 bg-emerald-500/[0.03] dark:bg-emerald-500/[0.02]" />
 
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
               
               {/* Left Column of Card 2: Text & Features */}
-              <div className="md:col-span-7 space-y-6">
+              <div className="md:col-span-6 space-y-6">
                 
                 {/* Header Icon Block */}
                 <div className="space-y-4">
@@ -222,17 +222,17 @@ export default function BuiltForEveryone({ isDarkMode = false }: BuiltForEveryon
 
               </div>
 
-              {/* Right Column of Card 2: Beautiful Static Mockup Image */}
-              <div className="md:col-span-5 relative flex flex-col justify-center items-center pt-8 md:pt-0">
-                <img 
+              {/* Right Column of Card 2: Beautiful Enlarged Mockup Image */}
+              <div className="md:col-span-6 relative flex flex-col justify-center items-center pt-8 md:pt-0">
+                <motion.img 
                   src={testerImage.src} 
                   alt="Discover Apps"
                   referrerPolicy="no-referrer"
-                  className="rounded-2xl max-w-full h-auto brightness-[0.95] dark:brightness-[0.85]"
-                  style={{
-                    WebkitMaskImage: 'radial-gradient(ellipse, rgba(0,0,0,1) 75%, rgba(0,0,0,0) 100%)',
-                    maskImage: 'radial-gradient(ellipse, rgba(0,0,0,1) 75%, rgba(0,0,0,0) 100%)'
-                  }}
+                  initial={{ opacity: 0, x: 50 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                  className="rounded-2xl w-[220px] sm:w-[260px] md:w-[280px] lg:w-[320px] h-auto object-contain scale-110 md:scale-125 transform transition-transform duration-500 group-hover:scale-130 drop-shadow-2xl brightness-[0.98] dark:brightness-[0.9]"
                 />
               </div>
 

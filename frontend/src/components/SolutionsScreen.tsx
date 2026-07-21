@@ -87,7 +87,7 @@ export default function SolutionsScreen({ onSelectTester, isDarkMode = false }: 
           </div>
           <h3 className={`font-bold text-lg mb-3 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>1. Background Verification</h3>
           <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-gray-500' : 'text-slate-500'}`}>
-            Every tester is certified by LaunchTest and undergoes thorough identity verification, technical screening, and NDA execution to protect your IP.
+            Every tester is certified by LaunchOps and undergoes thorough identity verification, technical screening, and NDA execution to protect your IP.
           </p>
         </div>
 

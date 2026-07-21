@@ -79,7 +79,7 @@ export default function WatchWorksModal({ isOpen, onClose, isDarkMode = false }:
           <div className="flex items-center gap-2">
             <Sparkles className={`w-5 h-5 animate-pulse ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`} />
             <h3 className={`font-extrabold text-xl tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-              LAUNCHTEST IN ACTION
+              LAUNCHOPS IN ACTION
             </h3>
           </div>
           <button
