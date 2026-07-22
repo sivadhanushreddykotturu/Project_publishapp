@@ -36,6 +36,7 @@ import {
   mapAssignment, mapBugReport, mapProject, mapTesterProfile, mapWallet, mapWithdrawal,
   paiseToRupees, rupeesToPaise,
 } from './lib/launchops-mappers';
+import { API_BASE_URL } from './lib/api';
 
 const emptyTester: Tester = { id: '', name: 'Tester', avatar: '', country: 'India', devices: [], bugsFoundCount: 0, rating: 0, specialty: 'General Testing', status: 'Idle', upiId: '', walletBalance: 0 };
 
@@ -678,7 +679,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   };
   const apiSubmitStep1 = async (assignmentId: string, email: string, screenshotUrl?: string) => { await submitAssignmentProof(assignmentId, { step: 1, fileUrl: screenshotUrl || email }, await getTokenOrThrow()); await refreshTesterData(); };
   const apiSubmitStep3 = async (assignmentId: string, screenshotUrl?: string) => {
-    if (!screenshotUrl) { window.open(`http://localhost:4000/t/${assignmentId}`, '_blank', 'noopener,noreferrer'); return; }
+    if (!screenshotUrl) { window.open(`${API_BASE_URL}/t/${assignmentId}`, '_blank', 'noopener,noreferrer'); return; }
     await submitAssignmentProof(assignmentId, { step: 3, fileUrl: screenshotUrl }, await getTokenOrThrow()); await refreshTesterData();
   };
   const apiSubmitStep4 = async (assignmentId: string) => { await submitAssignmentProof(assignmentId, { step: 4, fileUrl: `check-in:${new Date().toISOString()}` }, await getTokenOrThrow()); await refreshTesterData(); };
