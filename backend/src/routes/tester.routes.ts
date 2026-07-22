@@ -3,6 +3,7 @@ import {
   getMyTesterProfile,
   upsertMyTesterProfile,
   listTesters,
+  listPublicTesterDirectory,
   getTesterById,
   updateTesterStatus,
 } from "../controllers/tester.controller";
@@ -83,6 +84,7 @@ router.put("/me", requireAuth(), requireRole("tester"), upsertMyTesterProfile);
  *                 meta: { $ref: '#/components/schemas/PaginationMeta' }
  */
 router.get("/", requireAuth(), requireRole("admin"), listTesters);
+router.get("/directory", listPublicTesterDirectory);
 
 /**
  * @openapi

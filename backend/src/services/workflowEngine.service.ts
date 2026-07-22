@@ -6,6 +6,8 @@ import { recordAudit } from "../middleware/audit";
 import { ApiError } from "../utils/apiError";
 import { creditEarning } from "./wallet.service";
 import { env } from "../config/env";
+import { Tester } from "../models/Tester";
+import { dispatchNotification } from "./notification.service";
 
 /**
  * Step template matching Google's actual closed-testing timeline (verified against
@@ -291,6 +293,18 @@ export async function activateProject(projectId: Types.ObjectId) {
   await project.save();
 
   await MetricEvent.create({ type: "opportunity_published", projectId: project._id, meta: {} });
+
+  const testerFilter: Record<string, unknown> = { status: "active" };
+  const requiredDeviceModels = project.requiredDeviceModels ?? [];
+  if (requiredDeviceModels.length > 0) testerFilter["devices.model"] = { $in: requiredDeviceModels };
+  const eligibleTesters = await Tester.find(testerFilter);
+  await Promise.all(eligibleTesters.map((tester) => dispatchNotification({
+    recipientUserId: tester.userId,
+    type: "project_opportunity",
+    channel: "email",
+    relatedId: project._id.toString(),
+    payload: { projectId: project._id.toString(), appName: project.appDetails.appName, requiredDeviceModels, joinPath: `/tester/explore?project=${project._id}` },
+  })));
 
   const joinLink = `${env.webBaseUrl}/join/${project._id.toString()}`;
   const whatsappPost = [

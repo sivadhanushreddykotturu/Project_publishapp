@@ -7,9 +7,19 @@ import { attemptSend } from "../services/notification.service";
 
 export const listNotifications = asyncHandler(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req);
-  const filter: Record<string, unknown> = {};
+  const filter: Record<string, unknown> = req.dbUser?.role === "admin" ? {} : { recipientId: req.dbUser!._id };
   if (req.query.status) filter.status = req.query.status;
 
+  const [items, total] = await Promise.all([
+    Notification.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    Notification.countDocuments(filter),
+  ]);
+  res.status(200).json({ data: items, meta: buildPageMeta(page, limit, total) });
+});
+
+export const listMyNotifications = asyncHandler(async (req: Request, res: Response) => {
+  const { page, limit, skip } = getPagination(req);
+  const filter = { recipientId: req.dbUser!._id };
   const [items, total] = await Promise.all([
     Notification.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
     Notification.countDocuments(filter),

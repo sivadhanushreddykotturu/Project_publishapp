@@ -44,6 +44,8 @@ async function sendViaChannel(
 
 function emailSubject(type: NotificationType): string {
   const subjects: Record<NotificationType, string> = {
+    project_request: "New client project request awaiting approval",
+    project_opportunity: "New testing project available",
     testing_link: "You're in! Your LaunchOps testing link",
     step_reminder: "Reminder: action needed on your LaunchOps project",
     step_verified: "Step verified — you've moved to the next stage",

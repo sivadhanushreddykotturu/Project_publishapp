@@ -44,7 +44,7 @@ export default function ClientDashboard({
   const [appName, setAppName] = useState('');
   const [version, setVersion] = useState('v1.0.0');
   const [category, setCategory] = useState('Productivity');
-  const [devices, setDevices] = useState<string[]>(['Google Pixel 8 Pro', 'Samsung Galaxy S24 Ultra']);
+  const [devices, setDevices] = useState<string[]>([]);
   const [packageTier, setPackageTier] = useState<'testers_only' | 'managed_testing' | 'launch_ready' | 'custom'>('testers_only');
   const [testersRequired, setTestersRequired] = useState(14);
   const [packageName, setPackageName] = useState('');
@@ -131,6 +131,7 @@ export default function ClientDashboard({
     setReleaseNotes('');
     setDemoCredentials('');
     setInstructions('');
+    setDevices([]);
     setNewProjectSuccess(true);
   };
 
@@ -580,6 +581,20 @@ export default function ClientDashboard({
                     </div>
                   </div>
 
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-500 block mb-2 font-mono">Required Device Models (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Google Pixel 8 Pro, Samsung Galaxy S24"
+                      value={devices.join(', ')}
+                      onChange={(e) => setDevices(e.target.value.split(',').map((device) => device.trim()).filter(Boolean))}
+                      className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500 ${
+                        isDarkMode ? 'bg-[#09090B] border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1.5">Leave blank to notify all active testers. Device names must match a tester's registered device.</p>
+                  </div>
+
                   {/* Package Name & APK Link Fields */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
@@ -693,8 +708,8 @@ export default function ClientDashboard({
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       {[
                         { id: 'testers_only', title: 'Testers Only', desc: '14 whitelisted users slot allotment.', price: '₹4,999' },
-                        { id: 'managed_testing', title: 'Managed Track', desc: '20 whitelists + weekly telemetry.', price: '₹12,499' },
-                        { id: 'launch_ready', title: 'Launch Ready', desc: '20 whitelists + continuous logs.', price: '₹24,999' }
+                        { id: 'managed_testing', title: 'Managed Track', desc: '14 whitelists + weekly telemetry.', price: '₹12,499' },
+                        { id: 'launch_ready', title: 'Launch Ready', desc: '14 whitelists + continuous logs.', price: '₹24,999' }
                       ].map((tier) => {
                         const isChosen = packageTier === tier.id;
                         return (
@@ -703,7 +718,7 @@ export default function ClientDashboard({
                             type="button"
                             onClick={() => {
                               setPackageTier(tier.id as any);
-                              setTestersRequired(tier.id === 'testers_only' ? 14 : 20);
+                              setTestersRequired(14);
                             }}
                             className={`p-5 border rounded-2xl text-left transition-all duration-300 cursor-pointer ${
                               isChosen 

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listNotifications, resendNotification } from "../controllers/notification.controller";
+import { listNotifications, listMyNotifications, resendNotification } from "../controllers/notification.controller";
 import { requireAuth, requireRole } from "../middleware/auth";
 
 const router = Router();
@@ -25,6 +25,7 @@ const router = Router();
  *                 meta: { $ref: '#/components/schemas/PaginationMeta' }
  */
 router.get("/", requireAuth(), requireRole("admin"), listNotifications);
+router.get("/me", requireAuth(), listMyNotifications);
 
 /**
  * @openapi

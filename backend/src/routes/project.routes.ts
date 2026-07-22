@@ -5,6 +5,7 @@ import {
   listTesterOpportunities,
   getProjectById,
   joinProjectAsTester,
+  assignTesterToProject,
   getProjectQueue,
   getVerifiedEmails,
   submitProjectVerification,
@@ -123,6 +124,7 @@ router.get("/:id", requireAuth(), requireRole("client", "admin"), getProjectById
  *       409: { description: Tester already joined this project }
  */
 router.post("/:id/join", requireAuth(), requireRole("tester"), joinProjectAsTester);
+router.post("/:id/assignments", requireAuth(), requireRole("admin"), assignTesterToProject);
 
 /**
  * @openapi

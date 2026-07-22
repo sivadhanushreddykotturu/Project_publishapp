@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Smartphone, Cpu, CheckCircle2, Clock, Wrench, RefreshCw } from 'lucide-react';
 import { AndroidDevice } from '../types';
-import { MOCK_DEVICES } from '../mockData';
+import { listPublicTesterDirectory } from '../lib/launchops-api';
 import BlurText from './ui/BlurText';
 
 interface ResourcesScreenProps {
@@ -9,9 +9,20 @@ interface ResourcesScreenProps {
 }
 
 export default function ResourcesScreen({ isDarkMode = false }: ResourcesScreenProps) {
-  const [devices, setDevices] = useState<AndroidDevice[]>(MOCK_DEVICES);
+  const [devices, setDevices] = useState<AndroidDevice[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [brandFilter, setBrandFilter] = useState<string>('all');
+
+  useEffect(() => {
+    void listPublicTesterDirectory().then(({ data }) => {
+      const unique = new Map<string, AndroidDevice>();
+      data.flatMap((profile) => profile.devices).forEach((device) => {
+        const key = `${device.model}-${device.androidVersion}`;
+        if (!unique.has(key)) unique.set(key, { id: key, name: device.model, brand: device.model.split(' ')[0] || 'Android', osVersion: device.androidVersion, screenSize: 'Registered physical device', status: 'Available' });
+      });
+      setDevices([...unique.values()]);
+    }).catch(() => setDevices([]));
+  }, []);
 
   const filteredDevices = devices.filter((dev) => {
     const matchesSearch = dev.name.toLowerCase().includes(searchQuery.toLowerCase()) || 

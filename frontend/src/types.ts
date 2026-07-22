@@ -16,6 +16,8 @@ export interface TestApp {
   verificationStatus?: 'pending' | 'approved' | 'rejected' | 'none';
   invoiceStatus?: 'none' | 'awaiting_payment' | 'paid';
   testersRequired?: number;
+  waitlistCount?: number;
+  joinState?: 'open' | 'full' | 'closed';
   whatsappGroupLink?: string;
   optInUrl?: string;
   playIntegration?: {

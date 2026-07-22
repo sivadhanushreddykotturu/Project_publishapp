@@ -7,12 +7,12 @@ import { syncLaunchOpsUser, type LaunchOpsUser } from "../lib/launchops-api";
 
 type ClerkAuthScreenProps = {
   isDarkMode: boolean;
-  onLoginSuccess: (testerName?: string) => void;
+  onLoginSuccess: (name: string, role: "tester" | "client" | "admin") => void;
   onBackToHome: () => void;
 };
 
 type SyncState = "idle" | "syncing" | "synced" | "error";
-const launchOpsSignupRole = "tester" as const;
+const intendedRoleKey = "launchops_intended_role";
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -34,6 +34,10 @@ export default function ClerkAuthScreen({ isDarkMode, onLoginSuccess, onBackToHo
   const [syncError, setSyncError] = useState<string>("");
   const [launchOpsUser, setLaunchOpsUser] = useState<LaunchOpsUser | null>(null);
   const [syncAttempt, setSyncAttempt] = useState(0);
+  const [selectedRole, setSelectedRole] = useState<"tester" | "client">(() => {
+    if (typeof window === "undefined") return "tester";
+    return sessionStorage.getItem(intendedRoleKey) === "client" ? "client" : "tester";
+  });
   const syncStartedRef = useRef(false);
   const getTokenRef = useRef(getToken);
   const onLoginSuccessRef = useRef(onLoginSuccess);
@@ -79,12 +83,23 @@ export default function ClerkAuthScreen({ isDarkMode, onLoginSuccess, onBackToHo
         if (!email) throw new Error("Your Clerk account needs a primary email address");
 
         const name = displayName || email.split("@")[0];
-        const response = await syncLaunchOpsUser({ role: launchOpsSignupRole, name, email }, token);
+        const intendedRole = sessionStorage.getItem(intendedRoleKey);
+        const signupMetadataRole = user?.unsafeMetadata?.launchOpsRole ?? user?.unsafeMetadata?.role;
+        const savedMetadataRole = user?.publicMetadata?.launchOpsRole ?? user?.publicMetadata?.role;
+        const requestedRole = intendedRole === "client" || intendedRole === "tester"
+          ? intendedRole
+          : signupMetadataRole === "client" || signupMetadataRole === "tester"
+            ? signupMetadataRole
+            : savedMetadataRole === "client" || savedMetadataRole === "tester"
+              ? savedMetadataRole
+              : selectedRole;
+        const response = await syncLaunchOpsUser({ role: requestedRole, name, email }, token);
         if (cancelled) return;
 
         setLaunchOpsUser(response.data);
         setSyncState("synced");
-        onLoginSuccessRef.current(response.data.name);
+        sessionStorage.removeItem(intendedRoleKey);
+        onLoginSuccessRef.current(response.data.name, response.data.role);
       } catch (error) {
         if (cancelled) return;
         syncStartedRef.current = false;
@@ -99,7 +114,7 @@ export default function ClerkAuthScreen({ isDarkMode, onLoginSuccess, onBackToHo
       cancelled = true;
       syncStartedRef.current = false;
     };
-  }, [displayName, email, isLoaded, isSignedIn, isUserLoaded, syncAttempt, userId]);
+  }, [displayName, email, isLoaded, isSignedIn, isUserLoaded, selectedRole, syncAttempt, userId]);
 
   return (
     <div
@@ -132,7 +147,7 @@ export default function ClerkAuthScreen({ isDarkMode, onLoginSuccess, onBackToHo
             LaunchTest Account
           </h2>
           <p className={`mt-2 text-sm font-semibold ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>
-            Tester access is connected to LaunchOps.
+            Sign in to your client or tester workspace.
           </p>
         </div>
       </div>
@@ -154,6 +169,26 @@ export default function ClerkAuthScreen({ isDarkMode, onLoginSuccess, onBackToHo
 
           {isLoaded && !isSignedIn && (
             <div className="space-y-4">
+              <div className={`grid grid-cols-2 gap-1 rounded-xl p-1 ${isDarkMode ? "bg-white/5" : "bg-slate-100"}`}>
+                {(["client", "tester"] as const).map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => {
+                      setSelectedRole(role);
+                      sessionStorage.setItem(intendedRoleKey, role);
+                    }}
+                    className={`rounded-lg px-3 py-2 text-xs font-extrabold uppercase transition ${
+                      selectedRole === role
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : isDarkMode ? "text-slate-400 hover:text-white" : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+
               <SignInButton mode="modal" forceRedirectUrl="/">
                 <button className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition hover:shadow-lg hover:shadow-indigo-500/20 cursor-pointer border-0">
                   Sign In
@@ -163,7 +198,7 @@ export default function ClerkAuthScreen({ isDarkMode, onLoginSuccess, onBackToHo
               <SignUpButton
                 mode="modal"
                 forceRedirectUrl="/"
-                unsafeMetadata={{ role: launchOpsSignupRole, launchOpsRole: launchOpsSignupRole }}
+                unsafeMetadata={{ role: selectedRole, launchOpsRole: selectedRole }}
               >
                 <button
                   className={`w-full py-3.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-3 transition border cursor-pointer ${
@@ -173,7 +208,7 @@ export default function ClerkAuthScreen({ isDarkMode, onLoginSuccess, onBackToHo
                   }`}
                 >
                   <UserPlus className="w-4 h-4" />
-                  Create Tester Account
+                  Create {selectedRole === "client" ? "Client" : "Tester"} Account
                 </button>
               </SignUpButton>
             </div>

@@ -94,6 +94,8 @@ export const NOTIFICATION_STATUSES = ["queued", "sent", "failed"] as const;
 export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number];
 
 export const NOTIFICATION_TYPES = [
+  "project_request",
+  "project_opportunity",
   "testing_link",
   "step_reminder",
   "step_verified",

@@ -22,6 +22,13 @@ export async function joinProject(projectId: Types.ObjectId, testerId: Types.Obj
   if (project.status !== "active" && project.status !== "full") {
     throw ApiError.badRequest("Project is not currently accepting testers");
   }
+  if (project.joinState === "closed") throw ApiError.conflict("Enrollment is closed: all 14 tester slots and 3 waitlist spots are filled");
+  const tester = await Tester.findById(testerId);
+  if (!tester) throw ApiError.notFound("Tester not found");
+  const requiredDevices = project.requiredDeviceModels ?? [];
+  if (requiredDevices.length > 0 && !tester.devices.some((device) => requiredDevices.includes(device.model))) {
+    throw ApiError.forbidden("This project requires a registered matching device");
+  }
 
   const claimed = await Project.findOneAndUpdate(
     { _id: projectId, $expr: { $lt: ["$activeTesterCount", "$requiredTesters"] } },
@@ -47,7 +54,7 @@ export async function joinProject(projectId: Types.ObjectId, testerId: Types.Obj
 
     await MetricEvent.create({ type: "tester_joined", projectId, meta: { testerId, status: "active" } });
     await dispatchNotification({
-      recipientUserId: (await Tester.findById(testerId))!.userId,
+      recipientUserId: tester.userId,
       type: "testing_link",
       channel: "email",
       relatedId: assignment._id.toString(),
@@ -56,8 +63,17 @@ export async function joinProject(projectId: Types.ObjectId, testerId: Types.Obj
     return assignment;
   }
 
-  const lastQueued = await Assignment.findOne({ projectId, status: "queued" }).sort({ queuePosition: -1 });
-  const queuePosition = (lastQueued?.queuePosition ?? 0) + 1;
+  const waitlistClaim = await Project.findOneAndUpdate(
+    {
+      _id: projectId,
+      joinState: { $ne: "closed" },
+      $or: [{ waitlistCount: { $lt: 3 } }, { waitlistCount: { $exists: false } }],
+    },
+    { $inc: { waitlistCount: 1 } },
+    { new: true }
+  );
+  if (!waitlistClaim) throw ApiError.conflict("Enrollment is closed: the 3-person waitlist is full");
+  const queuePosition = waitlistClaim.waitlistCount;
 
   const assignment = await Assignment.create({
     projectId,
@@ -66,6 +82,10 @@ export async function joinProject(projectId: Types.ObjectId, testerId: Types.Obj
     queuePosition,
     lastActivityAt: new Date(),
   });
+  if (waitlistClaim.waitlistCount >= 3) {
+    waitlistClaim.joinState = "closed";
+    await waitlistClaim.save();
+  }
 
   await MetricEvent.create({ type: "tester_joined", projectId, meta: { testerId, status: "queued", queuePosition } });
   return assignment;
@@ -96,6 +116,9 @@ export async function promoteFromQueue(projectId: Types.ObjectId) {
     await Project.findByIdAndUpdate(projectId, { $inc: { activeTesterCount: -1 } });
     return null;
   }
+  claimedProject.waitlistCount = Math.max(0, (claimedProject.waitlistCount ?? 0) - 1);
+  claimedProject.joinState = claimedProject.activeTesterCount >= claimedProject.requiredTesters ? "full" : "open";
+  await claimedProject.save();
 
   await MetricEvent.create({ type: "tester_replaced", projectId, meta: { promotedAssignmentId: promoted._id } });
   const tester = await Tester.findById(promoted.testerId);

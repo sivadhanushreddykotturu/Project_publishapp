@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Tester, TestApp, TesterAssignment, BugReport, Transaction, WithdrawalRequest } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
+import type { BackendNotification } from '../lib/launchops-api';
 
 interface TesterDashboardProps {
   isDarkMode: boolean;
@@ -16,16 +17,14 @@ interface TesterDashboardProps {
   bugs: BugReport[];
   transactions: Transaction[];
   withdrawals: WithdrawalRequest[];
+  notifications: BackendNotification[];
   onUpdateTesterProfile: (updatedTester: Partial<Tester>) => void;
   onJoinProject: (projectId: string) => void;
   onSubmitStep1Email: (assignmentId: string, email: string, screenshotUrl?: string) => void;
   onClickStep3Link: (assignmentId: string, screenshotUrl?: string) => void;
   onLogStep4CheckIn: (assignmentId: string) => void;
-  onSubmitBugReport: (bugReport: Omit<BugReport, 'id' | 'createdAt' | 'testerName' | 'testerAvatar' | 'screenshot'> & { screenshot?: string }) => void;
-  onRequestWithdrawal: (amount: number, upiId: string) => { success: boolean; error?: string };
-  // Simulation Helpers
-  onSimulateAdminAdvanceStep: (assignmentId: string) => void;
-  onSimulateFastForwardDay: (assignmentId: string) => void;
+  onSubmitBugReport: (bugReport: Omit<BugReport, 'id' | 'createdAt' | 'testerName' | 'testerAvatar' | 'screenshot'> & { screenshot?: string }) => void | Promise<void>;
+  onRequestWithdrawal: (amount: number, upiId: string) => { success: boolean; error?: string } | Promise<{ success: boolean; error?: string }>;
   onLogout: () => void;
   initialTab?: string;
   onTabChange?: (tab: string) => void;
@@ -39,6 +38,7 @@ export default function TesterDashboard({
   bugs,
   transactions,
   withdrawals,
+  notifications,
   onUpdateTesterProfile,
   onJoinProject,
   onSubmitStep1Email,
@@ -46,8 +46,6 @@ export default function TesterDashboard({
   onLogStep4CheckIn,
   onSubmitBugReport,
   onRequestWithdrawal,
-  onSimulateAdminAdvanceStep,
-  onSimulateFastForwardDay,
   onLogout,
   initialTab,
   onTabChange
@@ -61,6 +59,7 @@ export default function TesterDashboard({
   });
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
   
   // Simulation & Modal States
   const [googlePlayEmail, setGooglePlayEmail] = useState<string>('');
@@ -216,7 +215,7 @@ export default function TesterDashboard({
 
   const [bugErrors, setBugErrors] = useState<{ bugAppId?: string; bugTitle?: string; bugSteps?: string }>({});
 
-  const handleBugSubmit = (e: React.FormEvent) => {
+  const handleBugSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBugSuccess(false);
     setBugErrors({});
@@ -326,7 +325,7 @@ export default function TesterDashboard({
       isDarkMode ? 'bg-[#09090B] text-slate-100' : 'bg-slate-50 text-slate-900'
     }`}>
       {/* 1. Left Sidebar Navigation */}
-      <aside className={`w-[260px] border-r shrink-0 hidden md:flex flex-col justify-between p-6 sticky top-20 h-[calc(100vh-5rem)] ${
+      <aside className={`w-[260px] border-r shrink-0 hidden md:flex flex-col justify-between p-6 sticky top-0 h-screen ${
         isDarkMode ? 'bg-[#09090B] border-zinc-800' : 'bg-white border-slate-200'
       }`}>
         <div className="space-y-8">
@@ -396,7 +395,7 @@ export default function TesterDashboard({
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
         
         {/* 2. Top Header Bar */}
-        <header className={`border-b px-6 py-4 flex items-center justify-between sticky top-20 z-40 backdrop-blur-xs ${
+        <header className={`border-b px-6 py-4 flex items-center justify-between sticky top-0 z-40 backdrop-blur-xs ${
           isDarkMode ? 'bg-[#09090B]/90 border-zinc-800' : 'bg-white/95 border-slate-200'
         }`}>
           <div>
@@ -408,12 +407,23 @@ export default function TesterDashboard({
 
           <div className="flex items-center gap-4 relative">
             {/* Bell Notifications */}
-            <button className={`p-2 rounded-xl relative border cursor-pointer bg-transparent ${
+            <button onClick={() => setNotificationDropdownOpen((open) => !open)} className={`p-2 rounded-xl relative border cursor-pointer bg-transparent ${
               isDarkMode ? 'border-zinc-800 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600 hover:text-slate-900'
             }`}>
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-indigo-600 rounded-full border-2 border-white" />
+              {notifications.length > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-indigo-600 rounded-full border-2 border-white" />}
             </button>
+            {notificationDropdownOpen && (
+              <div className={`absolute right-0 top-12 w-80 max-h-96 overflow-y-auto rounded-xl border p-2 shadow-xl z-50 ${isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                {notifications.length === 0 ? <p className="p-3 text-xs text-slate-500">No notifications.</p> : notifications.map((notification) => (
+                  <button key={notification._id} onClick={() => { if (notification.type === 'project_opportunity') handleTabSelect('explore'); setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs ${isDarkMode ? 'hover:bg-zinc-900' : 'hover:bg-slate-50'}`}>
+                    <span className="font-bold block">{notification.type === 'project_opportunity' ? 'New testing opportunity' : notification.type.replace(/_/g, ' ')}</span>
+                    <span className="text-slate-500 block mt-1">{String(notification.payload.appName ?? '')}</span>
+                    {notification.payload.requiredDeviceModels?.length ? <span className="text-indigo-500 block mt-1">Device: {notification.payload.requiredDeviceModels.join(', ')}</span> : null}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Profile Avatar Trigger */}
             <div 
@@ -934,8 +944,8 @@ export default function TesterDashboard({
                                     : `Log Check-In (Day ${selectedAssignment.step4CheckInsCompleted + 1})`}
                                 </button>
                                 <button
-                                  onClick={() => onSimulateFastForwardDay(selectedAssignment.id)}
-                                  className="px-4 py-2.5 rounded-xl text-xs font-bold border border-indigo-500/25 bg-indigo-950/20 text-indigo-400 cursor-pointer"
+                                  hidden
+                                  className="hidden"
                                 >
                                   Simulate Fast Forward Day ⏩
                                 </button>
@@ -1118,7 +1128,7 @@ export default function TesterDashboard({
                 <div className="lg:col-span-5 space-y-8">
                   
                   {/* 1. Available Opportunities */}
-                  {showDashboardOpportunityPanel && (
+                  {(
                   <div className={`border rounded-2xl p-6 ${
                     isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200 shadow-xs'
                   }`}>
@@ -1159,13 +1169,14 @@ export default function TesterDashboard({
                               ) : (
                                 <button
                                   onClick={() => onJoinProject(p.id)}
+                                  disabled={p.joinState === 'closed'}
                                   className={`px-4 py-2 border rounded-xl text-xs font-extrabold transition-all cursor-pointer bg-transparent ${
                                     isDarkMode
                                       ? 'border-zinc-700 hover:border-zinc-600 text-white hover:bg-zinc-800/30'
                                       : 'border-indigo-500 hover:bg-indigo-50/20 text-indigo-600'
                                   }`}
                                 >
-                                  Join
+                                  {p.joinState === 'closed' ? 'Enrollment Closed' : p.joinState === 'full' ? `Join Waitlist (${p.waitlistCount ?? 0}/3)` : 'Join'}
                                 </button>
                               )}
                             </div>
@@ -1324,9 +1335,10 @@ export default function TesterDashboard({
                       ) : (
                         <button
                           onClick={() => onJoinProject(p.id)}
+                          disabled={p.joinState === 'closed'}
                           className="w-full btn-gradient text-white py-2.5 rounded-xl font-bold text-xs border-0 cursor-pointer shadow-md"
                         >
-                          Join Testing Track
+                          {p.joinState === 'closed' ? 'Enrollment Closed (14 + 3)' : p.joinState === 'full' ? `Enter Waitlist (${p.waitlistCount ?? 0}/3)` : 'Join Testing Track'}
                         </button>
                       )}
                     </div>

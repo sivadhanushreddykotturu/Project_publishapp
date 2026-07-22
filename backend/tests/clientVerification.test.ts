@@ -41,7 +41,7 @@ afterEach(async () => {
 });
 
 describe("client package verification gate", () => {
-  it("testers_only stays self-serve: invoice created immediately, no verification required", async () => {
+  it("routes testers_only through admin approval before creating an invoice", async () => {
     await signUpClient("clerk_c1");
 
     const res = await request(app)
@@ -50,9 +50,9 @@ describe("client package verification gate", () => {
       .send({ package: "testers_only", appDetails: { appName: "App One" } });
 
     expect(res.status).toBe(201);
-    expect(res.body.data.invoice).not.toBeNull();
-    expect(res.body.data.project.status).toBe("awaiting_payment");
-    expect(res.body.data.project.verification.required).toBe(false);
+    expect(res.body.data.invoice).toBeNull();
+    expect(res.body.data.project.status).toBe("pending_verification");
+    expect(res.body.data.project.verification.required).toBe(true);
   });
 
   it("managed_testing blocks payment: no invoice, status pending_verification", async () => {

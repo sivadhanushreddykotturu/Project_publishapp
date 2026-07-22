@@ -81,6 +81,8 @@ export interface IProject extends Document {
   projectType: ProjectType;
   requiredTesters: number;
   activeTesterCount: number;
+  waitlistCount: number;
+  requiredDeviceModels: string[];
   status: ProjectStatus;
   joinState: JoinState;
   steps: IStep[];
@@ -151,6 +153,8 @@ const projectSchema = new Schema<IProject>(
     // Atomic slot counter — incremented only via guarded findOneAndUpdate
     // (activeTesterCount < requiredTesters) so concurrent joins can never overfill a project.
     activeTesterCount: { type: Number, default: 0, min: 0 },
+    waitlistCount: { type: Number, default: 0, min: 0, max: 3 },
+    requiredDeviceModels: { type: [String], default: [] },
     status: { type: String, enum: PROJECT_STATUSES, default: "draft", index: true },
     joinState: { type: String, enum: JOIN_STATES, default: "open" },
     steps: { type: [stepSchema], default: [] },

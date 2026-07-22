@@ -50,6 +50,16 @@ export const listTesters = asyncHandler(async (req: Request, res: Response) => {
   res.status(200).json({ data: items, meta: buildPageMeta(page, limit, total) });
 });
 
+export const listPublicTesterDirectory = asyncHandler(async (_req: Request, res: Response) => {
+  const testers = await Tester.find({ status: "active" })
+    .select("devices experienceLevel ratingAvg ratingCount status")
+    .populate("userId", "name")
+    .sort({ ratingAvg: -1, ratingCount: -1 })
+    .limit(100)
+    .lean();
+  res.status(200).json({ data: testers });
+});
+
 export const getTesterById = asyncHandler(async (req: Request, res: Response) => {
   const tester = await Tester.findById(req.params.id).populate("userId");
   if (!tester) throw ApiError.notFound("Tester not found");

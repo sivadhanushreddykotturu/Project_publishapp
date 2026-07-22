@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { TestApp, BugReport, Tester, TesterAssignment, WithdrawalRequest, Transaction } from './types';
 import Navbar from './components/Navbar';
@@ -21,17 +21,37 @@ import AdminConsole from './components/AdminConsole';
 
 import { MapPin, Users, Heart, ShieldCheck, Sparkles, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  advanceProjectMilestone, assignTesterToProject, checkoutInvoice, completeAdminWithdrawal, createClientProject,
+  getCurrentLaunchOpsUser, getMyTesterProfile, getMyWallet, joinTesterProject,
+  listAdminTesters, listAdminWithdrawals, listInvoices, listMyAssignments, listMyBugReports,
+  listAdminNotifications, listMyNotifications,
+  listProjectAssignments, listProjectBugReports, listProjects, listTesterOpportunities,
+  mergeBugReports, publishBugReport, rejectAdminWithdrawal, replaceAssignment,
+  requestWalletWithdrawal, reviewProjectVerification, submitAssignmentProof,
+  submitClientVerification, submitProjectBugReport, updateMyTesterProfile, verifyAssignment,
+  type BackendInvoice, type BackendNotification, type BackendTesterProfile, type LaunchOpsUser,
+} from './lib/launchops-api';
+import {
+  mapAssignment, mapBugReport, mapProject, mapTesterProfile, mapWallet, mapWithdrawal,
+  paiseToRupees, rupeesToPaise,
+} from './lib/launchops-mappers';
 
-const ENHANCED_INITIAL_APPS: TestApp[] = INITIAL_APPS.map(app => ({
-  ...app,
-  packageTier: 'managed_testing' as const,
-  testersRequired: 35,
-  verificationRequired: true,
-  verificationStatus: 'approved' as const,
-  invoiceStatus: 'paid' as const
-}));
+const emptyTester: Tester = { id: '', name: 'Tester', avatar: '', country: 'India', devices: [], bugsFoundCount: 0, rating: 0, specialty: 'General Testing', status: 'Idle', upiId: '', walletBalance: 0 };
 
-export default function App() {
+type AuthScreenRenderProps = {
+  isDarkMode: boolean;
+  onLoginSuccess: (name: string, role: 'tester' | 'client' | 'admin') => void;
+  onBackToHome: () => void;
+};
+
+type AppProps = {
+  getAuthToken?: () => Promise<string | null>;
+  onSignOut?: () => Promise<void>;
+  renderAuthScreen?: (props: AuthScreenRenderProps) => ReactNode;
+};
+
+export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppProps = {}) {
   // Data version guard — bump this whenever mock data schema changes to clear stale localStorage
   const DATA_VERSION = 'v2';
   if (typeof window !== 'undefined') {
@@ -117,243 +137,109 @@ export default function App() {
   };
 
   // Core Data States with robust key deduplication
-  const [apps, setApps] = useState<TestApp[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchops_apps');
-      if (saved) {
-        try {
-          const parsed: TestApp[] = JSON.parse(saved);
-          const seen = new Set<string>();
-          const uniqueApps: TestApp[] = [];
-          parsed.forEach((app) => {
-            let uniqueId = app.id;
-            if (!uniqueId || seen.has(uniqueId)) {
-              uniqueId = `${uniqueId || 'app'}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-            }
-            seen.add(uniqueId);
-            uniqueApps.push({ ...app, id: uniqueId });
-          });
-          return uniqueApps;
-        } catch (e) {
-          return ENHANCED_INITIAL_APPS;
-        }
-      }
-    }
-    return ENHANCED_INITIAL_APPS;
-  });
-
-  const [bugs, setBugs] = useState<BugReport[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchops_bugs');
-      if (saved) {
-        try {
-          const parsed: BugReport[] = JSON.parse(saved);
-          const seen = new Set<string>();
-          const uniqueBugs: BugReport[] = [];
-          parsed.forEach((bug) => {
-            let uniqueId = bug.id;
-            if (!uniqueId || seen.has(uniqueId)) {
-              uniqueId = `${uniqueId || 'bug'}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-            }
-            seen.add(uniqueId);
-            uniqueBugs.push({ ...bug, id: uniqueId });
-          });
-          return uniqueBugs;
-        } catch (e) {
-          return INITIAL_BUGS;
-        }
-      }
-    }
-    return INITIAL_BUGS;
-  });
-
-  const [devices] = useState<AndroidDevice[]>(MOCK_DEVICES);
+  const [apps, setApps] = useState<TestApp[]>([]);
+  const [bugs, setBugs] = useState<BugReport[]>([]);
+  const [invoices, setInvoices] = useState<BackendInvoice[]>([]);
+  const [dashboardError, setDashboardError] = useState('');
+  const [notifications, setNotifications] = useState<BackendNotification[]>([]);
 
   // Tester Flow Data States
-  const [activeTester, setActiveTester] = useState<Tester>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchops_active_tester');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
-      }
-    }
-    return {
-      id: 'tester-123',
-      name: 'Deven Patel',
-      avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAd4DobtQhtBLqI2y6OKlewxLeYjt-2dWb4zwElRSw3AkyelrVX03GtqcPvaHfiHqBmJ0Vx1zl7HAPThzZFmtQMgzZtTneML_NYjSYU4vG6RBX4fSntKJVcLe6LynQ6fA_uX-2DwS17Tmhy_HeV9OTXke2fR_wxp0Hd8o2jQ8o_JyxlSk8JWlPZB0xIZZFOIlL_M7TFexHbiDgLji027458If5kijP8M31CdMtcgRKCfBSIWIi36ck6kA',
-      country: 'India',
-      devices: ['Google Pixel 8 Pro'],
-      bugsFoundCount: 0,
-      rating: 5.0,
-      specialty: 'General Testing',
-      status: 'Idle',
-      upiId: '',
-      walletBalance: 0
-    };
-  });
+  const [activeTester, setActiveTester] = useState<Tester>(emptyTester);
+  const [adminTesters, setAdminTesters] = useState<Tester[]>([]);
 
-  const [assignments, setAssignments] = useState<TesterAssignment[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchops_assignments');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
-      }
-    }
-    return [];
-  });
+  const [assignments, setAssignments] = useState<TesterAssignment[]>([]);
 
-  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchops_withdrawals');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
-      }
-    }
-    return [];
-  });
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
 
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('launchops_transactions');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) {}
-      }
-    }
-    return [];
-  });
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
   // Modals Controller State
   const [isWatchWorksOpen, setIsWatchWorksOpen] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem('launchops_apps', JSON.stringify(apps));
-  }, [apps]);
-
-  useEffect(() => {
-    localStorage.setItem('launchops_bugs', JSON.stringify(bugs));
-  }, [bugs]);
-
-  useEffect(() => {
-    localStorage.setItem('launchops_active_tester', JSON.stringify(activeTester));
-  }, [activeTester]);
-
-  useEffect(() => {
-    localStorage.setItem('launchops_assignments', JSON.stringify(assignments));
-  }, [assignments]);
-
-  useEffect(() => {
-    localStorage.setItem('launchops_withdrawals', JSON.stringify(withdrawals));
-  }, [withdrawals]);
-
-  useEffect(() => {
-    localStorage.setItem('launchops_transactions', JSON.stringify(transactions));
-  }, [transactions]);
-
-  // Keep refs to avoid stale closures in the simulation interval
-  const appsRef = useRef(apps);
-  const bugsRef = useRef(bugs);
-
-  useEffect(() => {
-    appsRef.current = apps;
-  }, [apps]);
-
-  useEffect(() => {
-    bugsRef.current = bugs;
-  }, [bugs]);
-
-  // Live Simulation Progress Loop for apps under test
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const currentApps = appsRef.current;
-      let appsUpdated = false;
-      const generatedBugs: BugReport[] = [];
-
-      const newApps = currentApps.map((app) => {
-        if (app.status === 'Testing' && app.progress < 100) {
-          appsUpdated = true;
-          const nextProgress = Math.min(app.progress + 4, 100);
-          const isCompleted = nextProgress === 100;
-
-          // Chance to spawn a simulated bug as testing advances
-          const shouldAddBug = Math.random() < 0.22 && nextProgress < 95;
-          let updatedBugsFound = app.bugsFound;
-
-          if (shouldAddBug) {
-            const deviceModels = [
-              'Google Pixel 8 Pro',
-              'Samsung Galaxy S24 Ultra',
-              'OnePlus 12',
-              'Galaxy Z Fold 5'
-            ];
-            const targetDevice = deviceModels[Math.floor(Math.random() * deviceModels.length)];
-            const bugTitles = [
-              'NullPointerException in state restoration on background pause',
-              'Thread sync issue during multi-page animation transit',
-              'Asset scaling cut off on Foldable Inner flex ratio',
-              'BLE sensor pairing timeout error'
-            ];
-            const randomTitle = bugTitles[Math.floor(Math.random() * bugTitles.length)];
-            
-            const testNames = ['Sarah Jenkins', 'Marcus Vance', 'David Kim', 'Elena Rostova'];
-            const randomTesterName = testNames[Math.floor(Math.random() * testNames.length)];
-            const matchingTester = MOCK_TESTERS.find(t => t.name === randomTesterName) || MOCK_TESTERS[0];
-
-            const newBug: BugReport = {
-              id: `bug-gen-${Date.now()}-${app.id}-${Math.floor(Math.random() * 1000000)}`,
-              appId: app.id,
-              appName: app.name,
-              title: `${randomTitle} on ${targetDevice}`,
-              severity: Math.random() < 0.4 ? 'Critical' : 'High',
-              status: 'Open',
-              testerName: matchingTester.name,
-              testerAvatar: matchingTester.avatar,
-              device: targetDevice,
-              osVersion: 'Android 14 (API 34)',
-              reproductionSteps: [
-                `Launch ${app.name} v${app.version}`,
-                'Perform intensive testing scenarios in settings block',
-                'Trigger connection handshake or screen layout rotate',
-                'Verify system crash logs and logcat output'
-              ],
-              createdAt: 'Just now'
-            };
-
-            generatedBugs.push(newBug);
-            updatedBugsFound += 1;
-          }
-
-          return {
-            ...app,
-            progress: nextProgress,
-            bugsFound: updatedBugsFound,
-            status: (isCompleted ? 'Completed' : 'Testing') as 'Completed' | 'Testing'
-          };
-        }
-        return app;
-      });
-
-      if (appsUpdated) {
-        setApps(newApps);
-        if (generatedBugs.length > 0) {
-          setBugs((prevBugs) => {
-            const existingIds = new Set(prevBugs.map((b) => b.id));
-            const uniqueNewBugs = generatedBugs.filter((b) => !existingIds.has(b.id));
-            return [...uniqueNewBugs, ...prevBugs];
-          });
-        }
-      }
-    }, 4500);
-
-    return () => clearInterval(interval);
-  }, []);
-
-
-
-  const handleUpdateBugStatus = (bugId: string, status: BugReport['status']) => {
-    setBugs((prev) =>
-      prev.map((bug) => (bug.id === bugId ? { ...bug, status } : bug))
-    );
+  const getTokenOrThrow = async () => {
+    const token = await getAuthToken?.();
+    if (!token) throw new Error('Your session has expired. Please sign in again.');
+    return token;
   };
+
+  const refreshTesterData = async () => {
+    const token = await getTokenOrThrow();
+    const [me, profileResponse, opportunities, assignmentResponse, walletResponse, bugResponse, notificationResponse] = await Promise.all([
+      getCurrentLaunchOpsUser(token), getMyTesterProfile(token), listTesterOpportunities(token),
+      listMyAssignments(token), getMyWallet(token), listMyBugReports(token), listMyNotifications(token),
+    ]);
+    const tester = mapTesterProfile(profileResponse.data, me.data.user);
+    const wallet = mapWallet(walletResponse.data, tester.id);
+    tester.walletBalance = paiseToRupees(walletResponse.data.balance);
+    tester.bugsFoundCount = bugResponse.data.length;
+    const projectMap = new Map(opportunities.data.map((project) => [project._id, mapProject(project)]));
+    assignmentResponse.data.forEach((assignment) => {
+      if (typeof assignment.projectId === 'object') projectMap.set(assignment.projectId._id, mapProject(assignment.projectId));
+    });
+    setActiveTester(tester);
+    setApps([...projectMap.values()]);
+    setAssignments(assignmentResponse.data.map((assignment) => mapAssignment(assignment, me.data.user)));
+    setWithdrawals(wallet.withdrawals);
+    setTransactions(wallet.transactions);
+    setBugs(bugResponse.data.map((report) => mapBugReport(report, tester)));
+    setNotifications(notificationResponse.data);
+  };
+
+  const refreshClientData = async () => {
+    const token = await getTokenOrThrow();
+    const [projectResponse, invoiceResponse] = await Promise.all([listProjects(token), listInvoices(token)]);
+    const projectBugs = await Promise.all(projectResponse.data.map((project) => listProjectBugReports(project._id, token)));
+    const clientTester = { ...emptyTester, name: 'Verified tester' };
+    const allBugs = projectBugs.flatMap((response) => response.data.map((report) => mapBugReport(report, clientTester)));
+    const invoiceByProject = new Map(invoiceResponse.data.filter((invoice) => invoice.projectId).map((invoice) => [invoice.projectId!, invoice]));
+    setApps(projectResponse.data.map((project) => {
+      const mapped = mapProject(project);
+      const invoice = invoiceByProject.get(project._id);
+      mapped.invoiceStatus = invoice?.status === 'paid' || invoice?.status === 'manual_paid' ? 'paid' : invoice ? 'awaiting_payment' : mapped.invoiceStatus;
+      mapped.bugsFound = allBugs.filter((bug) => bug.appId === project._id).length;
+      return mapped;
+    }));
+    setInvoices(invoiceResponse.data);
+    setBugs(allBugs);
+  };
+
+  const refreshAdminData = async () => {
+    const token = await getTokenOrThrow();
+    const [projectResponse, testerResponse, withdrawalResponse, notificationResponse] = await Promise.all([
+      listProjects(token), listAdminTesters(token), listAdminWithdrawals(token), listAdminNotifications(token),
+    ]);
+    const testers = testerResponse.data.map((profile) => mapTesterProfile(profile as BackendTesterProfile, profile.userId));
+    const [queueResponses, bugResponses] = await Promise.all([
+      Promise.all(projectResponse.data.map((project) => listProjectAssignments(project._id, token))),
+      Promise.all(projectResponse.data.map((project) => listProjectBugReports(project._id, token))),
+    ]);
+    const mappedAssignments = queueResponses.flatMap((response) => response.data.map((assignment) => mapAssignment(assignment)));
+    const mappedBugs = bugResponses.flatMap((response) => response.data.map((report) => {
+      const testerId = typeof report.testerId === 'string' ? report.testerId : '';
+      return mapBugReport(report, testers.find((tester) => tester.id === testerId) ?? { ...emptyTester, name: 'Tester' });
+    }));
+    setApps(projectResponse.data.map((project) => ({ ...mapProject(project), bugsFound: mappedBugs.filter((bug) => bug.appId === project._id).length })));
+    setAdminTesters(testers);
+    setAssignments(mappedAssignments);
+    setBugs(mappedBugs);
+    setWithdrawals(withdrawalResponse.data.map((item) => mapWithdrawal(item, typeof item.testerId === 'string' ? item.testerId : item.testerId._id)));
+    setNotifications(notificationResponse.data);
+  };
+
+  const refreshCurrentDashboard = async () => {
+    setDashboardError('');
+    try {
+      if (currentTab === 'tester') await refreshTesterData();
+      if (currentTab === 'client') await refreshClientData();
+      if (currentTab === 'admin') await refreshAdminData();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : 'Could not load dashboard data.');
+    }
+  };
+
+  useEffect(() => {
+    if (['tester', 'client', 'admin'].includes(currentTab)) void refreshCurrentDashboard();
+  }, [currentTab]);
 
   const handleUpdateTesterProfile = (updated: Partial<Tester>) => {
     setActiveTester(prev => ({
@@ -520,26 +406,15 @@ export default function App() {
   const handleSubmitBugReport = async (
     bugReport: Omit<BugReport, 'id' | 'createdAt' | 'testerName' | 'testerAvatar' | 'screenshot'> & { screenshot?: string }
   ) => {
-    try {
-      const token = await getTokenOrThrow();
-      await submitProjectBugReport(bugReport.appId, {
-        title: bugReport.title,
-        description: bugReport.title,
-        category: 'functional',
-        severity: bugReport.severity.toLowerCase() as 'low' | 'medium' | 'high' | 'critical',
-        device: bugReport.device,
-        appVersion: bugReport.osVersion,
-        expectedResult: 'Expected the app to work without this issue.',
-        actualResult: bugReport.title,
-        stepsToReproduce: bugReport.reproductionSteps,
-        attachments: bugReport.screenshot ? [bugReport.screenshot] : [],
-      }, token);
-      await refreshTesterDashboard();
-    } catch (error) {
-      const message = formatError(error);
-      setDashboardError(message);
-      alert(message);
-    }
+    const nextBug: BugReport = {
+      ...bugReport,
+      id: `bug-${Date.now()}`,
+      createdAt: 'Just now',
+      testerName: activeTester.name,
+      testerAvatar: activeTester.avatar,
+      screenshot: bugReport.screenshot,
+    };
+    setBugs((previous) => [nextBug, ...previous]);
   };
 
   const handleRequestWithdrawal = async (amount: number, upiId: string) => {
@@ -547,19 +422,18 @@ export default function App() {
       return { success: false, error: 'Amount exceeds balance' };
     }
 
-    try {
-      const token = await getTokenOrThrow();
-      if (upiId && upiId !== activeTester.upiId) {
-        await updateMyTesterProfile(profilePayloadFromTester(activeTester, { upiId }), token);
-      }
-      await requestWalletWithdrawal(rupeesToPaise(amount), token);
-      await refreshTesterDashboard();
-      return { success: true };
-    } catch (error) {
-      const message = formatError(error);
-      setDashboardError(message);
-      return { success: false, error: message };
-    }
+    if (amount <= 0) return { success: false, error: 'Enter a valid amount' };
+    setActiveTester((tester) => ({ ...tester, upiId }));
+    setWithdrawals((previous) => [{
+      id: `withdrawal-${Date.now()}`,
+      testerId: activeTester.id,
+      amount,
+      upiId,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      expectedCompletionAt: 'Within 3 business days',
+    }, ...previous]);
+    return { success: true };
   };
 
   const handleSimulateAdminAdvanceStep = (assignmentId: string) => {
@@ -774,6 +648,88 @@ export default function App() {
   };
 
   const isDashboard = ['tester', 'client', 'admin'].includes(currentTab);
+  const isTesterExperience = currentTab === 'tester';
+
+  const handleLogout = async () => {
+    await onSignOut?.();
+    localStorage.removeItem('launchops_current_tab');
+    handleSetTab('home');
+  };
+
+  const apiUpdateTesterProfile = async (updated: Partial<Tester>) => {
+    const token = await getTokenOrThrow();
+    const models = updated.devices ?? activeTester.devices;
+    await updateMyTesterProfile({
+      devices: (models.length ? models : ['Android device']).map((model, index) => ({ model, androidVersion: 'Android 14', fingerprint: `${activeTester.id || 'tester'}-${index}-${model.replace(/\W+/g, '-').toLowerCase()}` })),
+      experienceLevel: (updated.experience ?? activeTester.experience ?? 'beginner') as 'beginner' | 'intermediate' | 'expert',
+      upi: { vpa: updated.upiId ?? activeTester.upiId },
+    }, token);
+    await refreshTesterData();
+  };
+
+  const apiJoinProject = async (projectId: string) => {
+    setDashboardError('');
+    try {
+      await joinTesterProject(projectId, await getTokenOrThrow());
+      await refreshTesterData();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : 'Unable to join this project.');
+    }
+  };
+  const apiSubmitStep1 = async (assignmentId: string, email: string, screenshotUrl?: string) => { await submitAssignmentProof(assignmentId, { step: 1, fileUrl: screenshotUrl || email }, await getTokenOrThrow()); await refreshTesterData(); };
+  const apiSubmitStep3 = async (assignmentId: string, screenshotUrl?: string) => {
+    if (!screenshotUrl) { window.open(`http://localhost:4000/t/${assignmentId}`, '_blank', 'noopener,noreferrer'); return; }
+    await submitAssignmentProof(assignmentId, { step: 3, fileUrl: screenshotUrl }, await getTokenOrThrow()); await refreshTesterData();
+  };
+  const apiSubmitStep4 = async (assignmentId: string) => { await submitAssignmentProof(assignmentId, { step: 4, fileUrl: `check-in:${new Date().toISOString()}` }, await getTokenOrThrow()); await refreshTesterData(); };
+  const apiSubmitBug = async (bug: Omit<BugReport, 'id' | 'createdAt' | 'testerName' | 'testerAvatar' | 'screenshot'> & { screenshot?: string }) => {
+    await submitProjectBugReport(bug.appId, { title: bug.title, description: bug.title, category: 'functional', severity: bug.severity.toLowerCase() as 'low' | 'medium' | 'high' | 'critical', device: bug.device, appVersion: bug.osVersion, expectedResult: 'Expected behavior without this issue', actualResult: bug.title, stepsToReproduce: bug.reproductionSteps, attachments: bug.screenshot ? [bug.screenshot] : [] }, await getTokenOrThrow());
+    await refreshTesterData();
+  };
+  const apiRequestWithdrawal = async (amount: number, upiId: string) => {
+    try {
+      if (amount > activeTester.walletBalance) return { success: false, error: 'Amount exceeds balance' };
+      if (upiId !== activeTester.upiId) await apiUpdateTesterProfile({ upiId });
+      await requestWalletWithdrawal(rupeesToPaise(amount), await getTokenOrThrow()); await refreshTesterData(); return { success: true };
+    } catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Withdrawal failed' }; }
+  };
+
+  const apiCreateProject = async (project: Omit<TestApp, 'id' | 'testersCount' | 'bugsFound' | 'progress' | 'status'>) => {
+    await createClientProject({ package: project.packageTier ?? 'managed_testing', requiredTesters: 14, requiredDeviceModels: project.devices, appDetails: { appName: project.name, packageName: project.playIntegration?.packageName || project.version, description: project.instructions, playStoreUrl: project.apkUrl } }, await getTokenOrThrow());
+    await refreshClientData();
+  };
+  const apiSubmitVerification = async (projectId: string, proofUrl: string) => { await submitClientVerification(projectId, proofUrl, await getTokenOrThrow()); await refreshClientData(); };
+  const apiPayInvoice = async (projectId: string) => {
+    const invoice = invoices.find((item) => item.projectId === projectId);
+    if (!invoice) throw new Error('Invoice is not available yet.');
+    const checkout = await checkoutInvoice(invoice._id, await getTokenOrThrow());
+    await new Promise<void>((resolve, reject) => {
+      const startCheckout = () => {
+        const Razorpay = (window as typeof window & { Razorpay?: new (options: unknown) => { open: () => void } }).Razorpay;
+        if (!Razorpay) { reject(new Error('Razorpay checkout failed to load.')); return; }
+        new Razorpay({ key: checkout.data.keyId, order_id: checkout.data.order.id, amount: checkout.data.order.amount, currency: checkout.data.order.currency, name: 'LaunchOps', handler: () => { void refreshClientData().then(resolve); }, modal: { ondismiss: resolve } }).open();
+      };
+      const existing = document.querySelector<HTMLScriptElement>('script[data-razorpay-checkout]');
+      if (existing) { startCheckout(); return; }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.dataset.razorpayCheckout = 'true';
+      script.onload = startCheckout;
+      script.onerror = () => reject(new Error('Could not load Razorpay checkout.'));
+      document.head.appendChild(script);
+    });
+  };
+
+  const apiReviewVerification = async (projectId: string, approve: boolean, customAmount?: number) => { await reviewProjectVerification(projectId, approve, await getTokenOrThrow(), customAmount); await refreshAdminData(); };
+  const apiAdvanceMilestone = async (projectId: string, step: number, payload?: { optInUrl?: string }) => { await advanceProjectMilestone(projectId, step, await getTokenOrThrow(), payload?.optInUrl); await refreshAdminData(); };
+  const apiReplaceTester = async (assignmentId: string) => { await replaceAssignment(assignmentId, await getTokenOrThrow()); await refreshAdminData(); };
+  const apiApproveStep1 = async (projectId: string, testerId: string) => { const assignment = assignments.find((item) => item.projectId === projectId && item.testerId === testerId); if (!assignment) throw new Error('Assignment not found'); await verifyAssignment(assignment.id, 1, true, await getTokenOrThrow()); await refreshAdminData(); };
+  const apiAddTester = async (projectId: string, testerId: string) => { await assignTesterToProject(projectId, testerId, await getTokenOrThrow()); await refreshAdminData(); };
+  const apiRemoveTester = async (projectId: string, testerId: string) => { const assignment = assignments.find((item) => item.projectId === projectId && item.testerId === testerId); if (!assignment) throw new Error('Assignment not found'); await replaceAssignment(assignment.id, await getTokenOrThrow()); await refreshAdminData(); };
+  const apiMergeBugs = async (canonicalId: string, duplicateId: string) => { await mergeBugReports(canonicalId, duplicateId, await getTokenOrThrow()); await refreshAdminData(); };
+  const apiPublishBug = async (bugId: string) => { await publishBugReport(bugId, await getTokenOrThrow()); await refreshAdminData(); };
+  const apiCompleteWithdrawal = async (id: string, transactionId: string) => { await completeAdminWithdrawal(id, transactionId, await getTokenOrThrow()); await refreshAdminData(); };
+  const apiRejectWithdrawal = async (id: string, reason: string) => { await rejectAdminWithdrawal(id, reason, await getTokenOrThrow()); await refreshAdminData(); };
 
   return (
     <div className={`min-h-screen font-sans antialiased overflow-x-hidden selection:bg-indigo-600/10 selection:text-indigo-900 transition-colors duration-300 ${
@@ -792,6 +748,11 @@ export default function App() {
 
       {/* Main Screen Router */}
       <main className="relative min-h-screen">
+        {dashboardError && isDashboard && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] rounded-xl border border-red-500/30 bg-red-950 px-4 py-3 text-sm font-semibold text-red-100 shadow-xl">
+            {dashboardError}
+          </div>
+        )}
         <AnimatePresence mode="wait">
           {currentTab === 'home' && (
             <motion.div
@@ -823,25 +784,19 @@ export default function App() {
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             >
-              <AuthScreen 
-                isDarkMode={isDarkMode}
-                onLoginSuccess={(name, role) => {
+              {(renderAuthScreen ?? ((props) => <AuthScreen {...props} />))({
+                isDarkMode,
+                onLoginSuccess: (name, role) => {
                   if (role === 'admin') {
                     handleSetTab('admin');
                   } else if (role === 'client') {
                     handleSetTab('client');
                   } else {
-                    const existingTester = MOCK_TESTERS.find(t => t.name.toLowerCase() === name.toLowerCase());
-                    if (existingTester) {
-                      setActiveTester(existingTester);
-                    } else {
-                      setActiveTester(MOCK_TESTERS[0]); 
-                    }
                     handleSetTab('tester');
                   }
-                }}
-                onBackToHome={() => handleSetTab('home')}
-              />
+                },
+                onBackToHome: () => handleSetTab('home'),
+              })}
             </motion.div>
           )}
 
@@ -861,16 +816,15 @@ export default function App() {
                 bugs={bugs}
                 transactions={transactions}
                 withdrawals={withdrawals}
-                onUpdateTesterProfile={handleUpdateTesterProfile}
-                onJoinProject={handleJoinProject}
-                onSubmitStep1Email={handleSubmitStep1Email}
-                onClickStep3Link={handleClickStep3Link}
-                onLogStep4CheckIn={handleLogStep4CheckIn}
-                onSubmitBugReport={handleSubmitBugReport}
-                onRequestWithdrawal={handleRequestWithdrawal}
-                onSimulateAdminAdvanceStep={handleSimulateAdminAdvanceStep}
-                onSimulateFastForwardDay={handleSimulateFastForwardDay}
-                onLogout={() => handleSetTab('home')}
+                notifications={notifications}
+                onUpdateTesterProfile={apiUpdateTesterProfile}
+                onJoinProject={apiJoinProject}
+                onSubmitStep1Email={apiSubmitStep1}
+                onClickStep3Link={apiSubmitStep3}
+                onLogStep4CheckIn={apiSubmitStep4}
+                onSubmitBugReport={apiSubmitBug}
+                onRequestWithdrawal={apiRequestWithdrawal}
+                onLogout={() => { void handleLogout(); }}
                 initialTab={initialSubTab}
                 onTabChange={(tab) => handleSetTab('tester', tab)}
               />
@@ -889,10 +843,10 @@ export default function App() {
                 isDarkMode={isDarkMode}
                 projects={apps}
                 bugs={bugs}
-                onCreateProject={handleCreateProject}
-                onSubmitVerification={handleSubmitVerification}
-                onPayInvoice={handlePayInvoice}
-                onLogout={() => handleSetTab('home')}
+                onCreateProject={apiCreateProject}
+                onSubmitVerification={apiSubmitVerification}
+                onPayInvoice={apiPayInvoice}
+                onLogout={() => { void handleLogout(); }}
                 initialTab={initialSubTab}
                 onTabChange={(tab) => handleSetTab('client', tab)}
               />
@@ -912,20 +866,21 @@ export default function App() {
                 projects={apps}
                 bugs={bugs}
                 assignments={assignments}
-                testers={MOCK_TESTERS}
+                testers={adminTesters}
                 withdrawals={withdrawals}
-                onApproveVerification={handleApproveVerification}
-                onRejectVerification={handleRejectVerification}
-                onAdvanceMilestone={handleAdvanceMilestone}
-                onReplaceTester={handleReplaceTester}
-                onMergeBugs={handleMergeBugs}
-                onPublishBug={handlePublishBug}
-                onCompleteWithdrawal={handleCompleteWithdrawal}
-                onRejectWithdrawal={handleRejectWithdrawal}
-                onLogout={() => handleSetTab('home')}
-                onAddTesterToProject={handleAddTesterToProject}
-                onRemoveTesterFromProject={handleRemoveTesterFromProject}
-                onApproveTesterStep1={handleApproveTesterStep1}
+                notifications={notifications}
+                onApproveVerification={(id, amount) => { void apiReviewVerification(id, true, amount); }}
+                onRejectVerification={(id) => { void apiReviewVerification(id, false); }}
+                onAdvanceMilestone={(id, step, payload) => { void apiAdvanceMilestone(id, step, payload); }}
+                onReplaceTester={(id) => { void apiReplaceTester(id); }}
+                onMergeBugs={(canonical, duplicate) => { void apiMergeBugs(canonical, duplicate); }}
+                onPublishBug={(id) => { void apiPublishBug(id); }}
+                onCompleteWithdrawal={(id, txn) => { void apiCompleteWithdrawal(id, txn); }}
+                onRejectWithdrawal={(id, reason) => { void apiRejectWithdrawal(id, reason); }}
+                onLogout={() => { void handleLogout(); }}
+                onAddTesterToProject={(projectId, testerId) => { void apiAddTester(projectId, testerId); }}
+                onRemoveTesterFromProject={(projectId, testerId) => { void apiRemoveTester(projectId, testerId); }}
+                onApproveTesterStep1={(projectId, testerId) => { void apiApproveStep1(projectId, testerId); }}
                 initialTab={initialSubTab}
                 onTabChange={(tab) => handleSetTab('admin', tab)}
               />

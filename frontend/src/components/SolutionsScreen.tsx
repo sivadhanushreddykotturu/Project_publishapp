@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   Search, Star, MapPin, Award, CheckCircle, 
   Smartphone, UserCheck, ShieldCheck, Heart, Sparkles 
 } from 'lucide-react';
 import { Tester } from '../types';
-import { MOCK_TESTERS } from '../mockData';
+import { listPublicTesterDirectory } from '../lib/launchops-api';
 import BlurText from './ui/BlurText';
 
 interface SolutionsScreenProps {
@@ -13,10 +13,21 @@ interface SolutionsScreenProps {
 }
 
 export default function SolutionsScreen({ onSelectTester, isDarkMode = false }: SolutionsScreenProps) {
-  const [testers] = useState<Tester[]>(MOCK_TESTERS);
+  const [testers, setTesters] = useState<Tester[]>([]);
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all');
   const [selectedCountry, setSelectedCountry] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  useEffect(() => {
+    void listPublicTesterDirectory().then(({ data }) => setTesters(data.map((profile) => ({
+      id: profile._id, name: profile.userId.name,
+      avatar: `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(profile.userId.name)}`,
+      country: 'India', devices: profile.devices.map((device) => device.model),
+      bugsFoundCount: profile.ratingCount, rating: profile.ratingAvg,
+      specialty: `${profile.experienceLevel[0].toUpperCase()}${profile.experienceLevel.slice(1)} Android testing`,
+      status: 'Online', upiId: '', walletBalance: 0,
+    })))).catch(() => setTesters([]));
+  }, []);
 
   const specialties = [
     { value: 'all', label: 'All Specialties' },

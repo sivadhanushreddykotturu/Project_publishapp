@@ -40,7 +40,7 @@ export type BackendTesterDevice = {
 
 export type BackendTesterProfile = {
   _id: string;
-  userId: string;
+  userId: string | LaunchOpsUser;
   devices: BackendTesterDevice[];
   experienceLevel: "beginner" | "intermediate" | "expert";
   upi?: {
@@ -55,6 +55,24 @@ export type BackendTesterProfile = {
   updatedAt: string;
 };
 
+export type BackendInvoice = {
+  _id: string;
+  projectId?: string;
+  amount: number;
+  gst: number;
+  status: "pending" | "paid" | "manual_paid" | "failed" | "refunded";
+};
+
+export type PublicTesterProfile = {
+  _id: string;
+  userId: { _id: string; name: string };
+  devices: BackendTesterDevice[];
+  experienceLevel: "beginner" | "intermediate" | "expert";
+  ratingAvg: number;
+  ratingCount: number;
+  status: "active";
+};
+
 export type BackendProject = {
   _id: string;
   package: "testers_only" | "managed_testing" | "launch_ready" | "custom";
@@ -66,6 +84,8 @@ export type BackendProject = {
   };
   requiredTesters: number;
   activeTesterCount: number;
+  waitlistCount: number;
+  requiredDeviceModels: string[];
   status: "draft" | "pending_verification" | "awaiting_payment" | "active" | "full" | "closed" | "completed" | "cancelled";
   joinState: "open" | "full" | "closed";
   steps?: Array<{
@@ -91,7 +111,7 @@ export type BackendProject = {
 
 export type BackendAssignment = {
   _id: string;
-  testerId: string;
+  testerId: string | { _id: string; userId?: LaunchOpsUser };
   projectId: string | BackendProject;
   status: "queued" | "active" | "removed" | "completed";
   currentStep: number;
@@ -110,7 +130,7 @@ export type BackendAssignment = {
 
 export type BackendWalletTransaction = {
   _id: string;
-  testerId: string;
+  testerId: string | { _id: string; userId?: LaunchOpsUser };
   projectId?: string;
   type: "earning" | "withdrawal";
   amount: number;
@@ -146,6 +166,14 @@ export type BackendBugReport = {
   status: "open" | "duplicate" | "merged" | "published";
   createdAt: string;
   updatedAt: string;
+};
+
+export type BackendNotification = {
+  _id: string;
+  type: "project_request" | "project_opportunity" | string;
+  payload: { projectId?: string; appName?: string; joinPath?: string; requiredDeviceModels?: string[]; [key: string]: unknown };
+  status: "queued" | "sent" | "failed";
+  createdAt: string;
 };
 
 export type UpsertTesterProfileInput = {
@@ -261,4 +289,122 @@ export function submitProjectBugReport(projectId: string, input: SubmitBugReport
 
 export function getBackendHealth() {
   return apiRequest<{ status: "ok"; uptime: number }>("/health");
+}
+
+export function listProjects(token: string) {
+  return apiRequest<ApiEnvelope<BackendProject[]>>("/api/v1/projects?limit=100", { token });
+}
+
+export function createClientProject(input: {
+  package: BackendProject["package"];
+  requiredTesters?: number;
+  requiredDeviceModels?: string[];
+  appDetails: BackendProject["appDetails"];
+}, token: string) {
+  return apiRequest<ApiEnvelope<{ project: BackendProject; invoice: BackendInvoice | null }>>("/api/v1/projects", {
+    method: "POST", token, body: input,
+  });
+}
+
+export function listMyNotifications(token: string) {
+  return apiRequest<ApiEnvelope<BackendNotification[]>>("/api/v1/notifications/me?limit=50", { token });
+}
+
+export function listAdminNotifications(token: string) {
+  return apiRequest<ApiEnvelope<BackendNotification[]>>("/api/v1/notifications?limit=50", { token });
+}
+
+export function submitClientVerification(projectId: string, proofUrl: string, token: string) {
+  return apiRequest<ApiEnvelope<BackendProject>>(`/api/v1/projects/${projectId}/verification/submit`, {
+    method: "POST", token, body: { proofUrl },
+  });
+}
+
+export function listInvoices(token: string) {
+  return apiRequest<ApiEnvelope<BackendInvoice[]>>("/api/v1/invoices?limit=100", { token });
+}
+
+export function checkoutInvoice(invoiceId: string, token: string) {
+  return apiRequest<ApiEnvelope<{ order: { id: string; amount: number; currency: string }; keyId: string }>>(`/api/v1/invoices/${invoiceId}/checkout`, {
+    method: "POST", token,
+  });
+}
+
+export function listProjectBugReports(projectId: string, token: string) {
+  return apiRequest<ApiEnvelope<BackendBugReport[]>>(`/api/v1/projects/${projectId}/bug-reports?limit=100`, { token });
+}
+
+export function listAdminTesters(token: string) {
+  return apiRequest<ApiEnvelope<Array<Omit<BackendTesterProfile, "userId"> & { userId: LaunchOpsUser }>>>("/api/v1/testers?limit=100", { token });
+}
+
+export function listPublicTesterDirectory() {
+  return apiRequest<ApiEnvelope<PublicTesterProfile[]>>("/api/v1/testers/directory");
+}
+
+export function listProjectAssignments(projectId: string, token: string) {
+  return apiRequest<ApiEnvelope<BackendAssignment[]>>(`/api/v1/projects/${projectId}/queue?all=true`, { token });
+}
+
+export function assignTesterToProject(projectId: string, testerId: string, token: string) {
+  return apiRequest<ApiEnvelope<BackendAssignment>>(`/api/v1/projects/${projectId}/assignments`, { method: "POST", token, body: { testerId } });
+}
+
+export function listAdminWithdrawals(token: string) {
+  return apiRequest<ApiEnvelope<BackendWalletTransaction[]>>("/api/v1/wallet/withdrawals?limit=100", { token });
+}
+
+export function reviewProjectVerification(projectId: string, approve: boolean, token: string, customAmount?: number) {
+  return apiRequest<ApiEnvelope<unknown>>(`/api/v1/projects/${projectId}/verification/review`, {
+    method: "POST", token, body: { approve, customAmount: customAmount ? rupeesToMinor(customAmount) : undefined },
+  });
+}
+
+function rupeesToMinor(value: number) { return Math.round(value * 100); }
+
+export function verifyAssignment(assignmentId: string, step: number, approve: boolean, token: string, reason?: string) {
+  return apiRequest<ApiEnvelope<BackendAssignment>>(`/api/v1/assignments/${assignmentId}/verify`, {
+    method: "POST", token, body: { step, approve, reason },
+  });
+}
+
+export function replaceAssignment(assignmentId: string, token: string) {
+  return apiRequest<ApiEnvelope<unknown>>(`/api/v1/assignments/${assignmentId}/replace`, { method: "POST", token });
+}
+
+export function mergeBugReports(canonicalId: string, duplicateId: string, token: string) {
+  return apiRequest<ApiEnvelope<unknown>>("/api/v1/bug-reports/merge", {
+    method: "POST", token, body: { canonicalId, duplicateIds: [duplicateId] },
+  });
+}
+
+export function publishBugReport(id: string, token: string) {
+  return apiRequest<ApiEnvelope<unknown>>("/api/v1/bug-reports/publish", { method: "POST", token, body: { ids: [id] } });
+}
+
+export function completeAdminWithdrawal(id: string, transactionId: string, token: string) {
+  return apiRequest<ApiEnvelope<BackendWalletTransaction>>(`/api/v1/wallet/withdrawals/${id}/complete`, {
+    method: "POST", token, body: { transactionId },
+  });
+}
+
+export function rejectAdminWithdrawal(id: string, reason: string, token: string) {
+  return apiRequest<ApiEnvelope<BackendWalletTransaction>>(`/api/v1/wallet/withdrawals/${id}/reject`, {
+    method: "POST", token, body: { reason },
+  });
+}
+
+export function advanceProjectMilestone(projectId: string, step: number, token: string, optInUrl?: string) {
+  const actions: Record<number, { path: string; body?: unknown }> = {
+    2: { path: "submit-email-review" },
+    3: { path: "confirm-email-review" },
+    4: { path: "testers-invited", body: { optInUrl } },
+    5: { path: "apply-production" },
+    6: { path: "confirm-production-approved" },
+  };
+  const action = actions[step];
+  if (!action) throw new Error(`No backend milestone action exists for step ${step}`);
+  return apiRequest<ApiEnvelope<BackendProject>>(`/api/v1/projects/${projectId}/${action.path}`, {
+    method: "POST", token, body: action.body,
+  });
 }

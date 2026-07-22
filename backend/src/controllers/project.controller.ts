@@ -8,7 +8,7 @@ import { Assignment } from "../models/Assignment";
 import { BugReport } from "../models/BugReport";
 import { Invoice } from "../models/Invoice";
 import { PACKAGES, PLAY_INTEGRATION_MODES } from "../models/enums";
-import { PACKAGE_CONFIG, computeInvoiceAmount, requiresClientVerification } from "../constants/packages";
+import { PACKAGE_CONFIG, computeInvoiceAmount } from "../constants/packages";
 import { ApiError } from "../utils/apiError";
 import { asyncHandler } from "../utils/asyncHandler";
 import { getPagination, buildPageMeta } from "../utils/pagination";
@@ -24,10 +24,13 @@ import {
 } from "../services/playIntegration.service";
 import { submitClientVerificationProof, reviewClientVerification } from "../services/clientVerification.service";
 import { env } from "../config/env";
+import { User } from "../models/User";
+import { dispatchNotification } from "../services/notification.service";
 
 const createProjectSchema = z.object({
   package: z.enum(PACKAGES),
   requiredTesters: z.number().int().min(1).optional(),
+  requiredDeviceModels: z.array(z.string().min(1)).max(10).optional(),
   appDetails: z.object({
     appName: z.string().min(1),
     packageName: z.string().optional(),
@@ -48,17 +51,16 @@ export const createProject = asyncHandler(async (req: Request, res: Response) =>
   const client = await Client.findOne({ userId: req.dbUser!._id });
   if (!client) throw ApiError.notFound("Client profile not found");
 
-  const requiredTesters = Math.max(
-    body.requiredTesters ?? PACKAGE_CONFIG[body.package]?.minTesters ?? env.workflow.defaultMinTesters,
-    env.workflow.defaultMinTesters
-  );
-  const needsVerification = requiresClientVerification(body.package);
+  const requiredTesters = 14;
+  // Every client request is reviewed by an admin before payment and activation.
+  const needsVerification = true;
 
   const project = await Project.create({
     clientId: client._id,
     package: body.package,
     appDetails: body.appDetails,
     requiredTesters,
+    requiredDeviceModels: body.requiredDeviceModels ?? [],
     status: needsVerification ? "pending_verification" : "awaiting_payment",
     verification: needsVerification ? { required: true, status: "pending" } : { required: false, status: "not_required" },
   });
@@ -66,6 +68,15 @@ export const createProject = asyncHandler(async (req: Request, res: Response) =>
   client.projects.push(project._id);
   client.activePackage = body.package;
   await client.save();
+
+  const admins = await User.find({ role: "admin", status: "active" });
+  await Promise.all(admins.map((admin) => dispatchNotification({
+    recipientUserId: admin._id,
+    type: "project_request",
+    channel: "email",
+    relatedId: project._id.toString(),
+    payload: { projectId: project._id.toString(), appName: project.appDetails.appName, requiredDeviceModels: project.requiredDeviceModels },
+  })));
 
   if (needsVerification) {
     res.status(201).json({
@@ -108,9 +119,12 @@ export const listProjects = asyncHandler(async (req: Request, res: Response) => 
 
 export const listTesterOpportunities = asyncHandler(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req);
+  const tester = await Tester.findOne({ userId: req.dbUser!._id });
+  const deviceModels = tester?.devices.map((device) => device.model) ?? [];
   const filter = {
     status: { $in: ["active", "full"] },
-    joinState: { $in: ["open", "full"] },
+    joinState: { $in: ["open", "full", "closed"] },
+    $or: [{ requiredDeviceModels: { $size: 0 } }, { requiredDeviceModels: { $in: deviceModels } }],
   };
 
   const [items, total] = await Promise.all([
@@ -146,8 +160,20 @@ export const joinProjectAsTester = asyncHandler(async (req: Request, res: Respon
   res.status(201).json({ data: assignment });
 });
 
+const adminAssignTesterSchema = z.object({ testerId: z.string().min(1) });
+
+export const assignTesterToProject = asyncHandler(async (req: Request, res: Response) => {
+  const { testerId } = adminAssignTesterSchema.parse(req.body);
+  const tester = await Tester.findById(testerId);
+  if (!tester) throw ApiError.notFound("Tester not found");
+  const assignment = await joinProject(new Types.ObjectId(req.params.id), tester._id);
+  res.status(201).json({ data: assignment });
+});
+
 export const getProjectQueue = asyncHandler(async (req: Request, res: Response) => {
-  const assignments = await Assignment.find({ projectId: req.params.id, status: "queued" })
+  const filter: Record<string, unknown> = { projectId: req.params.id };
+  if (req.query.all !== "true") filter.status = "queued";
+  const assignments = await Assignment.find(filter)
     .sort({ queuePosition: 1 })
     .populate({ path: "testerId", populate: { path: "userId" } });
   res.status(200).json({ data: assignments });

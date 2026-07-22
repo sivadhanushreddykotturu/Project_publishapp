@@ -42,12 +42,13 @@ export default function ClientWrapper() {
 }
 
 function LaunchOpsApp() {
-  const { getToken } = useAuth();
+  const { getToken, signOut } = useAuth();
   const getAuthToken = useCallback(() => getToken(), [getToken]);
 
   return (
     <App
       getAuthToken={getAuthToken}
+      onSignOut={() => signOut()}
       renderAuthScreen={(props) => <ClerkAuthScreen {...props} />}
     />
   );

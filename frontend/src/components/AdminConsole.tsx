@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { TestApp, BugReport, TesterAssignment, Tester, WithdrawalRequest } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
+import type { BackendNotification } from '../lib/launchops-api';
 
 interface AdminConsoleProps {
   isDarkMode: boolean;
@@ -14,6 +15,7 @@ interface AdminConsoleProps {
   assignments: TesterAssignment[];
   testers: Tester[];
   withdrawals: WithdrawalRequest[];
+  notifications: BackendNotification[];
   onApproveVerification: (projectId: string, customPrice?: number) => void;
   onRejectVerification: (projectId: string) => void;
   onAdvanceMilestone: (projectId: string, step: number, payload?: any) => void;
@@ -37,6 +39,7 @@ export default function AdminConsole({
   assignments,
   testers,
   withdrawals,
+  notifications,
   onApproveVerification,
   onRejectVerification,
   onAdvanceMilestone,
@@ -75,6 +78,7 @@ export default function AdminConsole({
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
   const [addingTesterProjectId, setAddingTesterProjectId] = useState<string | null>(null);
   const [selectedTesterToAssign, setSelectedTesterToAssign] = useState<string>('');
+  const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (initialTab && ['dashboard', 'projects', 'testers', 'verifications', 'bugs', 'cashouts'].includes(initialTab)) {
@@ -104,6 +108,27 @@ export default function AdminConsole({
     setSelectedUtrWithdrawalId(null);
     setUtrVal('');
   };
+
+  const activeProjects = projects.filter((project) => project.status === 'Testing');
+  const activeAssignments = assignments.filter((assignment) => assignment.status === 'active');
+  const completedAssignments = assignments.filter((assignment) => assignment.status === 'completed');
+  const pendingVerifications = projects.filter((project) => project.verificationStatus === 'pending');
+  const completedPayoutTotal = withdrawals.filter((withdrawal) => withdrawal.status === 'completed').reduce((sum, withdrawal) => sum + withdrawal.amount, 0);
+  const successRate = assignments.length ? Math.round((completedAssignments.length / assignments.length) * 100) : 0;
+  const dashboardStats = [
+    { title: 'Active Projects', value: activeProjects.length.toString(), desc: `${projects.length} total projects` },
+    { title: 'Total Testers', value: testers.length.toString(), desc: `${testers.filter((tester) => tester.status === 'Online').length} active` },
+    { title: 'Tests In Progress', value: activeAssignments.length.toString(), desc: `${assignments.length} assignments` },
+    { title: 'Bugs Reported', value: bugs.length.toString(), desc: `${bugs.filter((bug) => bug.isPublished).length} published` },
+    { title: 'Total Payouts', value: `₹${completedPayoutTotal.toFixed(2)}`, desc: `${withdrawals.filter((withdrawal) => withdrawal.status === 'pending').length} pending` },
+    { title: 'Success Rate', value: `${successRate}%`, desc: `${completedAssignments.length} completed` },
+  ];
+  const dashboardAlerts = [
+    ...assignments.filter((assignment) => assignment.inactivityFlag).map((assignment) => ({ title: 'Tester inactivity flagged', app: assignment.appName, type: 'error' as const })),
+    ...projects.filter((project) => project.playIntegration?.lastApiError).map((project) => ({ title: project.playIntegration!.lastApiError!, app: project.name, type: 'warning' as const })),
+    ...pendingVerifications.map((project) => ({ title: 'Client verification awaiting review', app: project.name, type: 'info' as const })),
+  ];
+  const todayLabel = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date());
 
   return (
     <div className={`h-screen overflow-hidden flex ${isDarkMode ? 'bg-[#09090B] text-slate-105' : 'bg-slate-50 text-slate-900'}`}>
@@ -162,7 +187,7 @@ export default function AdminConsole({
                 AD
               </div>
               <div className="hidden sm:block text-left text-xs leading-none">
-                <span className={`font-bold block ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Arjun Dev</span>
+                <span className={`font-bold block ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>LaunchOps Admin</span>
                 <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-1 mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Super Admin
                 </span>
@@ -190,7 +215,7 @@ export default function AdminConsole({
         }`}>
           <div>
             <h1 className={`text-xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-              Good morning, Admin! 👋
+              Admin Control Center
             </h1>
             <p className="text-[10px] text-slate-500 mt-0.5">Here's what's happening on LaunchOps today.</p>
           </div>
@@ -200,16 +225,21 @@ export default function AdminConsole({
               isDarkMode ? 'bg-zinc-900/60 border-zinc-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
             }`}>
               <Calendar className="w-4 h-4 text-indigo-500" />
-              <span>May 31, 2025</span>
+              <span>{todayLabel}</span>
             </div>
             
-            <button className={`p-2 border rounded-xl relative hover:bg-slate-500/5 border-slate-250 cursor-pointer ${isDarkMode ? 'border-zinc-800' : 'border-slate-200'}`}>
+            <div className="relative">
+            <button onClick={() => setNotificationDropdownOpen((open) => !open)} className={`p-2 border rounded-xl relative hover:bg-slate-500/5 border-slate-250 cursor-pointer ${isDarkMode ? 'border-zinc-800' : 'border-slate-200'}`}>
               <Bell className="w-4 h-4 text-slate-400" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-indigo-500 rounded-full" />
+              {notifications.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-indigo-500 rounded-full" />}
             </button>
+            {notificationDropdownOpen && <div className={`absolute right-0 top-12 w-80 max-h-96 overflow-y-auto rounded-xl border p-2 shadow-xl ${isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-slate-200'}`}>
+              {notifications.length === 0 ? <p className="p-3 text-xs text-slate-500">No notifications.</p> : notifications.map((notification) => <button key={notification._id} onClick={() => { if (notification.type === 'project_request') handleTabSelect('verifications'); setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs ${isDarkMode ? 'hover:bg-zinc-900' : 'hover:bg-slate-50'}`}><span className="font-bold block">{notification.type === 'project_request' ? 'New project request' : notification.type.replace(/_/g, ' ')}</span><span className="text-slate-500 block mt-1">{String(notification.payload.appName ?? '')}</span></button>) }
+            </div>}
+            </div>
 
-            <button className="px-4 py-2 text-white text-xs font-black rounded-xl bg-indigo-655 hover:bg-indigo-700 shadow-md shadow-indigo-600/25 border-0 cursor-pointer" style={{ backgroundColor: '#4F46E5' }}>
-              + Create New Project
+            <button onClick={() => handleTabSelect('projects')} className="px-4 py-2 text-white text-xs font-black rounded-xl bg-indigo-655 hover:bg-indigo-700 shadow-md shadow-indigo-600/25 border-0 cursor-pointer" style={{ backgroundColor: '#4F46E5' }}>
+              Manage Projects
             </button>
           </div>
         </header>
@@ -223,21 +253,13 @@ export default function AdminConsole({
               
               {/* 1. Stat cards widgets grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
-                {[
-                  { title: 'Active Projects', value: '12', pct: '+ 20%', color: 'indigo', desc: 'vs last month' },
-                  { title: 'Total Testers', value: '248', pct: '+ 18%', color: 'blue', desc: 'vs last month' },
-                  { title: 'Tests In Progress', value: '48', pct: '+ 16%', color: 'purple', desc: 'vs last month' },
-                  { title: 'Bugs Reported', value: '342', pct: '+ 32%', color: 'red', desc: 'vs last month' },
-                  { title: 'Total Payouts', value: '₹48,750', pct: '+ 22%', color: 'emerald', desc: 'vs last month' },
-                  { title: 'Success Rate', value: '93.2%', pct: '+ 6%', color: 'amber', desc: 'vs last month' }
-                ].map((stat, i) => (
+                {dashboardStats.map((stat, i) => (
                   <div key={i} className={`p-5 border rounded-2xl relative overflow-hidden transition-all duration-300 ${
                     isDarkMode ? 'bg-[#18181B] border-zinc-800/80' : 'bg-white border-slate-200 shadow-xs'
                   }`}>
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">{stat.title}</span>
                     <h3 className={`text-xl font-black mt-2 tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{stat.value}</h3>
                     <div className="flex items-center gap-1.5 mt-2">
-                      <span className="text-[10px] font-extrabold text-emerald-505">{stat.pct}</span>
                       <span className="text-[9px] text-slate-400 font-semibold">{stat.desc}</span>
                     </div>
                   </div>
@@ -272,13 +294,15 @@ export default function AdminConsole({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-zinc-800/60 font-semibold">
-                          {[
-                            { name: 'Spotify Closed Testing', pkg: 'com.spotify.music', type: 'Play Store', slots: '14 / 14', prog: 100, status: 'In Progress', date: 'Today, 8:00 PM', color: 'indigo' },
-                            { name: 'Flipkart Early Access', pkg: 'com.flipkart.android', type: 'Play Store', slots: '13 / 14', prog: 72, status: 'In Progress', date: 'Jun 2, 2025', color: 'indigo' },
-                            { name: 'Zomato Beta Testing', pkg: 'com.zomato', type: 'Closed Beta', slots: '10 / 14', prog: 56, status: 'In Progress', date: 'Jun 5, 2025', color: 'purple' },
-                            { name: 'Cred UPI Module Test', pkg: 'com.cred.app', type: 'Functional', slots: '8 / 14', prog: 40, status: 'In Progress', date: 'Jun 7, 2025', color: 'emerald' },
-                            { name: 'Navi App Performance', pkg: 'com.navi.app', type: 'Performance', slots: '0 / 14', prog: 0, status: 'Scheduled', date: 'Jun 10, 2025', color: 'blue' }
-                          ].map((p, idx) => (
+                          {projects.slice(0, 5).map((project) => ({
+                            name: project.name,
+                            pkg: project.playIntegration?.packageName || project.version,
+                            type: project.packageTier?.replace(/_/g, ' ') || project.category,
+                            slots: `${project.testersCount} / ${project.testersRequired || 0}`,
+                            prog: Math.round(project.progress),
+                            status: project.status === 'Testing' ? 'In Progress' : project.status,
+                            date: project.launchDate,
+                          })).map((p, idx) => (
                             <tr key={idx} className="hover:bg-slate-500/5">
                               <td className="py-4.5">
                                 <div className="flex items-center gap-3">
@@ -331,12 +355,10 @@ export default function AdminConsole({
                     </div>
 
                     <div className="space-y-6">
-                      {[
-                        { name: 'Spotify Closed Testing', steps: [14, 14, 12, 10, 6] },
-                        { name: 'Flipkart Early Access', steps: [13, 11, 7, 5, 0] },
-                        { name: 'Zomato Beta Testing', steps: [10, 8, 5, 3, 0] },
-                        { name: 'Cred UPI Module Test', steps: [8, 6, 2, 0, 0] }
-                      ].map((p, idx) => (
+                      {projects.slice(0, 4).map((project) => ({
+                        name: project.name,
+                        steps: [1, 2, 3, 4, 5].map((step) => assignments.filter((assignment) => assignment.projectId === project.id && assignment.currentStep >= step).length),
+                      })).map((p, idx) => (
                         <div key={idx} className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-2 border-b last:border-0 border-slate-500/5">
                           <div className="w-[180px] shrink-0">
                             <span className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{p.name}</span>
@@ -373,11 +395,11 @@ export default function AdminConsole({
                     
                     <div className="flex items-center justify-center py-6">
                       <div className="relative w-44 h-44 flex items-center justify-center">
-                        {/* Mock Progress Ring */}
+                        {/* Tester distribution ring */}
                         <div className="absolute inset-0 rounded-full border-[14px] border-slate-500/5" />
                         <div className="absolute inset-0 rounded-full border-[14px] border-indigo-600 border-t-purple-500 border-r-amber-500 border-b-transparent transform rotate-45" />
                         <div className="text-center z-10">
-                          <span className={`text-3xl font-black block tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>248</span>
+                          <span className={`text-3xl font-black block tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{testers.length}</span>
                           <span className="text-[10px] text-slate-400 uppercase font-extrabold tracking-wider mt-1 block">Total Testers</span>
                         </div>
                       </div>
@@ -387,22 +409,22 @@ export default function AdminConsole({
                       <div className="flex items-center gap-2 border-b pb-2 border-slate-500/5">
                         <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0" />
                         <span className="text-slate-500">Active</span>
-                        <span className="font-mono font-black ml-auto">142 (57%)</span>
+                        <span className="font-mono font-black ml-auto">{testers.filter((tester) => tester.status === 'Online').length}</span>
                       </div>
                       <div className="flex items-center gap-2 border-b pb-2 border-slate-500/5">
                         <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0" />
                         <span className="text-slate-500">In Progress</span>
-                        <span className="font-mono font-black ml-auto">48 (19%)</span>
+                        <span className="font-mono font-black ml-auto">{new Set(activeAssignments.map((assignment) => assignment.testerId)).size}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
                         <span className="text-slate-500">Waiting</span>
-                        <span className="font-mono font-black ml-auto">36 (15%)</span>
+                        <span className="font-mono font-black ml-auto">{assignments.filter((assignment) => assignment.status === 'queued').length}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-slate-405 shrink-0" />
                         <span className="text-slate-500">Inactive</span>
-                        <span className="font-mono font-black ml-auto">22 (9%)</span>
+                        <span className="font-mono font-black ml-auto">{testers.filter((tester) => tester.status !== 'Online').length}</span>
                       </div>
                     </div>
                   </div>
@@ -412,11 +434,7 @@ export default function AdminConsole({
                     <h3 className={`text-sm font-bold uppercase tracking-wider mb-5 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Alerts</h3>
                     
                     <div className="space-y-4">
-                      {[
-                        { title: '3 testers inactive > 48h (Step 1)', app: 'Spotify Closed Testing', type: 'error' },
-                        { title: 'Play Store sync failed', app: 'Flipkart Early Access', type: 'warning' },
-                        { title: 'Payment pending verification', app: 'Zomato Beta Testing', type: 'info' }
-                      ].map((alert, i) => (
+                      {dashboardAlerts.map((alert, i) => (
                         <div key={i} className={`p-4 border rounded-xl flex gap-3 text-xs ${
                           alert.type === 'error' ? 'bg-red-500/5 border-red-500/20 text-red-400' :
                           alert.type === 'warning' ? 'bg-amber-500/5 border-amber-500/20 text-amber-500' : 'bg-indigo-500/5 border-indigo-500/20 text-indigo-400'
@@ -428,6 +446,7 @@ export default function AdminConsole({
                           </div>
                         </div>
                       ))}
+                      {dashboardAlerts.length === 0 && <p className="text-xs font-semibold text-slate-500">No operational alerts.</p>}
                     </div>
                   </div>
                 </div>
@@ -683,7 +702,7 @@ export default function AdminConsole({
                           </p>
                           <p className="flex justify-between">
                             <span className="text-slate-400">Mobile:</span>
-                            <span className="font-mono text-[10px]">+91 98765 {Array.from(t.name).reduce((acc, char) => acc + char.charCodeAt(0), 10000) % 90000}</span>
+                            <span className="font-mono text-[10px]">Profile ID: {t.id.slice(-8)}</span>
                           </p>
                           <p className="flex justify-between">
                             <span className="text-slate-400">Specialty:</span>

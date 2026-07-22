@@ -57,7 +57,7 @@ export function mapProject(project: BackendProject): TestApp {
     launchDate: formatDate(project.createdAt, "Not scheduled"),
     category: project.package.replace(/_/g, " "),
     progress: projectProgress(project),
-    devices: ["Android devices"],
+    devices: project.requiredDeviceModels ?? [],
     packageTier: project.package,
     verificationRequired: project.verification?.required ?? false,
     verificationStatus:
@@ -70,6 +70,8 @@ export function mapProject(project: BackendProject): TestApp {
             : "none",
     invoiceStatus: project.status === "awaiting_payment" ? "awaiting_payment" : project.status === "active" ? "paid" : "none",
     testersRequired: project.requiredTesters,
+    waitlistCount: project.waitlistCount,
+    joinState: project.joinState,
     optInUrl: project.playIntegration?.optInUrl,
     playIntegration: {
       serviceAccountSet: Boolean(project.playIntegration?.serviceAccountLinked),
