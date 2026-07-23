@@ -52,6 +52,19 @@ type AppProps = {
   renderAuthScreen?: (props: AuthScreenRenderProps) => ReactNode;
 };
 
+function DashboardLoadingScreen({ isDarkMode }: { isDarkMode: boolean }) {
+  return (
+    <div className={`flex min-h-screen items-center justify-center ${isDarkMode ? 'bg-[#09090B]' : 'bg-slate-50'}`}>
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-9 w-9 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+        <p className={`text-sm font-bold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+          Loading your workspace
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppProps = {}) {
   // Data version guard — bump this whenever mock data schema changes to clear stale localStorage
   const DATA_VERSION = 'v2';
@@ -142,6 +155,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   const [bugs, setBugs] = useState<BugReport[]>([]);
   const [invoices, setInvoices] = useState<BackendInvoice[]>([]);
   const [dashboardError, setDashboardError] = useState('');
+  const [dashboardLoading, setDashboardLoading] = useState(true);
   const [notifications, setNotifications] = useState<BackendNotification[]>([]);
 
   // Tester Flow Data States
@@ -229,12 +243,15 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
 
   const refreshCurrentDashboard = async () => {
     setDashboardError('');
+    setDashboardLoading(true);
     try {
       if (currentTab === 'tester') await refreshTesterData();
       if (currentTab === 'client') await refreshClientData();
       if (currentTab === 'admin') await refreshAdminData();
     } catch (error) {
       setDashboardError(error instanceof Error ? error.message : 'Could not load dashboard data.');
+    } finally {
+      setDashboardLoading(false);
     }
   };
 
@@ -662,6 +679,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     setTransactions([]);
     setNotifications([]);
     setActiveTester(emptyTester);
+    setDashboardLoading(true);
     setCurrentTab('home');
     setInitialSubTab('');
     window.history.replaceState(null, '', '/');
@@ -825,7 +843,9 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             >
-              <TesterDashboard
+              {dashboardLoading ? (
+                <DashboardLoadingScreen isDarkMode={isDarkMode} />
+              ) : <TesterDashboard
                 isDarkMode={isDarkMode}
                 activeTester={activeTester}
                 projects={apps}
@@ -844,7 +864,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 onLogout={() => { void handleLogout(); }}
                 initialTab={initialSubTab}
                 onTabChange={(tab) => handleSetTab('tester', tab)}
-              />
+              />}
             </motion.div>
           )}
 
@@ -856,7 +876,9 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             >
-              <ClientDashboard
+              {dashboardLoading ? (
+                <DashboardLoadingScreen isDarkMode={isDarkMode} />
+              ) : <ClientDashboard
                 isDarkMode={isDarkMode}
                 projects={apps}
                 bugs={bugs}
@@ -866,7 +888,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 onLogout={() => { void handleLogout(); }}
                 initialTab={initialSubTab}
                 onTabChange={(tab) => handleSetTab('client', tab)}
-              />
+              />}
             </motion.div>
           )}
 
@@ -878,7 +900,9 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             >
-              <AdminConsole
+              {dashboardLoading ? (
+                <DashboardLoadingScreen isDarkMode={isDarkMode} />
+              ) : <AdminConsole
                 isDarkMode={isDarkMode}
                 projects={apps}
                 bugs={bugs}
@@ -900,7 +924,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 onApproveTesterStep1={(projectId, testerId) => { void apiApproveStep1(projectId, testerId); }}
                 initialTab={initialSubTab}
                 onTabChange={(tab) => handleSetTab('admin', tab)}
-              />
+              />}
             </motion.div>
           )}
 
