@@ -35,7 +35,11 @@ export default function ClientWrapper() {
   }
 
   return (
-    <ClerkProvider publishableKey={clerkPublishableKey}>
+    <ClerkProvider
+      publishableKey={clerkPublishableKey}
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
+    >
       <LaunchOpsApp />
     </ClerkProvider>
   );
