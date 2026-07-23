@@ -189,16 +189,15 @@ export default function ClerkAuthScreen({ isDarkMode, onLoginSuccess, onBackToHo
                 ))}
               </div>
 
-              <SignInButton mode="modal" forceRedirectUrl="/">
+              <SignInButton mode="redirect" forceRedirectUrl="/">
                 <button className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition hover:shadow-lg hover:shadow-indigo-500/20 cursor-pointer border-0">
                   Sign In
                 </button>
               </SignInButton>
 
               <SignUpButton
-                mode="modal"
+                mode="redirect"
                 forceRedirectUrl="/"
-                unsafeMetadata={{ role: selectedRole, launchOpsRole: selectedRole }}
               >
                 <button
                   className={`w-full py-3.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-3 transition border cursor-pointer ${
