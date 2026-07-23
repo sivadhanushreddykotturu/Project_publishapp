@@ -56,7 +56,16 @@ export async function handlePaymentCapturedWebhook(payload: {
     logger.warn({ orderId }, "Webhook for unknown invoice/order");
     return null;
   }
-  if (invoice.status === "paid") return invoice;
+  if (invoice.status === "paid" || invoice.status === "manual_paid") {
+    if (!invoice.paidAt) {
+      invoice.paidAt = new Date();
+      await invoice.save();
+    }
+    // Reconcile partial payment updates: a paid invoice must always have an
+    // active project, even if an earlier process stopped between the two writes.
+    if (invoice.projectId) await activateProject(invoice.projectId);
+    return invoice;
+  }
 
   invoice.status = "paid";
   invoice.paidAt = new Date();
@@ -78,7 +87,14 @@ export async function markInvoicePaidManually(invoiceId: Types.ObjectId, adminNo
   const invoice = await Invoice.findById(invoiceId);
   if (!invoice) throw ApiError.notFound("Invoice not found");
   if (invoice.status === "paid" || invoice.status === "manual_paid") {
-    throw ApiError.conflict("Invoice is already paid");
+    if (!invoice.paidAt) {
+      invoice.paidAt = new Date();
+      await invoice.save();
+    }
+    // Manual confirmation is deliberately idempotent. Repeating it repairs a
+    // project that was not activated after its invoice status was persisted.
+    if (invoice.projectId) await activateProject(invoice.projectId);
+    return invoice;
   }
 
   invoice.status = "manual_paid";
