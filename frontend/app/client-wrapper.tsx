@@ -52,7 +52,7 @@ function LaunchOpsApp() {
   return (
     <App
       getAuthToken={getAuthToken}
-      onSignOut={() => signOut()}
+      onSignOut={() => signOut({ redirectUrl: "/" })}
       renderAuthScreen={(props) => <ClerkAuthScreen {...props} />}
     />
   );

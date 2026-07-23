@@ -652,9 +652,25 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   const isTesterExperience = currentTab === 'tester';
 
   const handleLogout = async () => {
-    await onSignOut?.();
     localStorage.removeItem('launchops_current_tab');
-    handleSetTab('home');
+    sessionStorage.removeItem('launchops_intended_role');
+    setApps([]);
+    setAssignments([]);
+    setBugs([]);
+    setInvoices([]);
+    setWithdrawals([]);
+    setTransactions([]);
+    setNotifications([]);
+    setActiveTester(emptyTester);
+    setCurrentTab('home');
+    setInitialSubTab('');
+    window.history.replaceState(null, '', '/');
+
+    try {
+      await onSignOut?.();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : 'Could not sign out. Please try again.');
+    }
   };
 
   const apiUpdateTesterProfile = async (updated: Partial<Tester>) => {
