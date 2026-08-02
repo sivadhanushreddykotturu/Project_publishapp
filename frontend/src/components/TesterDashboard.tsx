@@ -18,6 +18,7 @@ interface TesterDashboardProps {
   transactions: Transaction[];
   withdrawals: WithdrawalRequest[];
   notifications: BackendNotification[];
+  onReadNotification: (notificationId: string) => void;
   onUpdateTesterProfile: (updatedTester: Partial<Tester>) => void;
   onJoinProject: (projectId: string) => void;
   onSubmitStep1Email: (assignmentId: string, email: string, screenshotUrl?: string) => void;
@@ -39,6 +40,7 @@ export default function TesterDashboard({
   transactions,
   withdrawals,
   notifications,
+  onReadNotification,
   onUpdateTesterProfile,
   onJoinProject,
   onSubmitStep1Email,
@@ -411,12 +413,12 @@ export default function TesterDashboard({
               isDarkMode ? 'border-zinc-800 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600 hover:text-slate-900'
             }`}>
               <Bell className="w-5 h-5" />
-              {notifications.length > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-indigo-600 rounded-full border-2 border-white" />}
+              {notifications.some((notification) => !notification.readAt) && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-indigo-600 rounded-full border-2 border-white" />}
             </button>
             {notificationDropdownOpen && (
               <div className={`absolute right-0 top-12 w-80 max-h-96 overflow-y-auto rounded-xl border p-2 shadow-xl z-50 ${isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-slate-200'}`}>
                 {notifications.length === 0 ? <p className="p-3 text-xs text-slate-500">No notifications.</p> : notifications.map((notification) => (
-                  <button key={notification._id} onClick={() => { if (notification.type === 'project_opportunity') handleTabSelect('explore'); setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs ${isDarkMode ? 'hover:bg-zinc-900' : 'hover:bg-slate-50'}`}>
+                  <button key={notification._id} onClick={() => { onReadNotification(notification._id); if (notification.type === 'project_opportunity') handleTabSelect('explore'); setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs ${notification.readAt ? 'opacity-55' : ''} ${isDarkMode ? 'hover:bg-zinc-900' : 'hover:bg-slate-50'}`}>
                     <span className="font-bold block">{notification.type === 'project_opportunity' ? 'New testing opportunity' : notification.type.replace(/_/g, ' ')}</span>
                     <span className="text-slate-500 block mt-1">{String(notification.payload.appName ?? '')}</span>
                     {notification.payload.requiredDeviceModels?.length ? <span className="text-indigo-500 block mt-1">Device: {notification.payload.requiredDeviceModels.join(', ')}</span> : null}
@@ -1159,7 +1161,9 @@ export default function TesterDashboard({
                                   <span>•</span>
                                   <span>{p.category}</span>
                                   <span>•</span>
-                                  <span>{p.testersCount}/{p.testersRequired ?? 35} slots</span>
+                                  <span>{p.testersCount}/{p.testersRequired ?? 14} slots</span>
+                                  <span>•</span>
+                                  <span>{p.waitlistCount ?? 0}/3 waitlist</span>
                                 </div>
                               </div>
                               {alreadyJoined ? (
@@ -1268,6 +1272,14 @@ export default function TesterDashboard({
                             <span className="font-semibold capitalize text-indigo-405">
                               {isJoined ? assignment.status === 'queued' ? `Queued #${assignment.queuePosition}` : 'Joined' : 'Open'}
                             </span>
+                          </div>
+                          <div className="flex justify-between text-xs text-slate-500">
+                            <span>Tester slots:</span>
+                            <span className="font-semibold">{p.testersCount}/{p.testersRequired ?? 14}</span>
+                          </div>
+                          <div className="flex justify-between text-xs text-slate-500">
+                            <span>Waitlist:</span>
+                            <span className="font-semibold">{p.waitlistCount ?? 0}/3</span>
                           </div>
                         </div>
 

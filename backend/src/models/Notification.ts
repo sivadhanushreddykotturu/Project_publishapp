@@ -19,6 +19,7 @@ export interface INotification extends Document {
   attempts: number;
   lastError?: string;
   sentAt?: Date;
+  readAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,6 +36,7 @@ const notificationSchema = new Schema<INotification>(
     attempts: { type: Number, default: 0 },
     lastError: { type: String },
     sentAt: { type: Date },
+    readAt: { type: Date, index: true },
   },
   { timestamps: true }
 );

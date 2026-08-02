@@ -25,7 +25,7 @@ import {
   advanceProjectMilestone, assignTesterToProject, checkoutInvoice, completeAdminWithdrawal, createClientProject,
   getCurrentLaunchOpsUser, getMyTesterProfile, getMyWallet, joinTesterProject,
   listAdminTesters, listAdminWithdrawals, listInvoices, listMyAssignments, listMyBugReports,
-  listAdminNotifications, listMyNotifications,
+  listMyNotifications, markNotificationRead,
   listProjectAssignments, listProjectBugReports, listProjects, listTesterOpportunities,
   mergeBugReports, publishBugReport, rejectAdminWithdrawal, replaceAssignment,
   requestWalletWithdrawal, reviewProjectVerification, submitAssignmentProof,
@@ -221,7 +221,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   const refreshAdminData = async () => {
     const token = await getTokenOrThrow();
     const [projectResponse, testerResponse, withdrawalResponse, notificationResponse] = await Promise.all([
-      listProjects(token), listAdminTesters(token), listAdminWithdrawals(token), listAdminNotifications(token),
+      listProjects(token), listAdminTesters(token), listAdminWithdrawals(token), listMyNotifications(token),
     ]);
     const testers = testerResponse.data.map((profile) => mapTesterProfile(profile as BackendTesterProfile, profile.userId));
     const [queueResponses, bugResponses] = await Promise.all([
@@ -711,6 +711,14 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
       setDashboardError(error instanceof Error ? error.message : 'Unable to join this project.');
     }
   };
+  const apiMarkNotificationRead = async (notificationId: string) => {
+    setNotifications((items) => items.map((item) => item._id === notificationId ? { ...item, readAt: new Date().toISOString() } : item));
+    try {
+      await markNotificationRead(notificationId, await getTokenOrThrow());
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : 'Unable to mark notification as read.');
+    }
+  };
   const apiSubmitStep1 = async (assignmentId: string, email: string, screenshotUrl?: string) => { await submitAssignmentProof(assignmentId, { step: 1, fileUrl: screenshotUrl || email }, await getTokenOrThrow()); await refreshTesterData(); };
   const apiSubmitStep3 = async (assignmentId: string, screenshotUrl?: string) => {
     if (!screenshotUrl) { window.open(`${API_BASE_URL}/t/${assignmentId}`, '_blank', 'noopener,noreferrer'); return; }
@@ -854,6 +862,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 transactions={transactions}
                 withdrawals={withdrawals}
                 notifications={notifications}
+                onReadNotification={apiMarkNotificationRead}
                 onUpdateTesterProfile={apiUpdateTesterProfile}
                 onJoinProject={apiJoinProject}
                 onSubmitStep1Email={apiSubmitStep1}
@@ -910,6 +919,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 testers={adminTesters}
                 withdrawals={withdrawals}
                 notifications={notifications}
+                onReadNotification={apiMarkNotificationRead}
                 onApproveVerification={(id, amount) => { void apiReviewVerification(id, true, amount); }}
                 onRejectVerification={(id) => { void apiReviewVerification(id, false); }}
                 onAdvanceMilestone={(id, step, payload) => { void apiAdvanceMilestone(id, step, payload); }}

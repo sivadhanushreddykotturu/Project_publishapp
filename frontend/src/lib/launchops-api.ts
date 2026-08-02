@@ -173,6 +173,7 @@ export type BackendNotification = {
   type: "project_request" | "project_opportunity" | string;
   payload: { projectId?: string; appName?: string; joinPath?: string; requiredDeviceModels?: string[]; [key: string]: unknown };
   status: "queued" | "sent" | "failed";
+  readAt?: string;
   createdAt: string;
 };
 
@@ -312,6 +313,13 @@ export function listMyNotifications(token: string) {
 
 export function listAdminNotifications(token: string) {
   return apiRequest<ApiEnvelope<BackendNotification[]>>("/api/v1/notifications?limit=50", { token });
+}
+
+export function markNotificationRead(notificationId: string, token: string) {
+  return apiRequest<ApiEnvelope<BackendNotification>>(`/api/v1/notifications/${notificationId}/read`, {
+    method: "PATCH",
+    token,
+  });
 }
 
 export function submitClientVerification(projectId: string, proofUrl: string, token: string) {

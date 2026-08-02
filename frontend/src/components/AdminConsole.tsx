@@ -16,6 +16,7 @@ interface AdminConsoleProps {
   testers: Tester[];
   withdrawals: WithdrawalRequest[];
   notifications: BackendNotification[];
+  onReadNotification: (notificationId: string) => void;
   onApproveVerification: (projectId: string, customPrice?: number) => void;
   onRejectVerification: (projectId: string) => void;
   onAdvanceMilestone: (projectId: string, step: number, payload?: any) => void;
@@ -40,6 +41,7 @@ export default function AdminConsole({
   testers,
   withdrawals,
   notifications,
+  onReadNotification,
   onApproveVerification,
   onRejectVerification,
   onAdvanceMilestone,
@@ -230,10 +232,10 @@ export default function AdminConsole({
             <div className="relative">
             <button onClick={() => setNotificationDropdownOpen((open) => !open)} className={`p-2 border rounded-xl relative hover:bg-slate-500/5 border-slate-250 cursor-pointer ${isDarkMode ? 'border-zinc-800' : 'border-slate-200'}`}>
               <Bell className="w-4 h-4 text-slate-400" />
-              {notifications.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-indigo-500 rounded-full" />}
+              {notifications.some((notification) => !notification.readAt) && <span className="absolute top-1 right-1 w-2 h-2 bg-indigo-500 rounded-full" />}
             </button>
             {notificationDropdownOpen && <div className={`absolute right-0 top-12 w-80 max-h-96 overflow-y-auto rounded-xl border p-2 shadow-xl ${isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-slate-200'}`}>
-              {notifications.length === 0 ? <p className="p-3 text-xs text-slate-500">No notifications.</p> : notifications.map((notification) => <button key={notification._id} onClick={() => { if (notification.type === 'project_request') handleTabSelect('projects'); setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs ${isDarkMode ? 'hover:bg-zinc-900' : 'hover:bg-slate-50'}`}><span className="font-bold block">{notification.type === 'project_request' ? 'New published project' : notification.type.replace(/_/g, ' ')}</span><span className="text-slate-500 block mt-1">{String(notification.payload.appName ?? '')}</span></button>) }
+              {notifications.length === 0 ? <p className="p-3 text-xs text-slate-500">No notifications.</p> : notifications.map((notification) => <button key={notification._id} onClick={() => { onReadNotification(notification._id); if (notification.type === 'project_request') handleTabSelect('projects'); setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs ${notification.readAt ? 'opacity-55' : ''} ${isDarkMode ? 'hover:bg-zinc-900' : 'hover:bg-slate-50'}`}><span className="font-bold block">{notification.type === 'project_request' ? 'New published project' : notification.type.replace(/_/g, ' ')}</span><span className="text-slate-500 block mt-1">{String(notification.payload.appName ?? '')}</span></button>) }
             </div>}
             </div>
 
