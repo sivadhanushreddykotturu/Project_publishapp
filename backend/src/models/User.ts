@@ -18,7 +18,7 @@ const userSchema = new Schema<IUser>(
     clerkUserId: { type: String, required: true, unique: true, index: true },
     role: { type: String, enum: ROLES, required: true, index: true },
     name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, lowercase: true, trim: true, index: true },
+    email: { type: String, required: true, lowercase: true, trim: true, unique: true, index: true },
     phone: { type: String, trim: true },
     status: { type: String, enum: ["active", "suspended"], default: "active" },
   },

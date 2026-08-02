@@ -62,6 +62,45 @@ describe("client & tester onboarding — real HTTP requests through the actual r
     expect(tester!.status).toBe("active");
   });
 
+  it("prevents an existing Clerk account from switching between client and tester", async () => {
+    await request(app).post("/api/v1/users/sync").set("x-test-user", "clerk_locked").send({
+      role: "client",
+      name: "Locked User",
+      email: "locked@example.com",
+    });
+
+    const switched = await request(app).post("/api/v1/users/sync").set("x-test-user", "clerk_locked").send({
+      role: "tester",
+      name: "Locked User",
+      email: "locked@example.com",
+    });
+
+    expect(switched.status).toBe(409);
+    expect(switched.body.error.message).toMatch(/already registered as a client/i);
+    const user = await User.findOne({ clerkUserId: "clerk_locked" });
+    expect(user!.role).toBe("client");
+    expect(await Client.exists({ userId: user!._id })).toBeTruthy();
+    expect(await Tester.exists({ userId: user!._id })).toBeNull();
+  });
+
+  it("prevents a second Clerk account from registering an existing email", async () => {
+    await request(app).post("/api/v1/users/sync").set("x-test-user", "clerk_email_owner").send({
+      role: "tester",
+      name: "Email Owner",
+      email: "same@example.com",
+    });
+
+    const duplicate = await request(app).post("/api/v1/users/sync").set("x-test-user", "clerk_email_duplicate").send({
+      role: "client",
+      name: "Duplicate",
+      email: "SAME@example.com",
+    });
+
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.error.message).toMatch(/already exists.*tester/i);
+    expect(await User.countDocuments({ email: "same@example.com" })).toBe(1);
+  });
+
   it("PUT /testers/me completes the tester profile (devices + UPI)", async () => {
     await request(app)
       .post("/api/v1/users/sync")
