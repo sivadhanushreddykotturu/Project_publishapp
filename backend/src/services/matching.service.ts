@@ -15,7 +15,9 @@ import { dispatchNotification } from "./notification.service";
  */
 export async function joinProject(projectId: Types.ObjectId, testerId: Types.ObjectId) {
   const existing = await Assignment.findOne({ projectId, testerId });
-  if (existing) throw ApiError.conflict("Tester has already joined this project");
+  // Joining is idempotent: repeated clicks, retries, or a refreshed notification
+  // return the tester's existing enrollment instead of surfacing a misleading 409.
+  if (existing) return existing;
 
   const project = await Project.findById(projectId);
   if (!project) throw ApiError.notFound("Project not found");
