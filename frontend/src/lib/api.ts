@@ -35,7 +35,7 @@ export async function apiRequest<T>(endpoint: string, options: ApiRequestOptions
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new ApiRequestError(payload?.message || `API request failed (${response.status})`, response.status);
+    throw new ApiRequestError(payload?.error?.message || payload?.message || `API request failed (${response.status})`, response.status);
   }
   return payload as T;
 }

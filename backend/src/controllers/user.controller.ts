@@ -5,9 +5,6 @@ import { logger } from "../config/logger";
 import { User } from "../models/User";
 import { Client } from "../models/Client";
 import { Tester } from "../models/Tester";
-import { Assignment } from "../models/Assignment";
-import { BugReport } from "../models/BugReport";
-import { WalletTransaction } from "../models/WalletTransaction";
 import { Role } from "../models/enums";
 import { ApiError } from "../utils/apiError";
 import { asyncHandler } from "../utils/asyncHandler";
@@ -42,41 +39,27 @@ export const syncUser = asyncHandler(async (req: Request, res: Response) => {
   if (!userId) throw ApiError.unauthorized();
 
   const body = syncSchema.parse(req.body);
+  const normalizedEmail = body.email.trim().toLowerCase();
 
   let user = await User.findOne({ clerkUserId: userId });
   if (!user) {
-    user = await User.create({ clerkUserId: userId, ...body });
+    const emailOwner = await User.findOne({ email: normalizedEmail });
+    if (emailOwner) {
+      throw ApiError.conflict(
+        `An account already exists for ${normalizedEmail} as a ${emailOwner.role}. Please sign in using the ${emailOwner.role} login.`
+      );
+    }
+
+    user = await User.create({ clerkUserId: userId, ...body, email: normalizedEmail });
     if (body.role === "client") {
       await Client.create({ userId: user._id, contactName: body.name });
     } else {
       await Tester.create({ userId: user._id });
     }
   } else if (user.role !== body.role && user.role !== "admin") {
-    if (user.role === "tester" && body.role === "client") {
-      const tester = await Tester.findOne({ userId: user._id });
-      const [assignments, bugs, walletTransactions] = tester
-        ? await Promise.all([
-            Assignment.countDocuments({ testerId: tester._id }),
-            BugReport.countDocuments({ testerId: tester._id }),
-            WalletTransaction.countDocuments({ testerId: tester._id }),
-          ])
-        : [0, 0, 0];
-      const pristine = !tester || (tester.devices.length === 0 && tester.walletBalance === 0 && assignments === 0 && bugs === 0 && walletTransactions === 0);
-      if (pristine) {
-        if (tester) await tester.deleteOne();
-        await Client.create({ userId: user._id, contactName: body.name });
-        user.role = "client";
-        await user.save();
-      }
-    } else if (user.role === "client" && body.role === "tester") {
-      const client = await Client.findOne({ userId: user._id });
-      if (!client || client.projects.length === 0) {
-        if (client) await client.deleteOne();
-        await Tester.create({ userId: user._id });
-        user.role = "tester";
-        await user.save();
-      }
-    }
+    throw ApiError.conflict(
+      `This email is already registered as a ${user.role}. Please use the ${user.role} login; one email cannot be both client and tester.`
+    );
   }
 
   await syncClerkRoleMetadata(userId, user.role);
