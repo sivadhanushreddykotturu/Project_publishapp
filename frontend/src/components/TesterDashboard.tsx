@@ -20,7 +20,7 @@ interface TesterDashboardProps {
   notifications: BackendNotification[];
   onReadNotification: (notificationId: string) => void;
   onUpdateTesterProfile: (updatedTester: Partial<Tester>) => void;
-  onJoinProject: (projectId: string) => void;
+  onJoinProject: (projectId: string) => Promise<void>;
   onSubmitStep1Email: (assignmentId: string, email: string, screenshotUrl?: string) => void;
   onClickStep3Link: (assignmentId: string, screenshotUrl?: string) => void;
   onLogStep4CheckIn: (assignmentId: string) => void;
@@ -62,6 +62,17 @@ export default function TesterDashboard({
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
+  const [joiningProjectIds, setJoiningProjectIds] = useState<string[]>([]);
+
+  const handleJoin = async (projectId: string) => {
+    if (joiningProjectIds.includes(projectId)) return;
+    setJoiningProjectIds((ids) => [...ids, projectId]);
+    try {
+      await onJoinProject(projectId);
+    } finally {
+      setJoiningProjectIds((ids) => ids.filter((id) => id !== projectId));
+    }
+  };
   
   // Simulation & Modal States
   const [googlePlayEmail, setGooglePlayEmail] = useState<string>('');
@@ -1172,15 +1183,15 @@ export default function TesterDashboard({
                                 </span>
                               ) : (
                                 <button
-                                  onClick={() => onJoinProject(p.id)}
-                                  disabled={p.joinState === 'closed'}
+                                  onClick={() => { void handleJoin(p.id); }}
+                                  disabled={p.joinState === 'closed' || joiningProjectIds.includes(p.id)}
                                   className={`px-4 py-2 border rounded-xl text-xs font-extrabold transition-all cursor-pointer bg-transparent ${
                                     isDarkMode
                                       ? 'border-zinc-700 hover:border-zinc-600 text-white hover:bg-zinc-800/30'
                                       : 'border-indigo-500 hover:bg-indigo-50/20 text-indigo-600'
                                   }`}
                                 >
-                                  {p.joinState === 'closed' ? 'Enrollment Closed' : p.joinState === 'full' ? `Join Waitlist (${p.waitlistCount ?? 0}/3)` : 'Join'}
+                                  {joiningProjectIds.includes(p.id) ? 'Joining...' : p.joinState === 'closed' ? 'Enrollment Closed' : p.joinState === 'full' ? `Join Waitlist (${p.waitlistCount ?? 0}/3)` : 'Join'}
                                 </button>
                               )}
                             </div>
@@ -1346,11 +1357,11 @@ export default function TesterDashboard({
                         </button>
                       ) : (
                         <button
-                          onClick={() => onJoinProject(p.id)}
-                          disabled={p.joinState === 'closed'}
+                          onClick={() => { void handleJoin(p.id); }}
+                          disabled={p.joinState === 'closed' || joiningProjectIds.includes(p.id)}
                           className="w-full btn-gradient text-white py-2.5 rounded-xl font-bold text-xs border-0 cursor-pointer shadow-md"
                         >
-                          {p.joinState === 'closed' ? 'Enrollment Closed (14 + 3)' : p.joinState === 'full' ? `Enter Waitlist (${p.waitlistCount ?? 0}/3)` : 'Join Testing Track'}
+                          {joiningProjectIds.includes(p.id) ? 'Joining...' : p.joinState === 'closed' ? 'Enrollment Closed (14 + 3)' : p.joinState === 'full' ? `Enter Waitlist (${p.waitlistCount ?? 0}/3)` : 'Join Testing Track'}
                         </button>
                       )}
                     </div>

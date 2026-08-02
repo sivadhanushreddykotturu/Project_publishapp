@@ -708,6 +708,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
       await joinTesterProject(projectId, await getTokenOrThrow());
       await refreshTesterData();
     } catch (error) {
+      await refreshTesterData().catch(() => undefined);
       setDashboardError(error instanceof Error ? error.message : 'Unable to join this project.');
     }
   };

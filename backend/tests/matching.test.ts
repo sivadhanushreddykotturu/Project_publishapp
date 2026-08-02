@@ -61,11 +61,14 @@ describe("matching.service", () => {
     expect(refreshed!.joinState).toBe("full");
   });
 
-  it("rejects a tester joining the same project twice", async () => {
+  it("returns the existing assignment when a tester retries joining", async () => {
     const project = await makeProject(2);
     const t1 = await makeTester("t1");
-    await joinProject(project._id, t1._id);
-    await expect(joinProject(project._id, t1._id)).rejects.toThrow(/already joined/i);
+    const first = await joinProject(project._id, t1._id);
+    const retried = await joinProject(project._id, t1._id);
+    expect(retried._id.toString()).toBe(first._id.toString());
+    const refreshed = await Project.findById(project._id);
+    expect(refreshed!.activeTesterCount).toBe(1);
   });
 
   it("replaces an inactive Step 1 tester and promotes the queued tester", async () => {
