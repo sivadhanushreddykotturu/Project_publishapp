@@ -3,7 +3,7 @@ import {
   Wallet, Shield, Smartphone, Plus, Bug, Check, AlertCircle, 
   ArrowRight, Landmark, ExternalLink, Calendar, Hourglass, 
   User, CheckCircle, Clock, ChevronDown, Upload, Sparkles, MapPin, Award,
-  Compass, Bell, Settings, LogOut, MessageSquare, Star, FolderCheck, ListFilter, Home, CheckSquare
+  Compass, Bell, Settings, LogOut, MessageSquare, Star, FolderCheck, ListFilter, Home, CheckSquare, Loader2
 } from 'lucide-react';
 import { Tester, TestApp, TesterAssignment, BugReport, Transaction, WithdrawalRequest } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -73,6 +73,12 @@ export default function TesterDashboard({
       setJoiningProjectIds((ids) => ids.filter((id) => id !== projectId));
     }
   };
+
+  const openCurrentProjectStep = (assignmentId: string) => {
+    setSelectedAssignmentId(assignmentId);
+    handleTabSelect('dashboard');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   
   // Simulation & Modal States
   const [googlePlayEmail, setGooglePlayEmail] = useState<string>('');
@@ -130,7 +136,7 @@ export default function TesterDashboard({
   };
 
   // Derive active testing tasks
-  const activeAssignments = assignments.filter(a => a.testerId === activeTester.id && a.status !== 'completed');
+  const activeAssignments = assignments.filter(a => a.testerId === activeTester.id && a.status === 'active');
   const completedAssignments = assignments.filter(a => a.testerId === activeTester.id && a.status === 'completed');
   
   // Select first assignment if none selected
@@ -1191,7 +1197,7 @@ export default function TesterDashboard({
                                       : 'border-indigo-500 hover:bg-indigo-50/20 text-indigo-600'
                                   }`}
                                 >
-                                  {joiningProjectIds.includes(p.id) ? 'Joining...' : p.joinState === 'closed' ? 'Enrollment Closed' : p.joinState === 'full' ? `Join Waitlist (${p.waitlistCount ?? 0}/3)` : 'Join'}
+                                  {joiningProjectIds.includes(p.id) ? <span className="inline-flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Joining...</span> : p.joinState === 'closed' ? 'Enrollment Closed' : p.joinState === 'full' ? `Join Waitlist (${p.waitlistCount ?? 0}/3)` : 'Join'}
                                 </button>
                               )}
                             </div>
@@ -1309,13 +1315,16 @@ export default function TesterDashboard({
                               { stepNum: 6, title: 'Step 6: Completion' }
                             ].map((stepItem) => {
                               const isStepDone = isJoined && assignment.currentStep > stepItem.stepNum;
-                              const isStepActive = isJoined && assignment.currentStep === stepItem.stepNum;
-                              const isStepLocked = !isJoined;
+                              const isStepActive = isJoined && assignment.status === 'active' && assignment.currentStep === stepItem.stepNum;
+                              const isStepLocked = !isJoined || assignment.currentStep < stepItem.stepNum;
 
                               return (
-                                <div 
+                                <button
                                   key={stepItem.stepNum} 
-                                  className={`flex items-center justify-between px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
+                                  type="button"
+                                  disabled={!isStepActive}
+                                  onClick={() => isStepActive && openCurrentProjectStep(assignment.id)}
+                                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all text-left ${isStepActive ? 'cursor-pointer hover:border-indigo-500 hover:bg-indigo-500/10' : 'cursor-default'} ${
                                     isStepDone
                                       ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-500'
                                       : isStepActive
@@ -1327,10 +1336,10 @@ export default function TesterDashboard({
                                 >
                                   <span>{stepItem.title}</span>
                                   {isStepDone ? (
-                                    <Check className="w-3.5 h-3.5 text-emerald-500 font-bold shrink-0" />
+                                    <span className="flex items-center gap-1 text-[9px] font-bold uppercase"><Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Completed</span>
                                   ) : isStepActive ? (
                                     <span className="flex items-center gap-1 text-indigo-600 font-bold uppercase text-[9px] tracking-wider shrink-0">
-                                      Unlocked
+                                      Open step <ArrowRight className="w-3 h-3" />
                                     </span>
                                   ) : isStepLocked ? (
                                     <span className="flex items-center gap-1 text-[10px] text-slate-500 font-bold shrink-0">
@@ -1341,7 +1350,7 @@ export default function TesterDashboard({
                                       Unlocked
                                     </span>
                                   )}
-                                </div>
+                                </button>
                               );
                             })}
                           </div>
@@ -1349,19 +1358,25 @@ export default function TesterDashboard({
                       </div>
 
                       {isJoined ? (
-                        <button
-                          disabled
-                          className={`w-full py-2.5 rounded-xl font-bold text-xs border border-transparent bg-slate-500/5 text-slate-500 cursor-not-allowed`}
-                        >
-                          Already Joined Track
-                        </button>
+                        assignment.status === 'queued' ? (
+                          <span className="w-full py-2.5 rounded-xl font-bold text-xs border border-amber-500/20 bg-amber-500/5 text-amber-500 text-center">
+                            Waitlisted #{assignment.queuePosition}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => openCurrentProjectStep(assignment.id)}
+                            className="w-full py-2.5 rounded-xl font-bold text-xs border border-indigo-500/20 bg-indigo-500/5 text-indigo-500 cursor-pointer hover:bg-indigo-500/10 transition-colors"
+                          >
+                            Open Current Step {assignment.currentStep}
+                          </button>
+                        )
                       ) : (
                         <button
                           onClick={() => { void handleJoin(p.id); }}
                           disabled={p.joinState === 'closed' || joiningProjectIds.includes(p.id)}
                           className="w-full btn-gradient text-white py-2.5 rounded-xl font-bold text-xs border-0 cursor-pointer shadow-md"
                         >
-                          {joiningProjectIds.includes(p.id) ? 'Joining...' : p.joinState === 'closed' ? 'Enrollment Closed (14 + 3)' : p.joinState === 'full' ? `Enter Waitlist (${p.waitlistCount ?? 0}/3)` : 'Join Testing Track'}
+                          {joiningProjectIds.includes(p.id) ? <span className="inline-flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Joining project...</span> : p.joinState === 'closed' ? 'Enrollment Closed (14 + 3)' : p.joinState === 'full' ? `Enter Waitlist (${p.waitlistCount ?? 0}/3)` : 'Join Testing Track'}
                         </button>
                       )}
                     </div>
