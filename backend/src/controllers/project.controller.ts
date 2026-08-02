@@ -101,12 +101,9 @@ export const listProjects = asyncHandler(async (req: Request, res: Response) => 
 
 export const listTesterOpportunities = asyncHandler(async (req: Request, res: Response) => {
   const { page, limit, skip } = getPagination(req);
-  const tester = await Tester.findOne({ userId: req.dbUser!._id });
-  const deviceModels = tester?.devices.map((device) => device.model) ?? [];
   const filter = {
     status: { $in: ["active", "full"] },
     joinState: { $in: ["open", "full", "closed"] },
-    $or: [{ requiredDeviceModels: { $size: 0 } }, { requiredDeviceModels: { $in: deviceModels } }],
   };
 
   const [items, total] = await Promise.all([

@@ -100,5 +100,36 @@ describe("externally managed commercial flow", () => {
     const notifications = await Notification.find({ type: "project_opportunity" });
     expect(notifications).toHaveLength(1);
     expect(notifications[0].recipientId.toString()).toBe(matching._id.toString());
+
+    const visibleToOtherTester = await request(app)
+      .get("/api/v1/projects/opportunities")
+      .set("x-test-user", "clerk_other");
+    expect(visibleToOtherTester.status).toBe(200);
+    expect(visibleToOtherTester.body.data).toHaveLength(1);
+  });
+
+  it("only lets the recipient mark a notification as read", async () => {
+    await signUpClient("clerk_owner");
+    await signUpClient("clerk_other_client");
+    const owner = await User.findOne({ clerkUserId: "clerk_owner" });
+    const notification = await Notification.create({
+      recipientId: owner!._id,
+      type: "project_request",
+      channel: "email",
+      payload: { appName: "Read Test" },
+      status: "sent",
+      idempotencyKey: "read-test",
+    });
+
+    const forbidden = await request(app)
+      .patch(`/api/v1/notifications/${notification._id}/read`)
+      .set("x-test-user", "clerk_other_client");
+    expect(forbidden.status).toBe(404);
+
+    const marked = await request(app)
+      .patch(`/api/v1/notifications/${notification._id}/read`)
+      .set("x-test-user", "clerk_owner");
+    expect(marked.status).toBe(200);
+    expect(marked.body.data.readAt).toBeTruthy();
   });
 });

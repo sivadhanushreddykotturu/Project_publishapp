@@ -27,6 +27,16 @@ export const listMyNotifications = asyncHandler(async (req: Request, res: Respon
   res.status(200).json({ data: items, meta: buildPageMeta(page, limit, total) });
 });
 
+export const markNotificationRead = asyncHandler(async (req: Request, res: Response) => {
+  const notification = await Notification.findOneAndUpdate(
+    { _id: req.params.id, recipientId: req.dbUser!._id },
+    { $set: { readAt: new Date() } },
+    { new: true }
+  );
+  if (!notification) throw ApiError.notFound("Notification not found");
+  res.status(200).json({ data: notification });
+});
+
 /** Admin console: monitor and, where needed, trigger reminders manually (PRD §8). */
 export const resendNotification = asyncHandler(async (req: Request, res: Response) => {
   const notification = await Notification.findById(req.params.id);
