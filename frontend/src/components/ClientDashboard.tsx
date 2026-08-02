@@ -347,20 +347,11 @@ export default function ClientDashboard({
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <span className={`px-3 py-1.5 rounded-xl text-[10px] font-extrabold border uppercase tracking-wider ${
-                          selectedProject.invoiceStatus === 'paid' 
-                            ? 'border-green-500/20 bg-green-500/10 text-green-500'
-                            : 'border-amber-500/20 bg-amber-500/10 text-amber-500'
-                        }`}>
-                          Invoice: {selectedProject.invoiceStatus === 'paid' ? 'Paid' : 'Awaiting Payment'}
+                        <span className="px-3 py-1.5 rounded-xl text-[10px] font-extrabold border uppercase tracking-wider border-green-500/20 bg-green-500/10 text-green-500">
+                          Published to testers
                         </span>
-
-                        <span className={`px-3 py-1.5 rounded-xl text-[10px] font-extrabold border uppercase tracking-wider ${
-                          selectedProject.verificationStatus === 'approved' 
-                            ? 'border-green-500/20 bg-green-500/10 text-green-500'
-                            : 'border-amber-500/20 bg-amber-500/10 text-amber-500'
-                        }`}>
-                          Vetting: {selectedProject.verificationStatus || 'none'}
+                        <span className="px-3 py-1.5 rounded-xl text-[10px] font-extrabold border uppercase tracking-wider border-slate-500/20 bg-slate-500/10 text-slate-500">
+                          Commercial process external
                         </span>
                       </div>
                     </div>
@@ -421,68 +412,18 @@ export default function ClientDashboard({
                           </div>
                         </div>
 
-                        {/* Integration status cards */}
+                        {/* Publication status */}
                         <div>
-                          <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider block font-mono mb-2">Simulation Pipeline</span>
+                          <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider block font-mono mb-2">Tester enrollment</span>
                           <div className={`p-4 border rounded-2xl space-y-3 ${
                             isDarkMode ? 'bg-black/30 border-white/5' : 'bg-slate-50 border-slate-200'
                           }`}>
-                            {selectedProject.verificationStatus === 'none' && (
-                              <div className="text-xs font-semibold text-slate-500">
-                                <p className="text-amber-500 font-extrabold flex items-center gap-1.5 mb-2">
-                                  <AlertCircle className="w-4 h-4" /> Vetting Required
-                                </p>
-                                <p className="text-[11px] leading-relaxed mb-3">Upload verification console screenshot proof to activate whitelists.</p>
-                                <form onSubmit={(e) => handleVerificationSubmit(e, selectedProject.id)} className="space-y-3">
-                                  <input
-                                    type="text"
-                                    required
-                                    placeholder="Enter proof screenshot link (e.g. imgur.com/ref)"
-                                    value={consoleProofUrl}
-                                    onChange={(e) => setConsoleProofUrl(e.target.value)}
-                                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 ${
-                                      isDarkMode 
-                                        ? `${verificationError ? 'border-red-500 bg-red-500/5' : 'bg-[#09090B] border-zinc-800'} text-white` 
-                                        : `${verificationError ? 'border-red-500 bg-red-500/5' : 'bg-white border-slate-200'} text-slate-800`
-                                    }`}
-                                  />
-                                  {verificationError && <p className="text-[10px] font-bold text-red-500">{verificationError}</p>}
-                                  <button 
-                                    type="submit" 
-                                    className="px-4 py-2 text-white text-xs font-black rounded-xl border-0 cursor-pointer"
-                                    style={{ backgroundColor: '#4F46E5' }}
-                                  >
-                                    Submit Screenshot Proof
-                                  </button>
-                                </form>
-                              </div>
-                            )}
-
-                            {selectedProject.verificationStatus === 'pending' && (
-                              <div className="text-xs font-semibold text-slate-500">
-                                <p className="text-amber-500 font-extrabold flex items-center gap-1.5 mb-2">
-                                  <Clock className="w-4 h-4" /> Awaiting Vetting
-                                </p>
-                                <p className="text-[11px] leading-relaxed">Admin is currently validating your screenshot proof.whitelisting begins immediately upon validation.</p>
-                              </div>
-                            )}
-
-                            {selectedProject.verificationStatus === 'approved' && (
-                              <div className="text-xs font-semibold text-slate-500 space-y-2">
-                                <p className="text-green-500 font-extrabold flex items-center gap-1.5">
-                                  <CheckCircle className="w-4 h-4" /> Verified Dashboard
-                                </p>
-                                <p className="text-[11px]">Play Store closed testing sync whitelisting link is active.</p>
-                                <a 
-                                  href={selectedProject.optInUrl || 'https://play.google.com/apps/testing/com.launchops.app'} 
-                                  target="_blank" 
-                                  rel="noreferrer" 
-                                  className="inline-flex items-center gap-1 text-indigo-500 hover:underline"
-                                >
-                                  Join Play Store Track <ExternalLink className="w-3.5 h-3.5" />
-                                </a>
-                              </div>
-                            )}
+                            <div className="text-xs font-semibold text-slate-500">
+                              <p className="text-green-500 font-extrabold flex items-center gap-1.5 mb-2">
+                                <CheckCircle className="w-4 h-4" /> Opportunity published
+                              </p>
+                              <p className="text-[11px] leading-relaxed">Eligible active testers have been notified. Enrollment accepts 14 testers and up to 3 waitlisted testers.</p>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -740,7 +681,7 @@ export default function ClientDashboard({
                     className="w-full py-3 text-white text-xs font-black rounded-xl border-0 cursor-pointer shadow-md hover:opacity-90 transition-all"
                     style={{ backgroundColor: '#4F46E5' }}
                   >
-                    Submit Request to Admin
+                    Publish Testing Request
                   </button>
                 </form>
               </div>
@@ -751,8 +692,8 @@ export default function ClientDashboard({
           {activeTab === 'billing' && (
             <div className="space-y-6">
               <div>
-                <h2 className={`text-xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Billing & Invoice Ledger</h2>
-                <p className="text-[11px] text-slate-500 mt-1">Audit outstanding balances, download invoice ledger receipts, and complete mock portal checkouts.</p>
+                <h2 className={`text-xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Commercial Processing</h2>
+                <p className="text-[11px] text-slate-500 mt-1">Invoices, payment, and commercial activation are managed externally.</p>
               </div>
 
               {clientProjects.length === 0 ? (
@@ -775,10 +716,8 @@ export default function ClientDashboard({
                           <span className={`text-sm font-black ${isDarkMode ? 'text-white' : 'text-slate-805'}`}>
                             {getTierPrice(p.packageTier || 'testers_only')}
                           </span>
-                          <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${
-                            p.invoiceStatus === 'paid' ? 'bg-green-500/10 text-green-500' : 'bg-amber-500/10 text-amber-500'
-                          }`}>
-                            {p.invoiceStatus === 'paid' ? 'Paid' : 'Awaiting Payment'}
+                          <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-slate-500/10 text-slate-500">
+                            Managed externally
                           </span>
                         </div>
                         <div className="text-xs space-y-1 font-semibold text-slate-500">
@@ -787,15 +726,7 @@ export default function ClientDashboard({
                         </div>
                       </div>
 
-                      {p.invoiceStatus !== 'paid' && (
-                        <button
-                          onClick={() => onPayInvoice(p.id)}
-                          className="px-5 py-2.5 text-xs text-white font-black rounded-xl border-0 cursor-pointer shadow-md hover:opacity-90 transition-all shrink-0 w-full md:w-auto"
-                          style={{ backgroundColor: '#4F46E5' }}
-                        >
-                          Complete Payment (Razorpay Mock)
-                        </button>
-                      )}
+                      <span className="text-[10px] font-semibold text-slate-500">No action is required in LaunchOps.</span>
                     </div>
                   ))}
                 </div>

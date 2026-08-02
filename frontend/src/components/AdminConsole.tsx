@@ -154,7 +154,6 @@ export default function AdminConsole({
               { id: 'dashboard', label: 'Dashboard', icon: <Activity className="w-4 h-4" /> },
               { id: 'projects', label: 'Projects', icon: <Smartphone className="w-4 h-4" /> },
               { id: 'testers', label: 'Testers', icon: <Users className="w-4 h-4" /> },
-              { id: 'verifications', label: 'Waiting Queue', icon: <Clock className="w-4 h-4" /> },
               { id: 'bugs', label: 'Bug Reports', icon: <Bug className="w-4 h-4" /> },
               { id: 'cashouts', label: 'Payouts & Wallets', icon: <Landmark className="w-4 h-4" /> }
             ].map((link) => {
@@ -234,7 +233,7 @@ export default function AdminConsole({
               {notifications.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-indigo-500 rounded-full" />}
             </button>
             {notificationDropdownOpen && <div className={`absolute right-0 top-12 w-80 max-h-96 overflow-y-auto rounded-xl border p-2 shadow-xl ${isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-slate-200'}`}>
-              {notifications.length === 0 ? <p className="p-3 text-xs text-slate-500">No notifications.</p> : notifications.map((notification) => <button key={notification._id} onClick={() => { if (notification.type === 'project_request') handleTabSelect('verifications'); setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs ${isDarkMode ? 'hover:bg-zinc-900' : 'hover:bg-slate-50'}`}><span className="font-bold block">{notification.type === 'project_request' ? 'New project request' : notification.type.replace(/_/g, ' ')}</span><span className="text-slate-500 block mt-1">{String(notification.payload.appName ?? '')}</span></button>) }
+              {notifications.length === 0 ? <p className="p-3 text-xs text-slate-500">No notifications.</p> : notifications.map((notification) => <button key={notification._id} onClick={() => { if (notification.type === 'project_request') handleTabSelect('projects'); setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs ${isDarkMode ? 'hover:bg-zinc-900' : 'hover:bg-slate-50'}`}><span className="font-bold block">{notification.type === 'project_request' ? 'New published project' : notification.type.replace(/_/g, ' ')}</span><span className="text-slate-500 block mt-1">{String(notification.payload.appName ?? '')}</span></button>) }
             </div>}
             </div>
 
@@ -1114,7 +1113,6 @@ export default function AdminConsole({
         {[
           { id: 'dashboard', label: 'Dashboard', icon: <Activity className="w-5 h-5" /> },
           { id: 'projects', label: 'Apps', icon: <Smartphone className="w-5 h-5" /> },
-          { id: 'verifications', label: 'Queue', icon: <Clock className="w-5 h-5" /> },
           { id: 'cashouts', label: 'Payouts', icon: <Landmark className="w-5 h-5" /> }
         ].map(link => (
           <button

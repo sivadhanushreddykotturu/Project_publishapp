@@ -6,9 +6,7 @@ import { Client } from "../models/Client";
 import { Tester } from "../models/Tester";
 import { Assignment } from "../models/Assignment";
 import { BugReport } from "../models/BugReport";
-import { Invoice } from "../models/Invoice";
 import { PACKAGES, PLAY_INTEGRATION_MODES } from "../models/enums";
-import { PACKAGE_CONFIG, computeInvoiceAmount } from "../constants/packages";
 import { ApiError } from "../utils/apiError";
 import { asyncHandler } from "../utils/asyncHandler";
 import { getPagination, buildPageMeta } from "../utils/pagination";
@@ -26,6 +24,7 @@ import { submitClientVerificationProof, reviewClientVerification } from "../serv
 import { env } from "../config/env";
 import { User } from "../models/User";
 import { dispatchNotification } from "../services/notification.service";
+import { activateProject } from "../services/workflowEngine.service";
 
 const createProjectSchema = z.object({
   package: z.enum(PACKAGES),
@@ -52,17 +51,14 @@ export const createProject = asyncHandler(async (req: Request, res: Response) =>
   if (!client) throw ApiError.notFound("Client profile not found");
 
   const requiredTesters = 14;
-  // Every client request is reviewed by an admin before payment and activation.
-  const needsVerification = true;
-
   const project = await Project.create({
     clientId: client._id,
     package: body.package,
     appDetails: body.appDetails,
     requiredTesters,
     requiredDeviceModels: body.requiredDeviceModels ?? [],
-    status: needsVerification ? "pending_verification" : "awaiting_payment",
-    verification: needsVerification ? { required: true, status: "pending" } : { required: false, status: "not_required" },
+    status: "draft",
+    verification: { required: false, status: "not_required" },
   });
 
   client.projects.push(project._id);
@@ -78,26 +74,12 @@ export const createProject = asyncHandler(async (req: Request, res: Response) =>
     payload: { projectId: project._id.toString(), appName: project.appDetails.appName, requiredDeviceModels: project.requiredDeviceModels },
   })));
 
-  if (needsVerification) {
-    res.status(201).json({
-      data: { project, invoice: null },
-      message:
-        "This package requires verification before payment. Submit proof you control the Play Console listing via POST /projects/:id/verification/submit, then the team will follow up directly.",
-    });
-    return;
-  }
-
-  const { amount, gst } = computeInvoiceAmount(body.package, requiredTesters);
-  const invoice = await Invoice.create({
-    clientId: client._id,
-    projectId: project._id,
-    package: body.package,
-    amount,
-    gst,
-    dueDate: new Date(Date.now() + 7 * 24 * 3_600_000),
+  const activation = await activateProject(project._id);
+  const publishedProject = "project" in activation ? activation.project : activation;
+  res.status(201).json({
+    data: { project: publishedProject, invoice: null },
+    message: "Project published. Eligible active testers have been notified.",
   });
-
-  res.status(201).json({ data: { project, invoice } });
 });
 
 export const listProjects = asyncHandler(async (req: Request, res: Response) => {
