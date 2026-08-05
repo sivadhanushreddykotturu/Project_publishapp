@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@theme {
+  /* LaunchOps design tokens — derived from the LaunchOS-style brief */
+  --color-cream-50: #f8f6f1;
+  --color-cream-100: #efeae1;
+  --color-cream-200: #e4ddcf;
+  --color-paper: #f5f5f7;
+
+  --color-ink-950: #0a0a0b;
+  --color-ink-800: #1c1e22;
+  --color-ink-600: #4b4f55;
+  --color-ink-500: #6b6f76;
+  --color-ink-400: #9a9ea6;
+
+  --color-lime-200: #ecfbab;
+  --color-lime-300: #e0f97e;
+  --color-lime-400: #d3f35a;
+  --color-lime-500: #c2e93e;
+
+  --color-orange-500: #e8590c;
+  --color-orange-600: #d9480f;
+
+  --color-navy-800: #131a3a;
+  --color-navy-900: #0b1026;
+
+  --color-blue-500: #2f6fed;
+  --color-blue-600: #1f5fe0;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --tracking-display: -0.045em;
+
+  --animate-float: float 7s ease-in-out infinite;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0) rotate(-2deg);
+    }
+    50% {
+      transform: translateY(-10px) rotate(2deg);
+    }
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink-950);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-lime-300);
+  color: var(--color-ink-950);
+}
