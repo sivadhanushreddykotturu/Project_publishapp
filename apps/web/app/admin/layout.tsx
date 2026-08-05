@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { getFreshRole, roleHome } from "@/lib/role";
 import { DashboardShell } from "@/components/dash/DashboardShell";
+import { SessionError } from "@/components/SessionError";
 
 const NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
@@ -49,6 +50,7 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const session = await getFreshRole();
+  if (session && "error" in session) return <SessionError />;
   if (!session) redirect("/sign-in");
   if (session.role !== "admin") redirect(roleHome(session.role));
 

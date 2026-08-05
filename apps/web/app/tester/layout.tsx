@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { getFreshRole, roleHome } from "@/lib/role";
 import { DashboardShell } from "@/components/dash/DashboardShell";
+import { SessionError } from "@/components/SessionError";
 
 const NAV = [
   { href: "/tester", label: "Overview", icon: LayoutDashboard },
@@ -37,6 +38,7 @@ export default async function TesterLayout({
   children: React.ReactNode;
 }) {
   const session = await getFreshRole();
+  if (session && "error" in session) return <SessionError />;
   if (!session) redirect("/sign-in");
   if (session.role !== "tester") redirect(roleHome(session.role));
 
