@@ -3,28 +3,109 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-import type { LucideIcon } from "lucide-react";
+import {
+  LayoutDashboard,
+  FolderKanban,
+  Receipt,
+  LifeBuoy,
+  Radar,
+  FlaskConical,
+  Wallet,
+  Bug,
+  UserRound,
+  Building2,
+  UsersRound,
+  ShieldCheck,
+  MailWarning,
+  Gauge,
+  type LucideIcon,
+} from "lucide-react";
 import { Logo } from "@/components/marketing/LogoMark";
 import { NotificationBell } from "./NotificationBell";
 
-export interface NavItem {
+export type DashRole = "client" | "tester" | "admin";
+
+interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
 }
 
+// Nav config lives here (client-side) — passing component references from a
+// Server Component into this client shell would break RSC serialization.
+const NAV_BY_ROLE: Record<DashRole, NavItem[]> = {
+  client: [
+    { href: "/client", label: "Overview", icon: LayoutDashboard },
+    { href: "/client/projects", label: "Projects", icon: FolderKanban },
+    { href: "/client/invoices", label: "Invoices", icon: Receipt },
+    { href: "/client/support", label: "Support", icon: LifeBuoy },
+  ],
+  tester: [
+    { href: "/tester", label: "Overview", icon: LayoutDashboard },
+    { href: "/tester/opportunities", label: "Opportunities", icon: Radar },
+    { href: "/tester/tests", label: "My Tests", icon: FlaskConical },
+    { href: "/tester/wallet", label: "Wallet", icon: Wallet },
+    { href: "/tester/reports", label: "My Reports", icon: Bug },
+    { href: "/tester/support", label: "Support", icon: LifeBuoy },
+    { href: "/tester/profile", label: "Profile", icon: UserRound },
+  ],
+  admin: [
+    { href: "/admin", label: "Overview", icon: LayoutDashboard },
+    { href: "/admin/projects", label: "Projects", icon: FolderKanban },
+    { href: "/admin/clients", label: "Clients", icon: Building2 },
+    { href: "/admin/testers", label: "Testers", icon: UsersRound },
+    { href: "/admin/verification", label: "Verification", icon: ShieldCheck },
+    { href: "/admin/bugs", label: "Bug Reports", icon: Bug },
+    { href: "/admin/wallets", label: "Wallets", icon: Wallet },
+    { href: "/admin/invoices", label: "Invoices", icon: Receipt },
+    { href: "/admin/notifications", label: "Notifications", icon: MailWarning },
+    { href: "/admin/support", label: "Support", icon: LifeBuoy },
+    { href: "/admin/metrics", label: "Metrics", icon: Gauge },
+  ],
+};
+
+const TITLES_BY_ROLE: Record<DashRole, Record<string, string>> = {
+  client: {
+    "/client/projects": "Projects",
+    "/client/invoices": "Invoices",
+    "/client/support": "Support",
+    "/client": "Overview",
+  },
+  tester: {
+    "/tester/opportunities": "Opportunities",
+    "/tester/tests": "My Tests",
+    "/tester/wallet": "Wallet",
+    "/tester/reports": "My Reports",
+    "/tester/support": "Support",
+    "/tester/profile": "Profile",
+    "/tester": "Overview",
+  },
+  admin: {
+    "/admin/projects": "Projects",
+    "/admin/clients": "Clients",
+    "/admin/testers": "Testers",
+    "/admin/verification": "Verification Queue",
+    "/admin/bugs": "Bug Reports",
+    "/admin/wallets": "Wallets & Payouts",
+    "/admin/invoices": "Invoices",
+    "/admin/notifications": "Notifications",
+    "/admin/support": "Support",
+    "/admin/metrics": "Metrics",
+    "/admin": "Overview",
+  },
+};
+
 export function DashboardShell({
-  nav,
-  titleByPath,
+  role,
   children,
 }: {
-  nav: NavItem[];
-  titleByPath: Record<string, string>;
+  role: DashRole;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const nav = NAV_BY_ROLE[role];
   const title =
-    Object.entries(titleByPath)
+    Object.entries(TITLES_BY_ROLE[role])
       .sort((a, b) => b[0].length - a[0].length)
       .find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? "Overview";
 
@@ -120,7 +201,6 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
 }
 
 function LogoMark({ size }: { size: number }) {
-  // local minimal mark for the mobile topbar
   return (
     <span
       className="inline-grid grid-cols-3 place-items-center rounded-[28%] bg-ink-950"
