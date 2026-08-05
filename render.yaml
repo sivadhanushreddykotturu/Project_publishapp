@@ -1,0 +1,38 @@
+# Render Blueprint — launchops-api
+# Render Dashboard → New → Blueprint → point at this repo. Fill the sync:false
+# values in the dashboard after creation.
+services:
+  - type: web
+    name: launchops-api
+    runtime: node
+    plan: free
+    # npm workspaces install from the repo root; types must build before api
+    buildCommand: npm ci --include=dev && npm run build -w @launchops/types && npm run build -w @launchops/api
+    startCommand: node apps/api/dist/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render injects PORT automatically
+      - key: MONGODB_URI
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_WEBHOOK_SECRET
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        value: LaunchOps <no-reply@launchops.app>
+      - key: WEB_BASE_URL
+        sync: false # https://<your-app>.vercel.app
+      - key: CORS_ORIGINS
+        sync: false # https://<your-app>.vercel.app
