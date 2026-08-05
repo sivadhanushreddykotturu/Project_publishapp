@@ -29,10 +29,17 @@ const schema = z.object({
 const parsed = schema.parse(process.env);
 
 // WEB_BASE_URL is always an allowed origin; CORS_ORIGINS adds extras (comma-separated)
+// tolerant of missing scheme + trailing slash
+const normalizeOrigin = (o: string): string => {
+  const clean = o.trim().replace(/\/$/, "");
+  if (!clean) return "";
+  return /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
+};
+
 const corsOrigins = Array.from(
   new Set([
-    ...parsed.CORS_ORIGINS.split(",").map((o) => o.trim().replace(/\/$/, "")),
-    parsed.WEB_BASE_URL.trim().replace(/\/$/, ""),
+    ...parsed.CORS_ORIGINS.split(",").map(normalizeOrigin),
+    normalizeOrigin(parsed.WEB_BASE_URL),
   ]),
 ).filter(Boolean);
 
