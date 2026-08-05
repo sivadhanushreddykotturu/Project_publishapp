@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Logo } from "@/components/marketing/LogoMark";
 
 /** Rendered when server-side session verification fails (bad/missing Clerk keys). */
@@ -17,12 +18,12 @@ export function SessionError() {
           </code>{" "}
           in the hosting environment. Fix it, redeploy, then refresh.
         </p>
-        <a
+        <Link
           href="/sign-in"
           className="mt-6 inline-block rounded-full bg-ink-950 px-6 py-3 text-[14px] font-semibold text-white"
         >
           Back to sign in
-        </a>
+        </Link>
       </div>
     </main>
   );
