@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 interface ProjectDetail {
   _id: string;
   packageKey: string;
+  projectType: string;
   status: string;
   joinState: string;
   requiredTesters: number;
@@ -36,6 +37,7 @@ interface InvoiceRow {
 const STEP_LABELS: Record<string, string> = {
   verification: "Verification",
   play_store_invite: "Play Store invite",
+  testflight_invite: "TestFlight invite",
   app_usage: "App usage",
   app_testing: "App testing",
   completion: "Completion",
@@ -50,7 +52,7 @@ interface PublishedBug {
   expectedResult: string;
   actualResult: string;
   stepsToReproduce: string[];
-  device: { model: string; androidVersion: string };
+  device: { platform?: string; model: string; osVersion: string };
 }
 
 interface CompletionReport {
@@ -120,6 +122,9 @@ export default async function ClientProjectDetail({
           </p>
         </div>
         <div className="flex items-center gap-2.5">
+          <span className="inline-block rounded-full bg-blue-100 px-3 py-1 text-[11.5px] font-semibold text-blue-800">
+            {project!.projectType === "ios_testflight" ? "iOS · TestFlight" : "Android · Google Play"}
+          </span>
           <StatusPill status={project!.joinState} />
           <StatusPill status={project!.status} />
         </div>
@@ -227,7 +232,8 @@ export default async function ClientProjectDetail({
                   </ol>
                 )}
                 <p className="mt-2.5 text-[11.5px] text-ink-400">
-                  {b.device.model} · Android {b.device.androidVersion}
+                  {b.device.model} · {b.device.platform === "ios" ? "iOS" : "Android"}{" "}
+                  {b.device.osVersion}
                 </p>
               </div>
             ))}

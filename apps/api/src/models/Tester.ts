@@ -1,8 +1,10 @@
 import mongoose, { Schema, type HydratedDocument, type Model, type Types } from "mongoose";
+import { PLATFORMS, type Platform } from "@launchops/types";
 
 export interface ITesterDevice {
+  platform: Platform;
   model: string;
-  androidVersion: string;
+  osVersion: string;
   /** fraud signal — one account per device */
   fingerprint: string;
 }
@@ -28,8 +30,9 @@ const testerSchema = new Schema<ITester>(
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, unique: true },
     devices: [
       {
+        platform: { type: String, enum: PLATFORMS, default: "android" },
         model: { type: String, required: true },
-        androidVersion: { type: String, required: true },
+        osVersion: { type: String, required: true },
         fingerprint: { type: String, required: true },
       },
     ],

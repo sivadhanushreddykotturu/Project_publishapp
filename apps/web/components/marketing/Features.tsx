@@ -22,14 +22,14 @@ interface Feature {
 }
 
 const FEATURES: Feature[] = [
-  { icon: Users, title: "14 real testers on real Android devices", accent: true },
-  { icon: CalendarCheck2, title: "Daily engagement for the full 14 days" },
+  { icon: Users, title: "14+ real testers on real Android & iOS devices", accent: true },
+  { icon: CalendarCheck2, title: "Daily engagement for the full test window" },
   { icon: Bug, title: "Structured bug reports with evidence", accent: true },
   { icon: Merge, title: "Duplicates merged before you see them", badge: "Clean" },
   { icon: RefreshCcw, title: "Inactive testers auto-replaced from the waitlist", badge: "Guaranteed", accent: true },
   { icon: Fingerprint, title: "Device-fingerprint anti-fraud checks" },
   { icon: Wallet, title: "Testers paid by UPI when steps verify", accent: true },
-  { icon: ClipboardCheck, title: "Completion report, ready for Play Console", badge: "Included" },
+  { icon: ClipboardCheck, title: "Completion report for Play Console & App Store Connect", badge: "Included" },
   { icon: MousePointerClick, title: "Per-tester testing links, click tracked" },
   { icon: ShieldCheck, title: "Every proof reviewed by an admin", accent: true },
   { icon: BellRing, title: "Automatic reminders keep testers on pace" },

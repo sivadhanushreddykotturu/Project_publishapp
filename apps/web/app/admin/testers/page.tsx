@@ -13,7 +13,7 @@ interface AdminTesterRow {
   walletBalance: number;
   ratingAvg: number;
   ratingCount: number;
-  devices: Array<{ model: string; androidVersion: string }>;
+  devices: Array<{ platform?: string; model: string; osVersion: string }>;
   upi: { vpa?: string };
   userId?: { name?: string; email?: string; status?: string };
 }
@@ -63,7 +63,12 @@ export default async function AdminTestersPage() {
               </td>
               <td className="px-6 py-4 text-[13px] text-ink-600">
                 {t.devices.length
-                  ? t.devices.map((d) => `${d.model} (${d.androidVersion})`).join(", ")
+                  ? t.devices
+                      .map(
+                        (d) =>
+                          `${d.model} (${d.platform === "ios" ? "iOS" : "Android"} ${d.osVersion})`,
+                      )
+                      .join(", ")
                   : "—"}
               </td>
               <td className="px-6 py-4 font-mono text-[12.5px] text-ink-600">

@@ -12,7 +12,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "LaunchOps — Real testers for Google Play closed testing",
   description:
-    "LaunchOps runs your Google Play closed test: 14+ real testers on real devices, daily engagement, structured bug reports, and a completion report ready for Play Console.",
+    "LaunchOps runs your Google Play closed test or iOS TestFlight beta: 14+ real testers on real devices, daily engagement, structured bug reports, and a completion report ready for Play Console and App Store Connect.",
 };
 
 export default function RootLayout({

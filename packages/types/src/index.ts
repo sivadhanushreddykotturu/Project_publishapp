@@ -10,11 +10,21 @@ export const ROLES = ["client", "tester", "admin"] as const;
 export type Role = (typeof ROLES)[number];
 
 // ---------------------------------------------------------------------------
+// Platforms & project types
+// ---------------------------------------------------------------------------
+export const PLATFORMS = ["android", "ios"] as const;
+export type Platform = (typeof PLATFORMS)[number];
+
+export const PROJECT_TYPES = ["play_store_internal", "ios_testflight"] as const;
+export type ProjectType = (typeof PROJECT_TYPES)[number];
+
+// ---------------------------------------------------------------------------
 // Workflow engine
 // ---------------------------------------------------------------------------
 export const STEP_TYPES = [
   "verification",
   "play_store_invite",
+  "testflight_invite",
   "app_usage",
   "app_testing",
   "completion",
@@ -234,15 +244,16 @@ export const PACKAGES: PackageTier[] = [
   {
     key: "starter",
     name: "Starter Track",
-    description: "Meet Google's closed-testing requirement for personal developer accounts.",
+    description: "Meet Google's closed-testing requirement, or run an iOS TestFlight beta.",
     requiredTesters: 14,
     durationDays: 14,
     pricePaise: 4_999_00,
     features: [
       "14 real testers, real devices",
-      "Google Play closed-track ready",
+      "Google Play closed-track or TestFlight",
+      "Android & iOS device coverage",
       "Daily engagement for 14 days",
-      "Completion report for Play Console",
+      "Completion report for Play Console / App Store Connect",
     ],
   },
   {
@@ -255,10 +266,11 @@ export const PACKAGES: PackageTier[] = [
     featured: true,
     features: [
       "20 real testers, real devices",
+      "Google Play closed-track or TestFlight",
       "Structured bug reports, deduplicated",
       "Daily engagement for 14 days",
       "Priority replacement queue",
-      "Completion report for Play Console",
+      "Completion report for Play Console / App Store Connect",
     ],
   },
   {
@@ -269,11 +281,12 @@ export const PACKAGES: PackageTier[] = [
     durationDays: 21,
     pricePaise: 14_999_00,
     features: [
-      "30 real testers, real devices",
+      "30 real testers across Android & iOS",
+      "Google Play closed-track or TestFlight",
       "Managed QA review + severity triage",
       "Daily engagement for 21 days",
       "Dedicated support thread",
-      "Completion report for Play Console",
+      "Completion report for Play Console / App Store Connect",
     ],
   },
 ];

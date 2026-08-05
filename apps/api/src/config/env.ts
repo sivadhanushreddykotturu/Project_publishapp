@@ -43,17 +43,21 @@ const corsOrigins = Array.from(
   ]),
 ).filter(Boolean);
 
+/** Placeholder values ("sk_test_...", "") count as NOT configured. */
+const real = (v?: string): v is string =>
+  Boolean(v && !v.includes("...") && v.trim().length > 0);
+
 export const env = {
   ...parsed,
   isTest: parsed.NODE_ENV === "test",
   isProd: parsed.NODE_ENV === "production",
   corsOrigins,
-  clerkConfigured: Boolean(parsed.CLERK_SECRET_KEY),
+  clerkConfigured: real(parsed.CLERK_SECRET_KEY),
   cloudinaryConfigured: Boolean(
-    parsed.CLOUDINARY_CLOUD_NAME &&
-      parsed.CLOUDINARY_API_KEY &&
-      parsed.CLOUDINARY_API_SECRET,
+    real(parsed.CLOUDINARY_CLOUD_NAME) &&
+      real(parsed.CLOUDINARY_API_KEY) &&
+      real(parsed.CLOUDINARY_API_SECRET),
   ),
-  resendConfigured: Boolean(parsed.RESEND_API_KEY),
+  resendConfigured: real(parsed.RESEND_API_KEY),
 };
 export type Env = typeof env;

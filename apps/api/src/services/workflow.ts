@@ -1,26 +1,64 @@
 import type { Types } from "mongoose";
 import {
   PACKAGES,
+  PROJECT_TYPES,
   type EmbeddedStep,
+  type ProjectType,
   type StepTemplate,
+  type StepType,
 } from "@launchops/types";
 import { Project, type ProjectDoc } from "../models/index.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { recordMetric } from "./metrics.js";
 
-export const TEMPLATE_VERSION = "play_store_internal_v1";
+export const TEMPLATE_VERSIONS: Record<ProjectType, string> = {
+  play_store_internal: "play_store_internal_v1",
+  ios_testflight: "ios_testflight_v1",
+};
+
+interface InviteStepSpec {
+  type: StepType;
+  instructions: string;
+}
+
+/** The invite step differs per platform; everything else is shared. */
+const INVITE_STEPS: Record<ProjectType, InviteStepSpec> = {
+  play_store_internal: {
+    type: "play_store_invite",
+    instructions:
+      "Open your personal testing link, accept the invite on Google Play, install the app, and upload a screenshot of it installed.",
+  },
+  ios_testflight: {
+    type: "testflight_invite",
+    instructions:
+      "Open your personal testing link, accept the invite in TestFlight, install the app, and upload a screenshot of it installed.",
+  },
+};
+
+const VERIFY_INSTRUCTIONS: Record<ProjectType, string> = {
+  play_store_internal:
+    "Verify the Google account you'll test with: submit your Gmail address and a screenshot of the account on your device.",
+  ios_testflight:
+    "Verify the Apple account you'll test with: submit the email linked to your Apple ID and a screenshot showing TestFlight on your device.",
+};
 
 /**
- * The five-step Play Store template. Payouts/deadlines are template config —
- * new project types are new configs, never engine changes.
+ * Step templates keyed by projectType + package. Payouts/deadlines are
+ * template config — new project types are new configs, never engine changes.
  */
-export function getTemplate(packageKey: string): StepTemplate {
+export function getTemplate(
+  projectType: ProjectType,
+  packageKey: string,
+): StepTemplate {
   const pkg = PACKAGES.find((p) => p.key === packageKey);
   if (!pkg) throw badRequest(`Unknown package: ${packageKey}`, "BAD_PACKAGE");
+  if (!PROJECT_TYPES.includes(projectType)) {
+    throw badRequest(`Unknown project type: ${projectType}`, "BAD_PROJECT_TYPE");
+  }
 
   return {
-    key: TEMPLATE_VERSION,
-    projectType: "play_store_internal",
+    key: TEMPLATE_VERSIONS[projectType],
+    projectType,
     packageKey,
     requiredTesters: pkg.requiredTesters,
     waitlistCap: Math.ceil(pkg.requiredTesters / 2),
@@ -34,20 +72,18 @@ export function getTemplate(packageKey: string): StepTemplate {
           payoutPaise: 3_000,
           requiresProof: true,
           projectLevelGate: true,
-          instructions:
-            "Verify the Google account you'll test with: submit your Gmail address and a screenshot of the account on your device.",
+          instructions: VERIFY_INSTRUCTIONS[projectType],
         },
       },
       {
         order: 2,
-        type: "play_store_invite",
+        type: INVITE_STEPS[projectType].type,
         config: {
           deadlineHours: 48,
           payoutPaise: 4_000,
           requiresProof: true,
           projectLevelGate: true,
-          instructions:
-            "Open your personal testing link, accept the invite on Google Play, install the app, and upload a screenshot of it installed.",
+          instructions: INVITE_STEPS[projectType].instructions,
         },
       },
       {
@@ -113,7 +149,7 @@ export async function activateProject(
     return project; // already activated — idempotent
   }
 
-  const template = getTemplate(project.packageKey);
+  const template = getTemplate(project.projectType, project.packageKey);
   project.status = "active";
   project.steps = createStepsFromTemplate(template);
   project.stepTemplateVersion = template.key;

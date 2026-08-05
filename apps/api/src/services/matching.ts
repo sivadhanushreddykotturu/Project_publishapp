@@ -82,7 +82,7 @@ export async function joinProject(
   }
 
   // 2. slots full → waiting queue (capped)
-  const cap = getTemplate(project.packageKey).waitlistCap;
+  const cap = getTemplate(project.projectType, project.packageKey).waitlistCap;
   const queuedProject = await Project.findOneAndUpdate(
     {
       _id: projectId,

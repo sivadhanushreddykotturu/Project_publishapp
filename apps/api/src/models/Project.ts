@@ -3,18 +3,20 @@ import {
   JOIN_STATES,
   PLAY_INTEGRATION_MODES,
   PROJECT_STATUSES,
+  PROJECT_TYPES,
   STEP_STATES,
   STEP_TYPES,
   type EmbeddedStep,
   type JoinState,
   type PlayIntegrationMode,
   type ProjectStatus,
+  type ProjectType,
 } from "@launchops/types";
 
 export interface IProject {
   clientId: Types.ObjectId;
   packageKey: string;
-  projectType: string;
+  projectType: ProjectType;
   appDetails: {
     appName: string;
     packageName: string;
@@ -69,7 +71,7 @@ const projectSchema = new Schema<IProject>(
   {
     clientId: { type: Schema.Types.ObjectId, ref: "Client", required: true, index: true },
     packageKey: { type: String, required: true },
-    projectType: { type: String, default: "play_store_internal" },
+    projectType: { type: String, enum: PROJECT_TYPES, default: "play_store_internal" },
     appDetails: {
       appName: { type: String, required: true },
       packageName: { type: String, required: true, lowercase: true, trim: true },

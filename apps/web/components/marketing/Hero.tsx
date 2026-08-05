@@ -11,7 +11,7 @@ export function Hero() {
             <BadgeCheck className="size-4 text-ink-950" strokeWidth={2.2} />
           </span>
           <span className="text-[13.5px] font-medium text-ink-800">
-            Built for Google Play closed testing
+            Google Play closed testing · iOS TestFlight
           </span>
         </div>
 
@@ -28,9 +28,9 @@ export function Hero() {
 
         <p className="mx-auto mt-8 max-w-2xl text-[17px] leading-relaxed text-ink-600 md:text-[19px]">
           Google Play asks new developers for a closed test with 14 opted-in
-          testers. LaunchOps runs the whole thing — recruitment, daily
-          engagement, structured bug reports, and the completion report Play
-          Console wants to see.
+          testers. LaunchOps runs the whole thing — on Android and iOS —
+          recruitment, daily engagement, structured bug reports, and the
+          completion report Play Console and App Store Connect want to see.
         </p>
 
         <div className="mt-11 flex flex-wrap items-center justify-center gap-4">

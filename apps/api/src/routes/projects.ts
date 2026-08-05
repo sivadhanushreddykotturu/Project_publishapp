@@ -38,13 +38,14 @@ projectsRouter.get("/packages", (_req, res) => {
 // --------------------------------------------------------------------------
 const createSchema = z.object({
   packageKey: z.string().min(1),
+  projectType: z.enum(["play_store_internal", "ios_testflight"]).optional(),
   appDetails: z.object({
     appName: z.string().min(1).max(120),
     packageName: z
       .string()
       .min(3)
       .max(200)
-      .regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/i, "Not a valid package name"),
+      .regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/i, "Not a valid package/bundle name"),
     description: z.string().max(2000).optional(),
     playStoreUrl: z.string().url().optional().or(z.literal("")),
   }),
@@ -64,6 +65,7 @@ projectsRouter.post(
     const { project, invoice } = await createProjectWithInvoice({
       clientId: client._id,
       packageKey: body.packageKey,
+      projectType: body.projectType,
       appDetails: {
         ...body.appDetails,
         playStoreUrl: body.appDetails.playStoreUrl || undefined,

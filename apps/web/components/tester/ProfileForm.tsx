@@ -7,7 +7,12 @@ import { Plus, Trash2 } from "lucide-react";
 import { api, ApiClientError } from "@/lib/api";
 
 export interface TesterProfileData {
-  devices: Array<{ model: string; androidVersion: string; fingerprint: string }>;
+  devices: Array<{
+    platform: "android" | "ios";
+    model: string;
+    osVersion: string;
+    fingerprint: string;
+  }>;
   experienceLevel: string;
   upi: { vpa?: string; qrImageUrl?: string };
   walletBalance: number;
@@ -31,7 +36,7 @@ export function ProfileForm({ initial }: { initial: TesterProfileData | null }) 
   const [devices, setDevices] = useState(
     initial?.devices?.length
       ? initial.devices
-      : [{ model: "", androidVersion: "", fingerprint: "" }],
+      : [{ platform: "android" as const, model: "", osVersion: "", fingerprint: "" }],
   );
   const [experienceLevel, setExperienceLevel] = useState(
     initial?.experienceLevel ?? "beginner",
@@ -47,10 +52,11 @@ export function ProfileForm({ initial }: { initial: TesterProfileData | null }) 
     setSaved(false);
     try {
       const cleanDevices = devices
-        .filter((d) => d.model.trim() && d.androidVersion.trim())
+        .filter((d) => d.model.trim() && d.osVersion.trim())
         .map((d) => ({
+          platform: d.platform,
           model: d.model.trim(),
-          androidVersion: d.androidVersion.trim(),
+          osVersion: d.osVersion.trim(),
           fingerprint: d.fingerprint || randomFingerprint(),
         }));
       const token = await getToken();
@@ -76,13 +82,30 @@ export function ProfileForm({ initial }: { initial: TesterProfileData | null }) 
     <div className="space-y-6">
       {/* devices */}
       <section className="rounded-[24px] border border-black/5 bg-white p-7 shadow-sm">
-        <h3 className="text-[16px] font-semibold text-ink-950">Android devices</h3>
+        <h3 className="text-[16px] font-semibold text-ink-950">Your devices</h3>
         <p className="mt-1 text-[13px] text-ink-500">
-          The devices you test on. Fingerprints stop duplicate accounts.
+          Android and iOS — the devices you test on. Fingerprints stop duplicate accounts.
         </p>
         <div className="mt-5 space-y-3">
           {devices.map((d, i) => (
             <div key={i} className="flex flex-wrap items-center gap-3">
+              <select
+                value={d.platform}
+                onChange={(e) =>
+                  setDevices((ds) =>
+                    ds.map((x, j) =>
+                      j === i
+                        ? { ...x, platform: e.target.value as "android" | "ios" }
+                        : x,
+                    ),
+                  )
+                }
+                aria-label="Platform"
+                className="w-[120px] rounded-2xl border border-black/10 bg-white px-3 py-3 text-[14px] outline-none focus:border-ink-950"
+              >
+                <option value="android">Android</option>
+                <option value="ios">iOS</option>
+              </select>
               <input
                 value={d.model}
                 onChange={(e) =>
@@ -90,20 +113,20 @@ export function ProfileForm({ initial }: { initial: TesterProfileData | null }) 
                     ds.map((x, j) => (j === i ? { ...x, model: e.target.value } : x)),
                   )
                 }
-                placeholder="Pixel 8a"
-                className="min-w-[160px] flex-1 rounded-2xl border border-black/10 px-4 py-3 text-[14px] outline-none placeholder:text-ink-400 focus:border-ink-950"
+                placeholder={d.platform === "ios" ? "iPhone 15" : "Pixel 8a"}
+                className="min-w-[140px] flex-1 rounded-2xl border border-black/10 px-4 py-3 text-[14px] outline-none placeholder:text-ink-400 focus:border-ink-950"
               />
               <input
-                value={d.androidVersion}
+                value={d.osVersion}
                 onChange={(e) =>
                   setDevices((ds) =>
                     ds.map((x, j) =>
-                      j === i ? { ...x, androidVersion: e.target.value } : x,
+                      j === i ? { ...x, osVersion: e.target.value } : x,
                     ),
                   )
                 }
-                placeholder="Android 15"
-                className="w-[140px] rounded-2xl border border-black/10 px-4 py-3 text-[14px] outline-none placeholder:text-ink-400 focus:border-ink-950"
+                placeholder={d.platform === "ios" ? "iOS 18" : "Android 15"}
+                className="w-[130px] rounded-2xl border border-black/10 px-4 py-3 text-[14px] outline-none placeholder:text-ink-400 focus:border-ink-950"
               />
               <button
                 type="button"
@@ -122,7 +145,7 @@ export function ProfileForm({ initial }: { initial: TesterProfileData | null }) 
             onClick={() =>
               setDevices((ds) => [
                 ...ds,
-                { model: "", androidVersion: "", fingerprint: "" },
+                { platform: "android", model: "", osVersion: "", fingerprint: "" },
               ])
             }
             className="mt-4 inline-flex items-center gap-2 text-[13.5px] font-semibold text-ink-800 hover:text-orange-500"

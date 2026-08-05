@@ -3,9 +3,11 @@ import {
   BUG_CATEGORIES,
   BUG_SEVERITIES,
   BUG_STATUSES,
+  PLATFORMS,
   type BugCategory,
   type BugSeverity,
   type BugStatus,
+  type Platform,
   type UploadedFile,
 } from "@launchops/types";
 
@@ -16,7 +18,7 @@ export interface IBugReport {
   description: string;
   category: BugCategory;
   severity: BugSeverity;
-  device: { model: string; androidVersion: string };
+  device: { platform: Platform; model: string; osVersion: string };
   appVersion?: string;
   expectedResult: string;
   actualResult: string;
@@ -52,8 +54,9 @@ const bugReportSchema = new Schema<IBugReport>(
     category: { type: String, enum: BUG_CATEGORIES, required: true },
     severity: { type: String, enum: BUG_SEVERITIES, required: true },
     device: {
+      platform: { type: String, enum: PLATFORMS, default: "android" },
       model: { type: String, required: true },
-      androidVersion: { type: String, required: true },
+      osVersion: { type: String, required: true },
     },
     appVersion: { type: String },
     expectedResult: { type: String, required: true, maxlength: 2000 },

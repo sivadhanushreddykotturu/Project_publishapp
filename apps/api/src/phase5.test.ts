@@ -46,7 +46,7 @@ const BUG = {
   description: "App force-closes immediately on cold start",
   category: "crash",
   severity: "critical",
-  device: { model: "Pixel 8a", androidVersion: "15" },
+  device: { platform: "android", model: "Pixel 8a", osVersion: "15" },
   expectedResult: "App opens to home screen",
   actualResult: "App crashes with no error",
   stepsToReproduce: ["Install app", "Open app"],

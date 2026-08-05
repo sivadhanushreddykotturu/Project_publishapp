@@ -13,7 +13,7 @@ export interface AdminBug {
   category: string;
   status: string;
   description: string;
-  device: { model: string; androidVersion: string };
+  device: { platform?: string; model: string; osVersion: string };
   expectedResult: string;
   actualResult: string;
   stepsToReproduce: string[];
@@ -144,8 +144,9 @@ export function BugTriage({ bugs }: { bugs: AdminBug[] }) {
                   <StatusPill status={b.status} />
                 </div>
                 <p className="mt-1 text-[12.5px] text-ink-400">
-                  {b.tester?.userId?.name ?? "tester"} · {b.device.model} (Android{" "}
-                  {b.device.androidVersion}) · {b.category}
+                  {b.tester?.userId?.name ?? "tester"} · {b.device.model} (
+                  {b.device.platform === "ios" ? "iOS" : "Android"} {b.device.osVersion}
+                  ) · {b.category}
                 </p>
                 <p className="mt-2.5 text-[14px] leading-relaxed text-ink-600">
                   {b.description}

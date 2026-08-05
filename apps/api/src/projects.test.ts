@@ -103,6 +103,38 @@ describe("projects + payments + workflow activation", () => {
     expect(metric).toBeTruthy();
   });
 
+  it("iOS projects activate with the TestFlight template", async () => {
+    const { user: owner } = await makeClient();
+    const created = await asRole(app, owner.clerkUserId, "client")
+      .post("/api/v1/projects")
+      .send({
+        packageKey: "starter",
+        projectType: "ios_testflight",
+        appDetails: { appName: "iOS App", packageName: "com.example.iosapp" },
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.data.project.projectType).toBe("ios_testflight");
+
+    const admin = await makeAdmin();
+    await asRole(app, admin.clerkUserId, "admin").post(
+      `/api/v1/invoices/${created.body.data.invoice._id}/mark-paid`,
+    );
+
+    const project = await Project.findById(created.body.data.project._id);
+    expect(project!.status).toBe("active");
+    expect(project!.stepTemplateVersion).toBe("ios_testflight_v1");
+    expect(project!.steps).toHaveLength(5);
+    expect(project!.steps[0].type).toBe("verification");
+    expect(project!.steps[1].type).toBe("testflight_invite");
+    expect(project!.steps[0].config.instructions).toContain("Apple");
+
+    // bad project type rejected
+    const bad = await asRole(app, owner.clerkUserId, "client")
+      .post("/api/v1/projects")
+      .send({ packageKey: "starter", projectType: "windows_store", appDetails: APP_DETAILS });
+    expect(bad.status).toBe(400);
+  });
+
   it("mark-paid is idempotent — no double activation, no double steps", async () => {
     const { user: owner } = await makeClient();
     const created = await clientCreatesProject(owner.clerkUserId);

@@ -9,16 +9,20 @@ const FAQS = [
     a: "Since late 2023, Google asks new personal developer accounts to run a closed test with at least 14 testers who opt in and stay engaged for 14 days before the app can apply for production. It's Google's way of filtering abandoned or low-quality apps. LaunchOps exists because doing this with friends, family, and WhatsApp groups rarely survives day 4.",
   },
   {
+    q: "Do you support iOS apps too, or only Android?",
+    a: "Both. Android tests run on your Google Play closed track; iOS tests run as a TestFlight beta via public links. The workflow is identical either way — verified testers, daily engagement, deduplicated bug reports, and a completion report at the end.",
+  },
+  {
     q: "Are these real people on real devices?",
-    a: "Yes. Every tester registers a physical Android device with a device fingerprint, verifies their Google account with a screenshot proof, and is reviewed by an admin before your test starts. Duplicate devices and recycled screenshots are flagged automatically.",
+    a: "Yes. Every tester registers a physical Android or iOS device with a device fingerprint, verifies their account with a screenshot proof, and is reviewed by an admin before your test starts. Duplicate devices and recycled screenshots are flagged automatically.",
   },
   {
     q: "What happens if a tester goes quiet mid-test?",
     a: "If a tester is inactive for more than 48 hours during the early steps, they're removed and the next person on the waiting list is promoted automatically — your 14-day clock keeps running. Later in the test, an admin is alerted and replaces them manually so your track stays intact.",
   },
   {
-    q: "Do you need my AAB or access to my Play Console?",
-    a: "No. In the standard flow you keep full control: you upload your own build, create the closed track, and we hand you a verified list of tester Google accounts to paste in, plus the opt-in link to share with us. We never ask for your Play Console password.",
+    q: "Do you need my build or access to my developer account?",
+    a: "No. In the standard flow you keep full control: you upload your own build to Play Console or App Store Connect, create the track or TestFlight group, and we hand you a verified list of tester accounts to invite, plus the opt-in link to share with us. We never ask for your developer account password.",
   },
   {
     q: "What do I receive when the test ends?",

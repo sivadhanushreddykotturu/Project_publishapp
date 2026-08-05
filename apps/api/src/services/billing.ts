@@ -1,5 +1,5 @@
 import type { Types } from "mongoose";
-import { GST_RATE, PACKAGES } from "@launchops/types";
+import { GST_RATE, PACKAGES, PROJECT_TYPES, type ProjectType } from "@launchops/types";
 import { Client, Invoice, Project, type InvoiceDoc } from "../models/index.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { writeAudit } from "./audit.js";
@@ -81,6 +81,7 @@ export async function markInvoicePaid(
 export async function createProjectWithInvoice(input: {
   clientId: Types.ObjectId;
   packageKey: string;
+  projectType?: ProjectType;
   appDetails: {
     appName: string;
     packageName: string;
@@ -90,10 +91,15 @@ export async function createProjectWithInvoice(input: {
 }): Promise<{ project: import("../models/index.js").ProjectDoc; invoice: InvoiceDoc }> {
   const pkg = PACKAGES.find((p) => p.key === input.packageKey);
   if (!pkg) throw badRequest(`Unknown package: ${input.packageKey}`, "BAD_PACKAGE");
+  const projectType = input.projectType ?? "play_store_internal";
+  if (!PROJECT_TYPES.includes(projectType)) {
+    throw badRequest(`Unknown project type: ${projectType}`, "BAD_PROJECT_TYPE");
+  }
 
   const project = await Project.create({
     clientId: input.clientId,
     packageKey: input.packageKey,
+    projectType,
     appDetails: input.appDetails,
     requiredTesters: pkg.requiredTesters,
     status: "awaiting_payment",

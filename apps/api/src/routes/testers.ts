@@ -12,8 +12,9 @@ const profileSchema = z.object({
   devices: z
     .array(
       z.object({
+        platform: z.enum(["android", "ios"]).default("android"),
         model: z.string().min(2).max(80),
-        androidVersion: z.string().min(1).max(20),
+        osVersion: z.string().min(1).max(20),
         fingerprint: z.string().min(8).max(200),
       }),
     )

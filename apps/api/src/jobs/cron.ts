@@ -27,7 +27,7 @@ export async function runInactivitySweep(
     const project = await Project.findById(a.projectId).lean();
     if (!project || project.status !== "active") continue;
     const thresholdHrs =
-      getTemplate(project.packageKey).inactivityHoursBeforeReplacement;
+      getTemplate(project.projectType, project.packageKey).inactivityHoursBeforeReplacement;
     const idleMs = now.getTime() - new Date(a.lastActivityAt).getTime();
     if (idleMs < thresholdHrs * 3600 * 1000) continue;
 

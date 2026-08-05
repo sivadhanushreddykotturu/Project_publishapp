@@ -12,6 +12,9 @@ export function NewProjectForm() {
   const router = useRouter();
   const { getToken } = useAuth();
   const [packageKey, setPackageKey] = useState<string>("growth");
+  const [projectType, setProjectType] = useState<"play_store_internal" | "ios_testflight">(
+    "play_store_internal",
+  );
   const [appName, setAppName] = useState("");
   const [packageName, setPackageName] = useState("");
   const [playStoreUrl, setPlayStoreUrl] = useState("");
@@ -31,6 +34,7 @@ export function NewProjectForm() {
         method: "POST",
         body: {
           packageKey,
+          projectType,
           appDetails: {
             appName,
             packageName,
@@ -48,8 +52,55 @@ export function NewProjectForm() {
     }
   }
 
+  const isIos = projectType === "ios_testflight";
+
   return (
     <form onSubmit={submit} className="space-y-8">
+      {/* platform picker */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {(
+          [
+            {
+              key: "play_store_internal",
+              title: "Google Play",
+              desc: "Android closed track — meets Google's 14-tester requirement.",
+            },
+            {
+              key: "ios_testflight",
+              title: "iOS · TestFlight",
+              desc: "Apple beta run via TestFlight public links.",
+            },
+          ] as const
+        ).map((p) => {
+          const active = projectType === p.key;
+          return (
+            <button
+              type="button"
+              key={p.key}
+              onClick={() => setProjectType(p.key)}
+              aria-pressed={active}
+              className={`rounded-[20px] border-2 p-5 text-left transition-all ${
+                active
+                  ? "border-ink-950 bg-white shadow-md"
+                  : "border-black/8 bg-white/60 hover:border-black/20"
+              }`}
+            >
+              <span className="flex items-center justify-between">
+                <span className="text-[15px] font-semibold text-ink-950">{p.title}</span>
+                {active && (
+                  <span className="grid size-5 place-items-center rounded-full bg-lime-400">
+                    <Check className="size-3.5 text-ink-950" strokeWidth={3} />
+                  </span>
+                )}
+              </span>
+              <span className="mt-1 block text-[12.5px] leading-snug text-ink-500">
+                {p.desc}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* package picker */}
       <div className="grid gap-3 sm:grid-cols-3">
         {PACKAGES.map((pkg) => {
@@ -98,7 +149,11 @@ export function NewProjectForm() {
             className={inputCls}
           />
         </Field>
-        <Field label="Package name" required hint="The applicationId from your build, e.g. com.example.myapp">
+        <Field
+          label={isIos ? "Bundle ID" : "Package name"}
+          required
+          hint={isIos ? "e.g. com.example.myapp from Xcode/App Store Connect" : "The applicationId from your build, e.g. com.example.myapp"}
+        >
           <input
             required
             value={packageName}
@@ -108,11 +163,14 @@ export function NewProjectForm() {
             className={inputCls}
           />
         </Field>
-        <Field label="Play Console draft link" hint="Optional — the closed-track or store-listing URL if you have it">
+        <Field
+          label={isIos ? "App Store / TestFlight link" : "Play Console draft link"}
+          hint="Optional — the track, TestFlight, or store-listing URL if you have it"
+        >
           <input
             value={playStoreUrl}
             onChange={(e) => setPlayStoreUrl(e.target.value)}
-            placeholder="https://play.google.com/…"
+            placeholder={isIos ? "https://testflight.apple.com/…" : "https://play.google.com/…"}
             type="url"
             className={inputCls}
           />

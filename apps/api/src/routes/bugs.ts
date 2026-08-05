@@ -16,8 +16,9 @@ const reportSchema = z.object({
   category: z.enum(["crash", "ui", "performance", "network", "functional", "other"]),
   severity: z.enum(["low", "medium", "high", "critical"]),
   device: z.object({
+    platform: z.enum(["android", "ios"]).default("android"),
     model: z.string().min(1).max(80),
-    androidVersion: z.string().min(1).max(20),
+    osVersion: z.string().min(1).max(20),
   }),
   appVersion: z.string().max(40).optional(),
   expectedResult: z.string().min(3).max(2000),

@@ -24,8 +24,9 @@ export function BugReportForm({ projects }: Props) {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("functional");
   const [severity, setSeverity] = useState("medium");
+  const [devicePlatform, setDevicePlatform] = useState<"android" | "ios">("android");
   const [deviceModel, setDeviceModel] = useState("");
-  const [androidVersion, setAndroidVersion] = useState("");
+  const [osVersion, setOsVersion] = useState("");
   const [expected, setExpected] = useState("");
   const [actual, setActual] = useState("");
   const [description, setDescription] = useState("");
@@ -59,7 +60,7 @@ export function BugReportForm({ projects }: Props) {
           description,
           category,
           severity,
-          device: { model: deviceModel, androidVersion },
+          device: { platform: devicePlatform, model: deviceModel, osVersion },
           expectedResult: expected,
           actualResult: actual,
           stepsToReproduce: steps.split("\n").map((s) => s.trim()).filter(Boolean),
@@ -157,22 +158,33 @@ export function BugReportForm({ projects }: Props) {
           </select>
         </label>
         <label className="block">
+          <span className="mb-1.5 block text-[13px] font-medium text-ink-800">Platform</span>
+          <select
+            value={devicePlatform}
+            onChange={(e) => setDevicePlatform(e.target.value as "android" | "ios")}
+            className={inputCls}
+          >
+            <option value="android">Android</option>
+            <option value="ios">iOS</option>
+          </select>
+        </label>
+        <label className="block">
           <span className="mb-1.5 block text-[13px] font-medium text-ink-800">Device model</span>
           <input
             required
             value={deviceModel}
             onChange={(e) => setDeviceModel(e.target.value)}
-            placeholder="Pixel 8a"
+            placeholder={devicePlatform === "ios" ? "iPhone 15" : "Pixel 8a"}
             className={inputCls}
           />
         </label>
         <label className="block">
-          <span className="mb-1.5 block text-[13px] font-medium text-ink-800">Android version</span>
+          <span className="mb-1.5 block text-[13px] font-medium text-ink-800">OS version</span>
           <input
             required
-            value={androidVersion}
-            onChange={(e) => setAndroidVersion(e.target.value)}
-            placeholder="15"
+            value={osVersion}
+            onChange={(e) => setOsVersion(e.target.value)}
+            placeholder={devicePlatform === "ios" ? "iOS 18" : "Android 15"}
             className={inputCls}
           />
         </label>
