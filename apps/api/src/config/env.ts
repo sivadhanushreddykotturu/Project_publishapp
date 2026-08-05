@@ -28,11 +28,19 @@ const schema = z.object({
 
 const parsed = schema.parse(process.env);
 
+// WEB_BASE_URL is always an allowed origin; CORS_ORIGINS adds extras (comma-separated)
+const corsOrigins = Array.from(
+  new Set([
+    ...parsed.CORS_ORIGINS.split(",").map((o) => o.trim().replace(/\/$/, "")),
+    parsed.WEB_BASE_URL.trim().replace(/\/$/, ""),
+  ]),
+).filter(Boolean);
+
 export const env = {
   ...parsed,
   isTest: parsed.NODE_ENV === "test",
   isProd: parsed.NODE_ENV === "production",
-  corsOrigins: parsed.CORS_ORIGINS.split(",").map((o) => o.trim()),
+  corsOrigins,
   clerkConfigured: Boolean(parsed.CLERK_SECRET_KEY),
   cloudinaryConfigured: Boolean(
     parsed.CLOUDINARY_CLOUD_NAME &&
