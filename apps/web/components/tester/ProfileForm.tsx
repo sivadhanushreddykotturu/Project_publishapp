@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { Plus, Trash2 } from "lucide-react";
 import { api, ApiClientError } from "@/lib/api";
+import { getDeviceFingerprint } from "@/lib/fingerprint";
 
 export interface TesterProfileData {
   devices: Array<{
@@ -19,15 +20,6 @@ export interface TesterProfileData {
   ratingAvg: number;
   ratingCount: number;
   status: string;
-}
-
-function randomFingerprint() {
-  // browser-side device fingerprint (v1): random persistent id
-  const existing = localStorage.getItem("launchops_device_fp");
-  if (existing) return existing;
-  const fp = `fp_${crypto.randomUUID()}`;
-  localStorage.setItem("launchops_device_fp", fp);
-  return fp;
 }
 
 export function ProfileForm({ initial }: { initial: TesterProfileData | null }) {
@@ -57,7 +49,7 @@ export function ProfileForm({ initial }: { initial: TesterProfileData | null }) 
           platform: d.platform,
           model: d.model.trim(),
           osVersion: d.osVersion.trim(),
-          fingerprint: d.fingerprint || randomFingerprint(),
+          fingerprint: d.fingerprint || getDeviceFingerprint(),
         }));
       const token = await getToken();
       await api("/testers/me", {
