@@ -1,8 +1,8 @@
 {
-  "name": "launchops",
+  "name": "defineux",
   "version": "0.1.0",
   "private": true,
-  "description": "LaunchOps — Play Store testing platform (client / tester / admin)",
+  "description": "DefineUX — Play Store testing platform (client / tester / admin)",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -10,7 +10,7 @@
   "scripts": {
     "dev:web": "npm run dev --workspace apps/web",
     "dev:api": "npm run dev --workspace apps/api",
-    "build": "npm run build -w @launchops/types && npm run build -w @launchops/api && npm run build -w @launchops/web",
+    "build": "npm run build -w @defineux/types && npm run build -w @defineux/api && npm run build -w @defineux/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present"

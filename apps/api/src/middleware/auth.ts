@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { verifyToken } from "@clerk/backend";
-import type { Role } from "@launchops/types";
+import type { Role } from "@defineux/types";
 import { env } from "../config/env.js";
 import { unauthorized, forbidden } from "../utils/errors.js";
 import { ah } from "../utils/asyncHandler.js";

@@ -6,7 +6,7 @@ import {
   type NotificationChannel,
   type NotificationStatus,
   type NotificationType,
-} from "@launchops/types";
+} from "@defineux/types";
 
 export interface INotification {
   recipientId: Types.ObjectId; // User

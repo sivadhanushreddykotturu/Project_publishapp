@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* LaunchOps design tokens — derived from the LaunchOS-style brief */
+  /* DefineUX design tokens — derived from the LaunchOS-style brief */
   --color-cream-50: #f8f6f1;
   --color-cream-100: #efeae1;
   --color-cream-200: #e4ddcf;

@@ -1,5 +1,5 @@
 import mongoose, { Schema, type HydratedDocument, type Model, type Types } from "mongoose";
-import { PLATFORMS, type Platform } from "@launchops/types";
+import { PLATFORMS, type Platform } from "@defineux/types";
 
 export interface ITesterDevice {
   platform: Platform;

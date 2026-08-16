@@ -18,9 +18,9 @@ export type UploadFolder =
 
 const ALLOWED_RESOURCE_TYPES = ["image", "video"] as const;
 
-/** launchops/{env}/{folder}/{entityId} — one bucket-agnostic convention. */
+/** defineux/{env}/{folder}/{entityId} — one bucket-agnostic convention. */
 export function cloudinaryFolder(folder: UploadFolder, entityId: string): string {
-  return `launchops/${env.NODE_ENV}/${folder}/${entityId}`;
+  return `defineux/${env.NODE_ENV}/${folder}/${entityId}`;
 }
 
 export interface UploadSignature {

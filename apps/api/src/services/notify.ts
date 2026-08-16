@@ -1,5 +1,5 @@
 import type { Types } from "mongoose";
-import type { NotificationType } from "@launchops/types";
+import type { NotificationType } from "@defineux/types";
 import { Notification, User } from "../models/index.js";
 import { env } from "../config/env.js";
 import { logger } from "../config/logger.js";
@@ -79,7 +79,7 @@ export async function attemptEmail(notificationId: Types.ObjectId): Promise<void
         from: env.RESEND_FROM_EMAIL,
         to: recipient.email,
         subject: n.payload.title,
-        html: `<div style="font-family:system-ui,sans-serif;max-width:560px"><h2 style="margin:0 0 12px">${n.payload.title}</h2><p style="color:#4b4f55;line-height:1.6">${n.payload.body}</p>${linkHtml}<p style="color:#9a9ea6;font-size:12px;margin-top:24px">LaunchOps — real testers for Google Play</p></div>`,
+        html: `<div style="font-family:system-ui,sans-serif;max-width:560px"><h2 style="margin:0 0 12px">${n.payload.title}</h2><p style="color:#4b4f55;line-height:1.6">${n.payload.body}</p>${linkHtml}<p style="color:#9a9ea6;font-size:12px;margin-top:24px">DefineUX — real testers for Google Play</p></div>`,
       });
     } else {
       logger.info(

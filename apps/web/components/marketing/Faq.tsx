@@ -6,7 +6,7 @@ import { Minus, Plus } from "lucide-react";
 const FAQS = [
   {
     q: "Why does Google Play require 14 testers?",
-    a: "Since late 2023, Google asks new personal developer accounts to run a closed test with at least 14 testers who opt in and stay engaged for 14 days before the app can apply for production. It's Google's way of filtering abandoned or low-quality apps. LaunchOps exists because doing this with friends, family, and WhatsApp groups rarely survives day 4.",
+    a: "Since late 2023, Google asks new personal developer accounts to run a closed test with at least 14 testers who opt in and stay engaged for 14 days before the app can apply for production. It's Google's way of filtering abandoned or low-quality apps. DefineUX exists because doing this with friends, family, and WhatsApp groups rarely survives day 4.",
   },
   {
     q: "Do you support iOS apps too, or only Android?",
@@ -48,10 +48,10 @@ export function Faq() {
             Something else on your mind? Write to us — a human replies.
           </p>
           <a
-            href="mailto:hello@launchops.app"
+            href="mailto:hello@defineux.app"
             className="mt-3 inline-block text-[15px] font-medium text-orange-500 underline-offset-4 hover:underline"
           >
-            hello@launchops.app
+            hello@defineux.app
           </a>
         </div>
 

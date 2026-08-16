@@ -8,7 +8,7 @@ export async function startTestDb(): Promise<void> {
   replSet = await MongoMemoryReplSet.create({
     replSet: { count: 1, storageEngine: "wiredTiger" },
   });
-  await mongoose.connect(replSet.getUri("launchops-test"));
+  await mongoose.connect(replSet.getUri("defineux-test"));
 }
 
 export async function clearTestDb(): Promise<void> {

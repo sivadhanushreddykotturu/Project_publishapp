@@ -1,5 +1,5 @@
 /**
- * @launchops/types — shared domain contract for web + api.
+ * @defineux/types — shared domain contract for web + api.
  * Single source of truth for enums, step templates, and API shapes.
  */
 

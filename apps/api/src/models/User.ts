@@ -1,5 +1,5 @@
 import mongoose, { Schema, type HydratedDocument, type Model } from "mongoose";
-import { ROLES, type Role } from "@launchops/types";
+import { ROLES, type Role } from "@defineux/types";
 
 export interface IUser {
   clerkUserId: string;

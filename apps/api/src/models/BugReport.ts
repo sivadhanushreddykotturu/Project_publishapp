@@ -9,7 +9,7 @@ import {
   type BugStatus,
   type Platform,
   type UploadedFile,
-} from "@launchops/types";
+} from "@defineux/types";
 
 export interface IBugReport {
   projectId: Types.ObjectId;

@@ -1,5 +1,5 @@
 import mongoose, { Schema, type HydratedDocument, type Model, type Types } from "mongoose";
-import { INVOICE_STATUSES, type InvoiceStatus } from "@launchops/types";
+import { INVOICE_STATUSES, type InvoiceStatus } from "@defineux/types";
 
 export interface IInvoice {
   clientId: Types.ObjectId;

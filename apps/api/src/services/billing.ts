@@ -1,5 +1,5 @@
 import type { Types } from "mongoose";
-import { GST_RATE, PACKAGES, PROJECT_TYPES, type ProjectType } from "@launchops/types";
+import { GST_RATE, PACKAGES, PROJECT_TYPES, type ProjectType } from "@defineux/types";
 import { Client, Invoice, Project, type InvoiceDoc } from "../models/index.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { writeAudit } from "./audit.js";

@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import request from "supertest";
-import type { Role } from "@launchops/types";
+import type { Role } from "@defineux/types";
 import { Client, Tester, User, type ClientDoc, type TesterDoc, type UserDoc } from "../models/index.js";
 
 let counter = 0;

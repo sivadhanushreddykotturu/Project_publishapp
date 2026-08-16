@@ -6,7 +6,7 @@ import {
   type ProjectType,
   type StepTemplate,
   type StepType,
-} from "@launchops/types";
+} from "@defineux/types";
 import { Project, type ProjectDoc } from "../models/index.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { recordMetric } from "./metrics.js";

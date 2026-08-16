@@ -9,7 +9,7 @@ async function main(): Promise<void> {
   startJobs();
   const app = createApp();
   app.listen(env.PORT, () => {
-    logger.info({ port: env.PORT }, "launchops-api listening");
+    logger.info({ port: env.PORT }, "defineux-api listening");
   });
 }
 

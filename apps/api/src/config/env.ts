@@ -17,7 +17,7 @@ const schema = z.object({
   CLOUDINARY_API_SECRET: z.string().optional(),
 
   RESEND_API_KEY: z.string().optional(),
-  RESEND_FROM_EMAIL: z.string().default("LaunchOps <no-reply@launchops.app>"),
+  RESEND_FROM_EMAIL: z.string().default("DefineUX <no-reply@defineux.app>"),
 
   WEB_BASE_URL: z.string().default("http://localhost:3000"),
   CORS_ORIGINS: z.string().default("http://localhost:3000"),

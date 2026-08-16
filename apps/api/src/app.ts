@@ -61,7 +61,7 @@ export function createApp(): express.Express {
   );
 
   app.get("/health", (_req, res) => {
-    res.json({ ok: true, service: "launchops-api", env: env.NODE_ENV });
+    res.json({ ok: true, service: "defineux-api", env: env.NODE_ENV });
   });
 
   // --- routers ---

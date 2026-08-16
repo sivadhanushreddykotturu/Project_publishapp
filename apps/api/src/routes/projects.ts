@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
-import { PACKAGES } from "@launchops/types";
+import { PACKAGES } from "@defineux/types";
 import { requireAuth, requireRole, auth } from "../middleware/auth.js";
 import type { Types } from "mongoose";
 import {

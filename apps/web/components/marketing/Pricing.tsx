@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Check, Lock } from "lucide-react";
-import { PACKAGES } from "@launchops/types";
+import { PACKAGES } from "@defineux/types";
 import { formatINR } from "@/lib/format";
 
 export function Pricing() {

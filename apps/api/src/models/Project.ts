@@ -11,7 +11,7 @@ import {
   type PlayIntegrationMode,
   type ProjectStatus,
   type ProjectType,
-} from "@launchops/types";
+} from "@defineux/types";
 
 export interface IProject {
   clientId: Types.ObjectId;

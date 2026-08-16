@@ -17,7 +17,7 @@ export function Footer() {
             FAQ
           </Link>
           <a
-            href="mailto:hello@launchops.app"
+            href="mailto:hello@defineux.app"
             className="transition-colors hover:text-orange-500"
           >
             Contact
@@ -27,7 +27,7 @@ export function Footer() {
           </Link>
         </nav>
         <p className="text-[13px] text-ink-400">
-          © {new Date().getFullYear()} LaunchOps. Built for builders.
+          © {new Date().getFullYear()} DefineUX. Built for builders.
         </p>
       </div>
     </footer>

@@ -28,7 +28,7 @@ export function Hero() {
 
         <p className="mx-auto mt-8 max-w-2xl text-[17px] leading-relaxed text-ink-600 md:text-[19px]">
           Google Play asks new developers for a closed test with 14 opted-in
-          testers. LaunchOps runs the whole thing — on Android and iOS —
+          testers. DefineUX runs the whole thing — on Android and iOS —
           recruitment, daily engagement, structured bug reports, and the
           completion report Play Console and App Store Connect want to see.
         </p>

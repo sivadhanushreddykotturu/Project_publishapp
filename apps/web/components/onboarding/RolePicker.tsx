@@ -48,7 +48,7 @@ export function RolePicker() {
         <Logo />
       </div>
       <h1 className="text-center text-[32px] font-semibold tracking-display text-ink-950">
-        What brings you to LaunchOps?
+        What brings you to DefineUX?
       </h1>
       <p className="mt-3 text-center text-[15px] text-ink-500">
         This sets up the right dashboard for you. It can&apos;t be changed

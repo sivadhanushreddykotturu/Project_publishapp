@@ -6,7 +6,7 @@ import {
   type AssignmentStatus,
   type ProofStatus,
   type VerificationSource,
-} from "@launchops/types";
+} from "@defineux/types";
 
 export interface IProof {
   _id?: Types.ObjectId;

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { Check } from "lucide-react";
-import { PACKAGES } from "@launchops/types";
+import { PACKAGES } from "@defineux/types";
 import { api, ApiClientError } from "@/lib/api";
 import { formatINR } from "@/lib/format";
 

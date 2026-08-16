@@ -1,5 +1,5 @@
 import { createClerkClient, type ClerkClient } from "@clerk/backend";
-import type { Role } from "@launchops/types";
+import type { Role } from "@defineux/types";
 import { env } from "../config/env.js";
 import { logger } from "../config/logger.js";
 

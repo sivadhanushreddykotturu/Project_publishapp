@@ -1,6 +1,6 @@
-# LaunchOps
+# DefineUX
 
-Real testers for Google Play closed testing. Clients buy a package, LaunchOps runs the whole loop — 14+ real testers on real devices, a five-step verified workflow, deduplicated bug reports, and a completion report ready for Play Console.
+Real testers for Google Play closed testing. Clients buy a package, DefineUX runs the whole loop — 14+ real testers on real devices, a five-step verified workflow, deduplicated bug reports, and a completion report ready for Play Console.
 
 ## Monorepo layout
 
@@ -18,7 +18,7 @@ Clerk (auth, roles in `publicMetadata.role`) · MongoDB Atlas + Mongoose · Clou
 
 ```bash
 npm install
-npm run build -w @launchops/types   # shared package, once (or --watch via dev)
+npm run build -w @defineux/types   # shared package, once (or --watch via dev)
 npm run dev:api                     # http://localhost:4000  (needs apps/api/.env)
 npm run dev:web                     # http://localhost:3000  (needs apps/web/.env.local)
 ```

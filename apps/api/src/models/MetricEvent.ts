@@ -1,5 +1,5 @@
 import mongoose, { Schema, type HydratedDocument, type Model, type Types } from "mongoose";
-import { METRIC_TYPES, type MetricType } from "@launchops/types";
+import { METRIC_TYPES, type MetricType } from "@defineux/types";
 
 export interface IMetricEvent {
   type: MetricType;

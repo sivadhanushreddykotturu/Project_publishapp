@@ -145,7 +145,7 @@ export default async function ClientProjectDetail({
           <p className="mt-2 max-w-lg text-[14px] leading-relaxed text-ink-600">
             Pay via UPI to{" "}
             <span className="font-semibold text-ink-950">
-              launchops@upi
+              defineux@upi
             </span>{" "}
             with your invoice ID as the note, and we&apos;ll confirm it here —
             usually within a few hours. Your tester workflow activates the

@@ -1,13 +1,13 @@
-# Render Blueprint — launchops-api
+# Render Blueprint — defineux-api
 # Render Dashboard → New → Blueprint → point at this repo. Fill the sync:false
 # values in the dashboard after creation.
 services:
   - type: web
-    name: launchops-api
+    name: defineux-api
     runtime: node
     plan: free
     # npm workspaces install from the repo root; types must build before api
-    buildCommand: npm ci --include=dev && npm run build -w @launchops/types && npm run build -w @launchops/api
+    buildCommand: npm ci --include=dev && npm run build -w @defineux/types && npm run build -w @defineux/api
     startCommand: node apps/api/dist/server.js
     healthCheckPath: /health
     envVars:
@@ -31,7 +31,7 @@ services:
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM_EMAIL
-        value: LaunchOps <no-reply@launchops.app>
+        value: DefineUX <no-reply@defineux.app>
       - key: WEB_BASE_URL
         sync: false # https://<your-app>.vercel.app
       - key: CORS_ORIGINS

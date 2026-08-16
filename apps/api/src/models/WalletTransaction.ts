@@ -4,7 +4,7 @@ import {
   WALLET_TX_TYPES,
   type WalletTxStatus,
   type WalletTxType,
-} from "@launchops/types";
+} from "@defineux/types";
 
 export interface IWalletTransaction {
   testerId: Types.ObjectId;

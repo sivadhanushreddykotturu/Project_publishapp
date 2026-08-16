@@ -1,5 +1,5 @@
 import mongoose, { Schema, type HydratedDocument, type Model, type Types } from "mongoose";
-import { TICKET_STATUSES, type TicketStatus } from "@launchops/types";
+import { TICKET_STATUSES, type TicketStatus } from "@defineux/types";
 
 export interface ISupportMessage {
   senderId: Types.ObjectId;

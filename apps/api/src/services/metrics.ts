@@ -1,5 +1,5 @@
 import type { Types } from "mongoose";
-import type { MetricType } from "@launchops/types";
+import type { MetricType } from "@defineux/types";
 import { MetricEvent } from "../models/index.js";
 import { logger } from "../config/logger.js";
 

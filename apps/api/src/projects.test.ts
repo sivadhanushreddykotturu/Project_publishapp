@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { PACKAGES } from "@launchops/types";
+import { PACKAGES } from "@defineux/types";
 import { createApp } from "./app.js";
 import { Invoice, MetricEvent, Project } from "./models/index.js";
 import { clearTestDb, startTestDb, stopTestDb } from "./test/db.js";

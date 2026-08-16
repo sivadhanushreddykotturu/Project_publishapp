@@ -5,7 +5,7 @@ import type { NextConfig } from "next";
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@launchops/types"],
+  transpilePackages: ["@defineux/types"],
   turbopack: { root: path.resolve(dirname, "../..") },
 };
 

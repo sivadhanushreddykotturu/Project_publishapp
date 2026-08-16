@@ -1,10 +1,10 @@
 {
-  "name": "@launchops/web",
+  "name": "@defineux/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "prebuild": "npm run build -w @launchops/types",
+    "prebuild": "npm run build -w @defineux/types",
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.25.4",
-    "@launchops/types": "*",
+    "@defineux/types": "*",
     "lucide-react": "^0.469.0",
     "react": "^19.1.4",
     "react-dom": "^19.1.4",

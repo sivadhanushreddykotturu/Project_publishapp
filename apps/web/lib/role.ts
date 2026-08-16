@@ -1,5 +1,5 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import type { Role } from "@launchops/types";
+import type { Role } from "@defineux/types";
 
 export function roleHome(role?: string | null): string {
   if (role === "admin") return "/admin";

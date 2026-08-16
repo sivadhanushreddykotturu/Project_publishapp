@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { Types } from "mongoose";
-import { MIN_WITHDRAWAL_PAISE } from "@launchops/types";
+import { MIN_WITHDRAWAL_PAISE } from "@defineux/types";
 import { requireAuth, requireRole, auth } from "../middleware/auth.js";
 import { Tester, User, WalletTransaction } from "../models/index.js";
 import {

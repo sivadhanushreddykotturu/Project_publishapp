@@ -1,5 +1,5 @@
 export function LogoMark({ size = 34 }: { size?: number }) {
-  // 3x3 app-grid tile, center cell in lime — LaunchOps' launchpad glyph
+  // 3x3 app-grid tile, center cell in lime — DefineUX' launchpad glyph
   const cells = Array.from({ length: 9 });
   return (
     <span
@@ -27,7 +27,7 @@ export function Logo({ dark = false }: { dark?: boolean }) {
           dark ? "text-white" : "text-ink-950"
         }`}
       >
-        LaunchOps
+        DefineUX
       </span>
     </span>
   );

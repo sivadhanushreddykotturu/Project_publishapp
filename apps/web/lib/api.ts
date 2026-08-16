@@ -17,7 +17,7 @@ interface ApiOptions {
   body?: unknown;
 }
 
-/** Typed client for the LaunchOps API. Pass a Clerk session token. */
+/** Typed client for the DefineUX API. Pass a Clerk session token. */
 export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: opts.method ?? "GET",

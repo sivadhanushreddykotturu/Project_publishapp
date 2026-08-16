@@ -1,5 +1,5 @@
 import mongoose, { type Types } from "mongoose";
-import { MIN_WITHDRAWAL_PAISE, WITHDRAWAL_SLA_HOURS } from "@launchops/types";
+import { MIN_WITHDRAWAL_PAISE, WITHDRAWAL_SLA_HOURS } from "@defineux/types";
 import { Tester, WalletTransaction } from "../models/index.js";
 import { badRequest, conflict } from "../utils/errors.js";
 import { writeAudit } from "./audit.js";
