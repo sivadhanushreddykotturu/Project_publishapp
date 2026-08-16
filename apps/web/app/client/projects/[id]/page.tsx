@@ -43,6 +43,22 @@ const STEP_LABELS: Record<string, string> = {
   completion: "Completion",
 };
 
+/** What each stage means for the client (testers see the imperative instructions). */
+const CLIENT_STEP_DESCRIPTIONS: Record<string, string> = {
+  verification:
+    "We verify every tester's account and device with a screenshot proof before they're accepted onto your project.",
+  play_store_invite:
+    "Testers opt in to your closed track, install the app from the Play Store, and prove the install with a screenshot.",
+  testflight_invite:
+    "Testers accept your TestFlight invite, install the app, and prove the install with a screenshot.",
+  app_usage:
+    "Testers use your app daily for 14 days, submitting a short check-in note or screenshot each day.",
+  app_testing:
+    "Testers hunt for bugs and file structured reports — our QA team deduplicates them before they reach you.",
+  completion:
+    "Testers keep the app installed through the final day, and your completion report is generated.",
+};
+
 interface PublishedBug {
   _id: string;
   title: string;
@@ -169,6 +185,9 @@ export default async function ClientProjectDetail({
         <h3 className="text-[17px] font-semibold text-ink-950">
           Testing workflow
         </h3>
+        <p className="mt-1 text-[13px] text-ink-400">
+          Where your tester cohort stands, stage by stage.
+        </p>
         {project!.steps.length === 0 ? (
           <p className="mt-3 text-[14px] text-ink-500">
             The five-step workflow appears here once payment is confirmed.
@@ -183,7 +202,7 @@ export default async function ClientProjectDetail({
                     Step {s.order} · {STEP_LABELS[s.type] ?? s.type}
                   </p>
                   <p className="mt-0.5 text-[13.5px] leading-snug text-ink-500">
-                    {s.config.instructions}
+                    {CLIENT_STEP_DESCRIPTIONS[s.type] ?? s.config.instructions}
                   </p>
                 </div>
                 <span className="ml-auto shrink-0">
