@@ -18,6 +18,12 @@ export type Platform = (typeof PLATFORMS)[number];
 export const PROJECT_TYPES = ["play_store_internal", "ios_testflight"] as const;
 export type ProjectType = (typeof PROJECT_TYPES)[number];
 
+/** Which device platform a project type tests on — drives tester↔project matching. */
+export const PROJECT_TYPE_PLATFORM: Record<ProjectType, Platform> = {
+  play_store_internal: "android",
+  ios_testflight: "ios",
+};
+
 // ---------------------------------------------------------------------------
 // Workflow engine
 // ---------------------------------------------------------------------------

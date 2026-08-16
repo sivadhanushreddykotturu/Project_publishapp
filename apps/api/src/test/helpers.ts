@@ -30,7 +30,13 @@ export async function makeUser(role: Role, clerkId = uniqueId("clerk")): Promise
 
 export async function makeTester(clerkId = uniqueId("clerk")): Promise<{ user: UserDoc; tester: TesterDoc }> {
   const user = await makeUser("tester", clerkId);
-  const tester = await Tester.create({ userId: user._id });
+  const tester = await Tester.create({
+    userId: user._id,
+    // default Android device — most test projects are play_store_internal
+    devices: [
+      { platform: "android", model: "Pixel 8", osVersion: "15", fingerprint: uniqueId("fp") },
+    ],
+  });
   return { user, tester };
 }
 

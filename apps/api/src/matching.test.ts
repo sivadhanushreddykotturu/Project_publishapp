@@ -22,11 +22,11 @@ const APP_DETAILS = {
 };
 
 /** client creates project → admin marks paid → admin publishes */
-async function activeProject(packageKey = "starter") {
+async function activeProject(packageKey = "starter", projectType?: string) {
   const { user: clientUser } = await makeClient();
   const created = await asRole(app, clientUser.clerkUserId, "client")
     .post("/api/v1/projects")
-    .send({ packageKey, appDetails: APP_DETAILS });
+    .send({ packageKey, projectType, appDetails: APP_DETAILS });
   const projectId: string = created.body.data.project._id;
   const invoiceId: string = created.body.data.invoice._id;
 
@@ -100,6 +100,53 @@ describe("matching, queueing, verification & testing links", () => {
       "/api/v1/projects/opportunities",
     );
     expect(opps.body.data.opportunities[0].myAssignment.status).toBe("active");
+  });
+
+  it("platform gate: iOS project hidden from Android-only tester until they add an iOS device", async () => {
+    const { projectId } = await activeProject("starter", "ios_testflight");
+    const { user: testerUser, tester } = await makeTester(); // android-only by default
+
+    // invisible in opportunities
+    const hidden = await asRole(app, testerUser.clerkUserId, "tester").get(
+      "/api/v1/projects/opportunities",
+    );
+    expect(
+      hidden.body.data.opportunities.map((o: { _id: string }) => o._id),
+    ).not.toContain(projectId);
+
+    // direct join blocked with a readable error
+    const blocked = await asRole(app, testerUser.clerkUserId, "tester").post(
+      `/api/v1/projects/${projectId}/join`,
+    );
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.error.code).toBe("PLATFORM_MISMATCH");
+
+    // tester registers an iOS device later → opportunity appears, join works
+    await Tester.updateOne(
+      { _id: tester._id },
+      {
+        $push: {
+          devices: {
+            platform: "ios",
+            model: "iPhone 15",
+            osVersion: "18",
+            fingerprint: uniqueId("fp"),
+          },
+        },
+      },
+    );
+
+    const visible = await asRole(app, testerUser.clerkUserId, "tester").get(
+      "/api/v1/projects/opportunities",
+    );
+    expect(
+      visible.body.data.opportunities.map((o: { _id: string }) => o._id),
+    ).toContain(projectId);
+
+    const joined = await asRole(app, testerUser.clerkUserId, "tester").post(
+      `/api/v1/projects/${projectId}/join`,
+    );
+    expect(joined.status).toBe(201);
   });
 
   it("proof → verify advances the step and credits the wallet exactly once", async () => {

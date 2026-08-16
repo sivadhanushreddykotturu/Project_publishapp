@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 interface Opportunity {
   _id: string;
   packageKey: string;
+  projectType: string;
   joinState: string;
   requiredTesters: number;
   activeTesterCount: number;
@@ -56,6 +57,9 @@ export default async function OpportunitiesPage() {
                 {o.appDetails.packageName} · {o.packageKey} track
               </p>
               <div className="mt-2.5 flex items-center gap-2.5">
+                <span className="inline-block rounded-full bg-blue-100 px-3 py-1 text-[11.5px] font-semibold text-blue-800">
+                  {o.projectType === "ios_testflight" ? "iOS · TestFlight" : "Android · Google Play"}
+                </span>
                 <StatusPill status={o.joinState} />
                 <span className="text-[13px] font-medium text-ink-500">
                   {slotsLeft > 0

@@ -1,4 +1,5 @@
 import mongoose, { type Types } from "mongoose";
+import { PROJECT_TYPE_PLATFORM } from "@defineux/types";
 import { Assignment, Project, Tester, type AssignmentDoc } from "../models/index.js";
 import { conflict, notFound } from "../utils/errors.js";
 import { recordMetric } from "./metrics.js";
@@ -22,6 +23,17 @@ export async function joinProject(
   if (!project) throw notFound("Project");
   if (!["open", "full"].includes(project.joinState)) {
     throw conflict("This opportunity isn't accepting testers", "JOIN_CLOSED");
+  }
+
+  // platform gate: an iOS TestFlight test needs a registered iOS device, etc.
+  const requiredPlatform = PROJECT_TYPE_PLATFORM[project.projectType];
+  if (!tester.devices.some((d) => d.platform === requiredPlatform)) {
+    throw conflict(
+      requiredPlatform === "ios"
+        ? "This project tests on iOS — add an iPhone or iPad to your profile before joining"
+        : "This project tests on Android — add an Android device to your profile before joining",
+      "PLATFORM_MISMATCH",
+    );
   }
 
   // already joined? return the existing assignment (idempotent)

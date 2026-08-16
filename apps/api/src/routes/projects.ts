@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
-import { PACKAGES } from "@defineux/types";
+import { PACKAGES, PROJECT_TYPES, PROJECT_TYPE_PLATFORM } from "@defineux/types";
 import { requireAuth, requireRole, auth } from "../middleware/auth.js";
 import type { Types } from "mongoose";
 import {
@@ -105,11 +105,18 @@ projectsRouter.get(
     const tester = await Tester.findOne({ userId: user?._id });
     if (!tester) throw notFound("Tester profile");
 
+    // only show projects the tester's registered devices can actually test
+    const platforms = new Set(tester.devices.map((d) => d.platform));
+    const eligibleTypes = PROJECT_TYPES.filter((t) =>
+      platforms.has(PROJECT_TYPE_PLATFORM[t]),
+    );
+
     const projects = await Project.find({
       status: "active",
       joinState: { $in: ["open", "full"] },
+      projectType: { $in: eligibleTypes },
     })
-      .select("appDetails packageKey requiredTesters activeTesterCount waitlistCount joinState createdAt")
+      .select("appDetails packageKey projectType requiredTesters activeTesterCount waitlistCount joinState createdAt")
       .sort({ opportunityPublishedAt: -1 })
       .lean();
 
