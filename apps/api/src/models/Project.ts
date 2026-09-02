@@ -21,6 +21,8 @@ export interface IProject {
     appName: string;
     packageName: string;
     description: string;
+    iconUrl?: string;
+    webOptInUrl?: string;
     playStoreUrl?: string;
   };
   requiredTesters: number; // min 14 — from package config
@@ -76,6 +78,8 @@ const projectSchema = new Schema<IProject>(
       appName: { type: String, required: true },
       packageName: { type: String, required: true, lowercase: true, trim: true },
       description: { type: String, default: "" },
+      iconUrl: { type: String },
+      webOptInUrl: { type: String },
       playStoreUrl: { type: String },
     },
     requiredTesters: { type: Number, required: true, min: 14 },

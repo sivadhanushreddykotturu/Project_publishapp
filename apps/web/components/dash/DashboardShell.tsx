@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/marketing/LogoMark";
 import { NotificationBell } from "./NotificationBell";
+import { TesterDeviceBadge } from "@/components/tester/TesterDeviceBadge";
 
 export type DashRole = "client" | "tester" | "admin";
 
@@ -146,6 +147,7 @@ export function DashboardShell({
               </h1>
             </div>
             <div className="flex items-center gap-4">
+              {role === "tester" && <TesterDeviceBadge />}
               <NotificationBell />
               <UserButton />
             </div>

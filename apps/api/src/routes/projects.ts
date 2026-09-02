@@ -39,14 +39,13 @@ projectsRouter.get("/packages", (_req, res) => {
 const createSchema = z.object({
   packageKey: z.string().min(1),
   projectType: z.enum(["play_store_internal", "ios_testflight"]).optional(),
+  testerCount: z.number().int().min(14).max(100).optional(),
   appDetails: z.object({
     appName: z.string().min(1).max(120),
-    packageName: z
-      .string()
-      .min(3)
-      .max(200)
-      .regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/i, "Not a valid package/bundle name"),
+    packageName: z.string().max(200).optional().default(""),
     description: z.string().max(2000).optional(),
+    iconUrl: z.string().max(1000).optional(),
+    webOptInUrl: z.string().url().optional().or(z.literal("")),
     playStoreUrl: z.string().url().optional().or(z.literal("")),
   }),
 });
@@ -62,12 +61,24 @@ projectsRouter.post(
     const client = await Client.findOne({ userId: user?._id });
     if (!client) throw notFound("Client profile");
 
+    // sanitize or generate a fallback package name if user did not supply one
+    let pkgName = (body.appDetails.packageName || "").trim().toLowerCase();
+    if (!pkgName || !/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/i.test(pkgName)) {
+      const cleanSlug = body.appDetails.appName.toLowerCase().replace(/[^a-z0-9]/g, "") || "app";
+      pkgName = `com.publishapp.${cleanSlug}`;
+    }
+
     const { project, invoice } = await createProjectWithInvoice({
       clientId: client._id,
       packageKey: body.packageKey,
       projectType: body.projectType,
+      testerCount: body.testerCount,
       appDetails: {
-        ...body.appDetails,
+        appName: body.appDetails.appName,
+        packageName: pkgName,
+        description: body.appDetails.description,
+        iconUrl: body.appDetails.iconUrl || undefined,
+        webOptInUrl: body.appDetails.webOptInUrl || undefined,
         playStoreUrl: body.appDetails.playStoreUrl || undefined,
       },
     });

@@ -15,17 +15,16 @@ export default async function TesterLayout({
   if (!session) redirect("/sign-in");
   if (session.role !== "tester") redirect(roleHome(session.role));
 
-  // First-run gate: devices + UPI are required before the dashboard unlocks
-  let needsSetup = false;
-  try {
-    const data = await serverApi<{
-      tester: { devices?: unknown[]; upi?: { vpa?: string } };
-    }>("/testers/me");
-    needsSetup =
-      (data.tester.devices?.length ?? 0) === 0 || !data.tester.upi?.vpa;
-  } catch {
-    // API hiccup — fail open; individual pages handle their own errors
-  }
+    // First-run gate: at least one device is required before the dashboard unlocks
+    let needsSetup = false;
+    try {
+      const data = await serverApi<{
+        tester: { devices?: unknown[]; upi?: { vpa?: string } };
+      }>("/testers/me");
+      needsSetup = (data.tester.devices?.length ?? 0) === 0;
+    } catch {
+      // API hiccup — fail open; individual pages handle their own errors
+    }
 
   return (
     <DashboardShell role="tester">

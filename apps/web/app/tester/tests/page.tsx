@@ -2,7 +2,8 @@ import { FlaskConical } from "lucide-react";
 import Link from "next/link";
 import { serverApi } from "@/lib/server-api";
 import { EmptySection } from "@/components/dash/EmptySection";
-import { AssignmentCard, type TesterAssignment } from "@/components/tester/AssignmentCard";
+import { type TesterAssignment } from "@/components/tester/AssignmentCard";
+import { TesterTestsView } from "@/components/tester/TesterTestsView";
 
 export const dynamic = "force-dynamic";
 
@@ -33,11 +34,5 @@ export default async function MyTestsPage() {
     );
   }
 
-  return (
-    <div className="space-y-5">
-      {assignments.map((a) => (
-        <AssignmentCard key={a._id} assignment={a} />
-      ))}
-    </div>
-  );
+  return <TesterTestsView assignments={assignments} />;
 }

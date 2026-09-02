@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckCircle2, Clock, Lock, XCircle } from "lucide-react";
@@ -17,7 +18,14 @@ interface ProjectDetail {
   requiredTesters: number;
   activeTesterCount: number;
   waitlistCount: number;
-  appDetails: { appName: string; packageName: string; description?: string };
+  appDetails: {
+    appName: string;
+    packageName: string;
+    description?: string;
+    iconUrl?: string;
+    webOptInUrl?: string;
+    playStoreUrl?: string;
+  };
   steps: Array<{
     order: number;
     type: string;
@@ -120,22 +128,44 @@ export default async function ClientProjectDetail({
     notFound();
   }
 
+  const fallbackLetter = (project!.appDetails.appName.trim()[0] || "A").toUpperCase();
+  const fillPercent = Math.min(
+    100,
+    Math.round(((project!.activeTesterCount ?? 0) / (project!.requiredTesters || 14)) * 100),
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Link
-            href="/client/projects"
-            className="text-[13px] font-medium text-ink-400 hover:text-orange-500"
-          >
-            ← All projects
-          </Link>
-          <h2 className="mt-2 text-[26px] font-semibold tracking-tight text-ink-950">
-            {project!.appDetails.appName}
-          </h2>
-          <p className="mt-1 text-[13.5px] text-ink-400">
-            {project!.appDetails.packageName}
-          </p>
+        <div className="flex items-center gap-4">
+          {/* App Icon with First Letter Fallback */}
+          <div className="relative size-16 shrink-0 overflow-hidden rounded-[20px] border border-black/10 bg-white shadow-md flex items-center justify-center">
+            {project!.appDetails.iconUrl ? (
+              <img
+                src={project!.appDetails.iconUrl}
+                alt={project!.appDetails.appName}
+                className="size-full object-cover"
+              />
+            ) : (
+              <div className="size-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white text-[26px] font-extrabold shadow-sm">
+                {fallbackLetter}
+              </div>
+            )}
+          </div>
+          <div>
+            <Link
+              href="/client/projects"
+              className="text-[13px] font-medium text-ink-400 hover:text-orange-500"
+            >
+              ← All projects
+            </Link>
+            <h2 className="mt-1 text-[26px] font-bold tracking-tight text-ink-950">
+              {project!.appDetails.appName}
+            </h2>
+            <p className="text-[13.5px] text-ink-400">
+              {project!.appDetails.packageName}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2.5">
           <span className="inline-block rounded-full bg-blue-100 px-3 py-1 text-[11.5px] font-semibold text-blue-800">
@@ -145,6 +175,47 @@ export default async function ClientProjectDetail({
           <StatusPill status={project!.status} />
         </div>
       </div>
+
+      {/* Testing Links Card */}
+      {(project!.appDetails.webOptInUrl || project!.appDetails.playStoreUrl) && (
+        <div className="rounded-[24px] border border-black/5 bg-white p-6 shadow-sm">
+          <h3 className="text-[15px] font-bold text-ink-950 mb-3">
+            Testing Links for Closed Track
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {project!.appDetails.webOptInUrl && (
+              <div className="rounded-2xl border border-amber-200/80 bg-amber-50/50 p-4">
+                <span className="text-[12px] font-semibold text-amber-900 block uppercase tracking-wider">
+                  1. Web Opt-In Link (Join access)
+                </span>
+                <a
+                  href={project!.appDetails.webOptInUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 block truncate text-[14px] font-medium text-blue-600 hover:underline"
+                >
+                  {project!.appDetails.webOptInUrl}
+                </a>
+              </div>
+            )}
+            {project!.appDetails.playStoreUrl && (
+              <div className="rounded-2xl border border-sky-200/80 bg-sky-50/50 p-4">
+                <span className="text-[12px] font-semibold text-sky-900 block uppercase tracking-wider">
+                  2. Play Store Link (App download)
+                </span>
+                <a
+                  href={project!.appDetails.playStoreUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 block truncate text-[14px] font-medium text-blue-600 hover:underline"
+                >
+                  {project!.appDetails.playStoreUrl}
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* payment banner */}
       {project!.status === "awaiting_payment" && invoice && (
@@ -159,13 +230,7 @@ export default async function ClientProjectDetail({
             </span>
           </p>
           <p className="mt-2 max-w-lg text-[14px] leading-relaxed text-ink-600">
-            Pay via UPI to{" "}
-            <span className="font-semibold text-ink-950">
-              defineux@upi
-            </span>{" "}
-            with your invoice ID as the note, and we&apos;ll confirm it here —
-            usually within a few hours. Your tester workflow activates the
-            moment payment confirms.
+            Your testing project is awaiting payment confirmation. Once confirmed or approved by an admin, the opportunity publishes to testers instantly.
           </p>
           <p className="mt-3 font-mono text-[12.5px] text-ink-400">
             Invoice ID: {invoice._id}
@@ -175,9 +240,25 @@ export default async function ClientProjectDetail({
 
       {/* tester counts */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <MiniStat label="Testers on board" value={`${project!.activeTesterCount}/${project!.requiredTesters}`} />
-        <MiniStat label="On the waitlist" value={String(project!.waitlistCount)} />
-        <MiniStat label="Package" value={project!.packageKey} />
+        <div className="rounded-[20px] border border-black/5 bg-white p-5 shadow-sm">
+          <span className="text-[13px] text-ink-500">Testers on board</span>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="text-[28px] font-extrabold text-ink-950">
+              {project!.activeTesterCount}/{project!.requiredTesters}
+            </span>
+            <span className="text-[13px] font-semibold text-emerald-600">
+              ({fillPercent}%)
+            </span>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+            <div
+              className="h-full bg-emerald-500 rounded-full"
+              style={{ width: `${fillPercent}%` }}
+            />
+          </div>
+        </div>
+        <MiniStat label="On the waitlist / Queue" value={String(project!.waitlistCount)} />
+        <MiniStat label="Track Package" value={project!.packageKey} />
       </div>
 
       {/* workflow steps */}

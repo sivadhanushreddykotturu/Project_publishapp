@@ -3,21 +3,31 @@ import { GST_RATE, PACKAGES, PROJECT_TYPES, type ProjectType } from "@defineux/t
 import { Client, Invoice, Project, type InvoiceDoc } from "../models/index.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { writeAudit } from "./audit.js";
-import { activateProject } from "./workflow.js";
+import { activateProject, publishOpportunity } from "./workflow.js";
 
 /** Invoice math lives in exactly one place. Amounts in paise, GST 18%. */
-export function priceForPackage(packageKey: string): {
+export function priceForPackage(
+  packageKey: string,
+  testerCount?: number,
+): {
   amountPaise: number;
   gstPaise: number;
   totalPaise: number;
 } {
-  const pkg = PACKAGES.find((p) => p.key === packageKey);
-  if (!pkg) throw badRequest(`Unknown package: ${packageKey}`, "BAD_PACKAGE");
-  const gstPaise = Math.round(pkg.pricePaise * GST_RATE);
+  const pkg = PACKAGES.find((p) => p.key === packageKey) ?? PACKAGES[0];
+  let baseAmountPaise = pkg.pricePaise;
+
+  // If client selected custom testers above the minimum 14
+  if (testerCount && testerCount > pkg.requiredTesters) {
+    const extraTesters = testerCount - pkg.requiredTesters;
+    baseAmountPaise += extraTesters * 150_00; // ₹150 per additional tester
+  }
+
+  const gstPaise = Math.round(baseAmountPaise * GST_RATE);
   return {
-    amountPaise: pkg.pricePaise,
+    amountPaise: baseAmountPaise,
     gstPaise,
-    totalPaise: pkg.pricePaise + gstPaise,
+    totalPaise: baseAmountPaise + gstPaise,
   };
 }
 
@@ -25,8 +35,9 @@ export async function createInvoice(
   clientId: Types.ObjectId,
   packageKey: string,
   projectId?: Types.ObjectId,
+  testerCount?: number,
 ): Promise<InvoiceDoc> {
-  const price = priceForPackage(packageKey);
+  const price = priceForPackage(packageKey, testerCount);
   return Invoice.create({
     clientId,
     projectId,
@@ -73,6 +84,7 @@ export async function markInvoicePaid(
 
   if (invoice.projectId) {
     await activateProject(invoice.projectId, adminId);
+    await publishOpportunity(invoice.projectId, adminId);
   }
   return invoice;
 }
@@ -82,32 +94,49 @@ export async function createProjectWithInvoice(input: {
   clientId: Types.ObjectId;
   packageKey: string;
   projectType?: ProjectType;
+  testerCount?: number;
   appDetails: {
     appName: string;
     packageName: string;
     description?: string;
+    iconUrl?: string;
+    webOptInUrl?: string;
     playStoreUrl?: string;
   };
 }): Promise<{ project: import("../models/index.js").ProjectDoc; invoice: InvoiceDoc }> {
-  const pkg = PACKAGES.find((p) => p.key === input.packageKey);
-  if (!pkg) throw badRequest(`Unknown package: ${input.packageKey}`, "BAD_PACKAGE");
+  const pkg = PACKAGES.find((p) => p.key === input.packageKey) ?? PACKAGES[0];
   const projectType = input.projectType ?? "play_store_internal";
   if (!PROJECT_TYPES.includes(projectType)) {
     throw badRequest(`Unknown project type: ${projectType}`, "BAD_PROJECT_TYPE");
   }
 
+  const requiredTesters = Math.max(14, input.testerCount ?? pkg.requiredTesters);
+
   const project = await Project.create({
     clientId: input.clientId,
     packageKey: input.packageKey,
     projectType,
-    appDetails: input.appDetails,
-    requiredTesters: pkg.requiredTesters,
+    appDetails: {
+      appName: input.appDetails.appName,
+      packageName: input.appDetails.packageName,
+      description: input.appDetails.description ?? "",
+      iconUrl: input.appDetails.iconUrl,
+      webOptInUrl: input.appDetails.webOptInUrl,
+      playStoreUrl: input.appDetails.playStoreUrl,
+    },
+    playIntegration: {
+      mode: "manual",
+      track: "internal",
+      optInUrl: input.appDetails.webOptInUrl,
+      serviceAccountLinked: false,
+    },
+    requiredTesters,
     status: "awaiting_payment",
     joinState: "closed",
     steps: [],
     stepTemplateVersion: "pending",
   });
-  const invoice = await createInvoice(input.clientId, input.packageKey, project._id);
+  const invoice = await createInvoice(input.clientId, input.packageKey, project._id, requiredTesters);
 
   // keep the client's project list fresh (best-effort; failure doesn't roll back)
   await Client.updateOne(

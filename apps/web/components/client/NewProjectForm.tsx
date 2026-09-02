@@ -1,232 +1,714 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { Check } from "lucide-react";
-import { PACKAGES } from "@defineux/types";
+import {
+  Check,
+  Lock,
+  ArrowRight,
+  ArrowLeft,
+  Upload,
+  CheckCircle2,
+} from "lucide-react";
 import { api, ApiClientError } from "@/lib/api";
 import { formatINR } from "@/lib/format";
+
+type WizardStep = "service" | "support_scope" | "package" | "details" | "payment_success";
+
+interface RazorpaySuccessResponse {
+  razorpay_payment_id: string;
+  razorpay_order_id?: string;
+  razorpay_signature?: string;
+}
+
+interface RazorpayInstance {
+  open: () => void;
+}
+
+type RazorpayConstructor = new (options: {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  handler: (response: RazorpaySuccessResponse) => void | Promise<void>;
+  theme?: { color?: string };
+}) => RazorpayInstance;
 
 export function NewProjectForm() {
   const router = useRouter();
   const { getToken } = useAuth();
-  const [packageKey, setPackageKey] = useState<string>("growth");
-  const [projectType, setProjectType] = useState<"play_store_internal" | "ios_testflight">(
-    "play_store_internal",
+
+  // Wizard state
+  const [step, setStep] = useState<WizardStep>("service");
+
+  // Step 1: Service selection
+  const [selectedService, setSelectedService] = useState<"playstore" | "ux" | "ios">(
+    "playstore",
   );
+
+  // Step 2: Support scope
+  const [supportScope, setSupportScope] = useState<"standard_14" | "console_setup">(
+    "standard_14",
+  );
+
+  // Step 3: Package & Testers count
+  const [testerCount, setTesterCount] = useState<number>(14);
+  const packageKey = "closed_testing_standard";
+
+  // Step 4: App Details
   const [appName, setAppName] = useState("");
   const [packageName, setPackageName] = useState("");
+  const [appIcon, setAppIcon] = useState<string>("");
+  const [webOptInUrl, setWebOptInUrl] = useState("");
   const [playStoreUrl, setPlayStoreUrl] = useState("");
   const [description, setDescription] = useState("");
+
+  // Payment & Redirect state
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(5);
+  // isRedirecting not needed externally
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  // Auto-generate package name slug if empty
+  useEffect(() => {
+    if (appName && !packageName) {
+      const slug = appName.toLowerCase().replace(/[^a-z0-9]/g, "");
+      setPackageName(`com.${slug || "app"}.testing`);
+    }
+  }, [appName, packageName]);
+
+  // Handle countdown timer for Step 5
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (step === "payment_success" && createdProjectId && countdown > 0) {
+      timer = setTimeout(() => {
+        setCountdown((prev) => prev - 1);
+      }, 1000);
+    } else if (step === "payment_success" && createdProjectId && countdown === 0) {
+      router.push(`/client/projects/${createdProjectId}`);
+    }
+    return () => clearTimeout(timer);
+  }, [step, countdown, createdProjectId, router]);
+
+  // Pricing math
+  const basePrice = 2999_00; // ₹2,999 for 14 testers
+  const extraTesters = Math.max(0, testerCount - 14);
+  const extraPrice = extraTesters * 150_00; // ₹150 per extra tester
+  const subtotalPaise = basePrice + extraPrice;
+  const gstPaise = Math.round(subtotalPaise * 0.18);
+  const totalPaise = subtotalPaise + gstPaise;
+
+  // File upload for app profile photo / icon
+  function handleIconFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAppIcon(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  // App icon fallback letter
+  const fallbackLetter = (appName.trim()[0] || "A").toUpperCase();
+
+  // Create project & initiate Razorpay payment
+  async function handleCheckout() {
     if (busy) return;
     setBusy(true);
     setError(null);
+
     try {
       const token = await getToken();
-      const { project } = await api<{ project: { _id: string } }>("/projects", {
+
+      // 1. Create project & invoice
+      const { project, invoice } = await api<{
+        project: { _id: string };
+        invoice: { _id: string; totalPaise: number };
+      }>("/projects", {
         token,
         method: "POST",
         body: {
           packageKey,
-          projectType,
+          projectType: "play_store_internal",
+          testerCount,
           appDetails: {
             appName,
-            packageName,
-            playStoreUrl: playStoreUrl || undefined,
-            description: description || undefined,
+            packageName: packageName.trim(),
+            iconUrl: appIcon || undefined,
+            webOptInUrl: webOptInUrl.trim() || undefined,
+            playStoreUrl: playStoreUrl.trim() || undefined,
+            description: description.trim() || undefined,
           },
         },
       });
-      router.push(`/client/projects/${project._id}`);
+
+      setCreatedProjectId(project._id);
+
+      // 2. Fetch Razorpay Order
+      const rzpOrder = await api<{
+        orderId: string;
+        amountPaise: number;
+        currency: string;
+        keyId: string;
+        isTestMode: boolean;
+      }>(`/invoices/${invoice._id}/create-razorpay-order`, {
+        token,
+        method: "POST",
+      });
+
+      // 3. Launch Razorpay or auto-verify test payment
+      const triggerVerification = async (paymentId: string) => {
+        await api(`/invoices/${invoice._id}/verify-razorpay-payment`, {
+          token,
+          method: "POST",
+          body: { razorpay_payment_id: paymentId },
+        });
+        setBusy(false);
+        setStep("payment_success");
+        setCountdown(5);
+      };
+
+      // Check if Razorpay script is present or can be loaded
+      const win = window as typeof window & { Razorpay?: RazorpayConstructor };
+      if (typeof window !== "undefined" && !win.Razorpay && !rzpOrder.isTestMode) {
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.async = true;
+        document.body.appendChild(script);
+        await new Promise((resolve) => { script.onload = resolve; });
+      }
+
+      if (win.Razorpay && !rzpOrder.isTestMode) {
+        const rzp = new win.Razorpay({
+          key: rzpOrder.keyId,
+          amount: rzpOrder.amountPaise,
+          currency: rzpOrder.currency,
+          name: "PublishApp",
+          description: `Play Store Closed Testing - ${appName}`,
+          order_id: rzpOrder.orderId,
+          handler: async (response: RazorpaySuccessResponse) => {
+            await triggerVerification(response.razorpay_payment_id);
+          },
+          theme: { color: "#000000" },
+        });
+        rzp.open();
+        setBusy(false);
+      } else {
+        // Test / Sandbox mode fallback (instant confirmation)
+        await triggerVerification(`pay_test_${Date.now()}`);
+      }
     } catch (err) {
       setError(
-        err instanceof ApiClientError ? err.message : "Could not create the project",
+        err instanceof ApiClientError ? err.message : "Could not complete project creation",
       );
       setBusy(false);
     }
   }
 
-  const isIos = projectType === "ios_testflight";
-
   return (
-    <form onSubmit={submit} className="space-y-8">
-      {/* platform picker */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        {(
-          [
-            {
-              key: "play_store_internal",
-              title: "Google Play",
-              desc: "Android closed track — meets Google's 14-tester requirement.",
-            },
-            {
-              key: "ios_testflight",
-              title: "iOS · TestFlight",
-              desc: "Apple beta run via TestFlight public links.",
-            },
-          ] as const
-        ).map((p) => {
-          const active = projectType === p.key;
-          return (
-            <button
-              type="button"
-              key={p.key}
-              onClick={() => setProjectType(p.key)}
-              aria-pressed={active}
-              className={`rounded-[20px] border-2 p-5 text-left transition-all ${
-                active
-                  ? "border-ink-950 bg-white shadow-md"
-                  : "border-black/8 bg-white/60 hover:border-black/20"
+    <div className="mx-auto max-w-2xl">
+      {/* ================= STEP 1: SERVICE SELECTION ================= */}
+      {step === "service" && (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          <div>
+            <h2 className="text-[34px] font-bold tracking-tight text-ink-950">
+              What do you need help with ?
+            </h2>
+            <p className="mt-2 text-[15px] text-ink-500">
+              Select your release track to get compliant real testers.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {/* Playstore Closed Testing (Active) */}
+            <div
+              onClick={() => setSelectedService("playstore")}
+              className={`relative cursor-pointer rounded-[24px] border-2 p-6 transition-all ${
+                selectedService === "playstore"
+                  ? "border-ink-950 bg-white shadow-lg ring-1 ring-black/5"
+                  : "border-black/10 bg-white/70 hover:border-black/30"
               }`}
             >
-              <span className="flex items-center justify-between">
-                <span className="text-[15px] font-semibold text-ink-950">{p.title}</span>
-                {active && (
-                  <span className="grid size-5 place-items-center rounded-full bg-lime-400">
-                    <Check className="size-3.5 text-ink-950" strokeWidth={3} />
-                  </span>
-                )}
-              </span>
-              <span className="mt-1 block text-[12.5px] leading-snug text-ink-500">
-                {p.desc}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-[20px] font-bold text-ink-950">
+                      Playstore Closed Testing
+                    </h3>
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                      Active
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[14px] text-ink-500">
+                    14 - days testing cycle · 14 real Android testers
+                  </p>
+                </div>
+                <div
+                  className={`grid size-7 place-items-center rounded-full transition-colors ${
+                    selectedService === "playstore"
+                      ? "bg-ink-950 text-white"
+                      : "border border-black/20"
+                  }`}
+                >
+                  <Check className="size-4" strokeWidth={3} />
+                </div>
+              </div>
+            </div>
 
-      {/* package picker */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        {PACKAGES.map((pkg) => {
-          const active = packageKey === pkg.key;
-          return (
+            {/* User Experience Testing (Disabled / Blocked) */}
+            <div className="relative cursor-not-allowed rounded-[24px] border border-black/10 bg-zinc-50 p-6 opacity-65">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <h3 className="text-[19px] font-semibold text-ink-400">
+                      User Experience Testing
+                    </h3>
+                    <span className="flex items-center gap-1 rounded-full bg-zinc-200 px-2.5 py-0.5 text-[11px] font-medium text-zinc-700">
+                      <Lock className="size-3" /> Coming soon
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[13.5px] text-ink-400">
+                    Test with real users for deep UX feedback
+                  </p>
+                </div>
+                <Lock className="size-5 text-zinc-400" />
+              </div>
+            </div>
+
+            {/* IOS App Publishing (Disabled / Blocked) */}
+            <div className="relative cursor-not-allowed rounded-[24px] border border-black/10 bg-zinc-50 p-6 opacity-65">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <h3 className="text-[19px] font-semibold text-ink-400">
+                      IOS App Publishing
+                    </h3>
+                    <span className="flex items-center gap-1 rounded-full bg-zinc-200 px-2.5 py-0.5 text-[11px] font-medium text-zinc-700">
+                      <Lock className="size-3" /> Coming soon
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[13.5px] text-ink-400">
+                    Setting up App Content and TestFlight runs
+                  </p>
+                </div>
+                <Lock className="size-5 text-zinc-400" />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-4">
             <button
               type="button"
-              key={pkg.key}
-              onClick={() => setPackageKey(pkg.key)}
-              aria-pressed={active}
-              className={`rounded-[20px] border-2 p-5 text-left transition-all ${
-                active
-                  ? "border-ink-950 bg-white shadow-md"
-                  : "border-black/8 bg-white/60 hover:border-black/20"
-              }`}
+              onClick={() => setStep("support_scope")}
+              className="flex items-center gap-2 rounded-full bg-ink-950 px-8 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-black hover:scale-[1.02]"
             >
-              <span className="flex items-center justify-between">
-                <span className="text-[15px] font-semibold text-ink-950">
-                  {pkg.name}
-                </span>
-                {active && (
-                  <span className="grid size-5 place-items-center rounded-full bg-lime-400">
-                    <Check className="size-3.5 text-ink-950" strokeWidth={3} />
-                  </span>
-                )}
-              </span>
-              <span className="mt-1 block text-[20px] font-semibold text-ink-950">
-                {formatINR(pkg.pricePaise)}
-              </span>
-              <span className="mt-1 block text-[12.5px] text-ink-500">
-                {pkg.requiredTesters} testers · {pkg.durationDays} days
-              </span>
+              Next <ArrowRight className="size-4" />
             </button>
-          );
-        })}
-      </div>
-
-      {/* app details */}
-      <div className="space-y-5 rounded-[24px] border border-black/5 bg-white p-7 shadow-sm">
-        <Field label="App name" required>
-          <input
-            required
-            value={appName}
-            onChange={(e) => setAppName(e.target.value)}
-            placeholder="e.g. Todo Master"
-            className={inputCls}
-          />
-        </Field>
-        <Field
-          label={isIos ? "Bundle ID" : "Package name"}
-          required
-          hint={isIos ? "e.g. com.example.myapp from Xcode/App Store Connect" : "The applicationId from your build, e.g. com.example.myapp"}
-        >
-          <input
-            required
-            value={packageName}
-            onChange={(e) => setPackageName(e.target.value)}
-            placeholder="com.example.myapp"
-            pattern="[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+"
-            className={inputCls}
-          />
-        </Field>
-        <Field
-          label={isIos ? "App Store / TestFlight link" : "Play Console draft link"}
-          hint="Optional — the track, TestFlight, or store-listing URL if you have it"
-        >
-          <input
-            value={playStoreUrl}
-            onChange={(e) => setPlayStoreUrl(e.target.value)}
-            placeholder={isIos ? "https://testflight.apple.com/…" : "https://play.google.com/…"}
-            type="url"
-            className={inputCls}
-          />
-        </Field>
-        <Field label="What should testers focus on?" hint="Optional">
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            placeholder="Core flows, known rough edges, devices you care about…"
-            className={`${inputCls} resize-none`}
-          />
-        </Field>
-      </div>
-
-      {error && (
-        <p className="rounded-xl bg-orange-500/10 px-4 py-3 text-[14px] text-orange-600">
-          {error}
-        </p>
+          </div>
+        </div>
       )}
 
-      <button
-        type="submit"
-        disabled={busy}
-        className="w-full rounded-full bg-ink-950 py-4 text-[16px] font-semibold text-white transition-all enabled:hover:scale-[1.01] disabled:opacity-40"
-      >
-        {busy ? "Creating…" : "Create project & invoice"}
-      </button>
-    </form>
+      {/* ================= STEP 2: SUPPORT SCOPE ================= */}
+      {step === "support_scope" && (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          <div>
+            <h2 className="text-[34px] font-bold tracking-tight text-ink-950">
+              Need any technical support ?
+            </h2>
+            <p className="mt-2 text-[15px] text-ink-500">
+              Pick the level of assistance you need for your Play Console testing track.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div
+              onClick={() => setSupportScope("standard_14")}
+              className={`cursor-pointer rounded-[24px] border-2 p-6 transition-all ${
+                supportScope === "standard_14"
+                  ? "border-ink-950 bg-white shadow-lg"
+                  : "border-black/10 bg-white/70 hover:border-black/30"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[18px] font-bold text-ink-950">
+                  Need only 14 testers
+                </span>
+                {supportScope === "standard_14" && (
+                  <span className="grid size-6 place-items-center rounded-full bg-ink-950 text-white">
+                    <Check className="size-3.5" strokeWidth={3} />
+                  </span>
+                )}
+              </div>
+              <p className="mt-2 text-[13.5px] text-ink-500">
+                Closed Testing · You manage your console, we deliver the active testers.
+              </p>
+            </div>
+
+            <div
+              onClick={() => setSupportScope("console_setup")}
+              className={`cursor-pointer rounded-[24px] border-2 p-6 transition-all ${
+                supportScope === "console_setup"
+                  ? "border-ink-950 bg-white shadow-lg"
+                  : "border-black/10 bg-white/70 hover:border-black/30"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[18px] font-bold text-ink-950">
+                  PlayConsole App Setup
+                </span>
+                {supportScope === "console_setup" && (
+                  <span className="grid size-6 place-items-center rounded-full bg-ink-950 text-white">
+                    <Check className="size-3.5" strokeWidth={3} />
+                  </span>
+                )}
+              </div>
+              <p className="mt-2 text-[13.5px] text-ink-500">
+                Console Management · Dedicated guidance through Google Play setup.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-4">
+            <button
+              type="button"
+              onClick={() => setStep("service")}
+              className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-6 py-3 text-[14.5px] font-medium text-ink-700 hover:bg-zinc-50"
+            >
+              <ArrowLeft className="size-4" /> Back
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep("package")}
+              className="flex items-center gap-2 rounded-full bg-ink-950 px-8 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-black hover:scale-[1.02]"
+            >
+              Next <ArrowRight className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ================= STEP 3: PACKAGE & PRICING ================= */}
+      {step === "package" && (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          <div>
+            <h2 className="text-[34px] font-bold tracking-tight text-ink-950">
+              Play Store Closed Testing
+            </h2>
+            <p className="mt-2 text-[15px] text-ink-500">
+              Billed one time for one app, to launch in playstore.
+            </p>
+          </div>
+
+          {/* Pricing Card matching Figma Node 266:1020 & 286:1168 */}
+          <div className="relative overflow-hidden rounded-[28px] border-2 border-ink-950 bg-white p-8 shadow-xl">
+            <div className="absolute right-6 top-6">
+              <span className="rounded-full bg-amber-100 px-3.5 py-1 text-[12px] font-semibold text-amber-900">
+                Most Popular Opt
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-[22px] font-bold text-ink-950">
+                Playstore Closed Testing
+              </h3>
+              <p className="text-[14px] text-ink-500">14 - days testing cycle</p>
+            </div>
+
+            <div className="mt-6 flex items-baseline gap-3">
+              <span className="text-[44px] font-extrabold tracking-tight text-ink-950">
+                {formatINR(subtotalPaise)}
+              </span>
+              <span className="text-[20px] font-medium text-ink-400 line-through">
+                ₹3,499/-
+              </span>
+            </div>
+            <p className="text-[12.5px] text-ink-400">One-time payment (+18% GST)</p>
+
+            <div className="mt-8 border-t border-black/10 pt-6">
+              <label className="block">
+                <div className="flex items-center justify-between">
+                  <span className="text-[14.5px] font-semibold text-ink-900">
+                    Number of Real Testers
+                  </span>
+                  <span className="text-[12.5px] font-medium text-emerald-600">
+                    Min 14 required by Google
+                  </span>
+                </div>
+                <div className="mt-3 flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setTesterCount((prev) => Math.max(14, prev - 1))}
+                    disabled={testerCount <= 14}
+                    className="grid size-10 place-items-center rounded-xl border border-black/15 bg-zinc-50 text-[18px] font-bold text-ink-900 disabled:opacity-40"
+                  >
+                    -
+                  </button>
+                  <span className="text-[20px] font-bold text-ink-950 w-12 text-center">
+                    {testerCount}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setTesterCount((prev) => prev + 1)}
+                    className="grid size-10 place-items-center rounded-xl border border-black/15 bg-zinc-50 text-[18px] font-bold text-ink-900"
+                  >
+                    +
+                  </button>
+                  <span className="text-[13px] text-ink-500">
+                    {testerCount > 14
+                      ? `(+₹${(extraTesters * 150).toLocaleString()} for ${extraTesters} extra testers)`
+                      : "Standard 14 testers bundle"}
+                  </span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-4">
+            <button
+              type="button"
+              onClick={() => setStep("support_scope")}
+              className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-6 py-3 text-[14.5px] font-medium text-ink-700 hover:bg-zinc-50"
+            >
+              <ArrowLeft className="size-4" /> Back
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep("details")}
+              className="flex items-center gap-2 rounded-full bg-ink-950 px-8 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-black hover:scale-[1.02]"
+            >
+              Continue to App Setup <ArrowRight className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ================= STEP 4: APP INFORMATION & DUAL LINKS ================= */}
+      {step === "details" && (
+        <div className="space-y-8 animate-in fade-in duration-300">
+          <div>
+            <h2 className="text-[34px] font-bold tracking-tight text-ink-950">
+              App Details & Testing Links
+            </h2>
+            <p className="mt-2 text-[15px] text-ink-500">
+              Upload your app icon and provide the two Google Play testing URLs.
+            </p>
+          </div>
+
+          <div className="rounded-[28px] border border-black/10 bg-white p-7 shadow-sm space-y-6">
+            {/* App Icon Upload with First Letter Fallback */}
+            <div>
+              <span className="mb-2 block text-[14px] font-semibold text-ink-900">
+                App Profile Photo / Icon
+              </span>
+              <div className="flex items-center gap-5">
+                <div className="relative size-20 shrink-0 overflow-hidden rounded-[22px] border-2 border-dashed border-black/15 bg-zinc-50 shadow-inner flex items-center justify-center">
+                  {appIcon ? (
+                    <img
+                      src={appIcon}
+                      alt="App Icon"
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <div className="size-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white text-[32px] font-extrabold shadow-sm">
+                      {fallbackLetter}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-zinc-50 px-4 py-2 text-[13.5px] font-medium text-ink-800 hover:bg-zinc-100">
+                    <Upload className="size-4" /> Upload icon
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleIconFile}
+                      className="hidden"
+                    />
+                  </label>
+                  <p className="mt-1 text-[12px] text-ink-400">
+                    If no image is uploaded, defaults to first letter of app name.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* App Name */}
+            <div>
+              <label className="block">
+                <span className="mb-1.5 block text-[13.5px] font-medium text-ink-900">
+                  App Name <span className="text-orange-500">*</span>
+                </span>
+                <input
+                  required
+                  value={appName}
+                  onChange={(e) => setAppName(e.target.value)}
+                  placeholder="e.g. BlinkIt"
+                  className={inputCls}
+                />
+              </label>
+            </div>
+
+            {/* Package Name */}
+            <div>
+              <label className="block">
+                <span className="mb-1.5 block text-[13.5px] font-medium text-ink-900">
+                  Package Name
+                </span>
+                <input
+                  value={packageName}
+                  onChange={(e) => setPackageName(e.target.value)}
+                  placeholder="e.g. com.blinkit.app"
+                  className={inputCls}
+                />
+              </label>
+            </div>
+
+            {/* LINK 1: Web Opt-In Link */}
+            <div className="rounded-2xl bg-amber-50/60 border border-amber-200/70 p-4">
+              <label className="block">
+                <span className="flex items-center gap-2 text-[14px] font-semibold text-amber-950">
+                  1. Web Opt-In Link (Where users join testing){" "}
+                  <span className="text-orange-500">*</span>
+                </span>
+                <span className="mt-1 block text-[12.5px] text-amber-800">
+                  The Google Play link where users click to get access to your product for
+                  testing (e.g.{" "}
+                  <code className="bg-amber-100/70 px-1 py-0.5 rounded text-[11.5px]">
+                    https://play.google.com/apps/testing/...
+                  </code>
+                  ).
+                </span>
+                <input
+                  required
+                  value={webOptInUrl}
+                  onChange={(e) => setWebOptInUrl(e.target.value)}
+                  placeholder="https://play.google.com/apps/testing/com.your.app"
+                  type="url"
+                  className={`mt-2 ${inputCls}`}
+                />
+              </label>
+            </div>
+
+            {/* LINK 2: Play Store App Link */}
+            <div className="rounded-2xl bg-sky-50/60 border border-sky-200/70 p-4">
+              <label className="block">
+                <span className="flex items-center gap-2 text-[14px] font-semibold text-sky-950">
+                  2. Play Store Link (Download Link){" "}
+                  <span className="text-orange-500">*</span>
+                </span>
+                <span className="mt-1 block text-[12.5px] text-sky-800">
+                  Direct Google Play Store link where testers download the app after
+                  opting in (e.g.{" "}
+                  <code className="bg-sky-100/70 px-1 py-0.5 rounded text-[11.5px]">
+                    https://play.google.com/store/apps/details?id=...
+                  </code>
+                  ).
+                </span>
+                <input
+                  required
+                  value={playStoreUrl}
+                  onChange={(e) => setPlayStoreUrl(e.target.value)}
+                  placeholder="https://play.google.com/store/apps/details?id=com.your.app"
+                  type="url"
+                  className={`mt-2 ${inputCls}`}
+                />
+              </label>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block">
+                <span className="mb-1.5 block text-[13.5px] font-medium text-ink-900">
+                  Special Testing Instructions (Optional)
+                </span>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  placeholder="Any particular features, test accounts, or test instructions..."
+                  className={`${inputCls} resize-none`}
+                />
+              </label>
+            </div>
+          </div>
+
+          {error && (
+            <p className="rounded-xl bg-orange-500/10 px-4 py-3 text-[14px] text-orange-600">
+              {error}
+            </p>
+          )}
+
+          <div className="flex items-center justify-between pt-4">
+            <button
+              type="button"
+              onClick={() => setStep("package")}
+              className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-6 py-3 text-[14.5px] font-medium text-ink-700 hover:bg-zinc-50"
+            >
+              <ArrowLeft className="size-4" /> Back
+            </button>
+            <button
+              type="button"
+              disabled={busy || !appName || !webOptInUrl || !playStoreUrl}
+              onClick={handleCheckout}
+              className="flex items-center gap-2 rounded-full bg-ink-950 px-9 py-4 text-[15.5px] font-semibold text-white transition-all hover:bg-black hover:scale-[1.02] disabled:opacity-40"
+            >
+              {busy ? "Processing Payment…" : `Pay ${formatINR(totalPaise)} with Razorpay`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ================= STEP 5: PAYMENT SUCCESS & 5-SECOND REDIRECT ================= */}
+      {step === "payment_success" && (
+        <div className="rounded-[32px] border border-black/10 bg-white p-10 text-center shadow-xl animate-in zoom-in-95 duration-300">
+          <div className="mx-auto grid size-20 place-items-center rounded-full bg-emerald-100 text-emerald-600 mb-6">
+            <CheckCircle2 className="size-12" />
+          </div>
+
+          <h2 className="text-[30px] font-extrabold tracking-tight text-ink-950">
+            Payment Completed!
+          </h2>
+          <p className="mt-2 text-[16px] text-ink-600">
+            Your Play Store testing project is activated and publishing to testers.
+          </p>
+
+          <div className="mt-8 rounded-2xl bg-zinc-50 p-6 border border-black/5">
+            <p className="text-[14.5px] font-medium text-ink-700">
+              Redirecting to your project in{" "}
+              <span className="font-bold text-ink-950 text-[20px] mx-1">
+                {countdown}
+              </span>{" "}
+              seconds...
+            </p>
+            {/* Animated progress bar */}
+            <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-zinc-200">
+              <div
+                className="h-full bg-ink-950 transition-all duration-1000 ease-linear"
+                style={{ width: `${((5 - countdown) / 5) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="mt-8">
+            <button
+              type="button"
+              onClick={() => router.push(`/client/projects/${createdProjectId}`)}
+              className="inline-flex items-center gap-2 rounded-full bg-ink-950 px-8 py-3.5 text-[15px] font-semibold text-white hover:bg-black transition-all"
+            >
+              Go to Project Now <ArrowRight className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
 const inputCls =
   "w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-[15px] outline-none transition-colors placeholder:text-ink-400 focus:border-ink-950";
-
-function Field({
-  label,
-  hint,
-  required,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-[13.5px] font-medium text-ink-800">
-        {label}
-        {required && <span className="text-orange-500"> *</span>}
-        {hint && (
-          <span className="ml-2 font-normal text-ink-400">{hint}</span>
-        )}
-      </span>
-      {children}
-    </label>
-  );
-}

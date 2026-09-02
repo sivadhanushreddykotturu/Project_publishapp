@@ -82,6 +82,29 @@ export default async function AdminProjectDetail({
         </div>
       </div>
 
+      {/* Admin 1-Click Payment Approval & Publish */}
+      {project.status === "awaiting_payment" && (
+        <div className="rounded-[24px] border-2 border-emerald-500/30 bg-emerald-50/60 p-6 shadow-sm flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <span className="text-[12px] font-bold text-emerald-800 uppercase tracking-wider block">
+              Super Admin Action · Payment Approval
+            </span>
+            <h3 className="mt-1 text-[17px] font-bold text-ink-950">
+              Manually Confirm Payment & Immediately Publish
+            </h3>
+            <p className="mt-1 text-[13.5px] text-ink-600 max-w-xl">
+              Approves the client invoice, initializes the 14-day workflow, and publishes the project to Android testers immediately.
+            </p>
+          </div>
+          <ActionButton
+            endpoint={`/projects/${project._id}/mark-paid`}
+            label="Approve & Publish Opportunity"
+            tone="lime"
+            confirm="Confirm payment for this project? It will become active and testers will be able to join immediately."
+          />
+        </div>
+      )}
+
       {/* step states */}
       <div className="rounded-[20px] border border-black/5 bg-white p-6 shadow-sm">
         <h3 className="mb-4 text-[15px] font-semibold text-ink-950">Workflow</h3>
@@ -163,9 +186,9 @@ export default async function AdminProjectDetail({
                   </span>
                   <ActionButton
                     endpoint={`/assignments/${a._id}/replace`}
-                    label="Replace"
+                    label="Remove Tester"
                     tone="danger"
-                    confirm={`Replace ${a.testerId?.userId?.name ?? "this tester"}? The next person in queue takes the slot.`}
+                    confirm={`Remove ${a.testerId?.userId?.name ?? "this tester"} from this project? The #1 person in the queue will be promoted automatically.`}
                   />
                 </div>
               </div>

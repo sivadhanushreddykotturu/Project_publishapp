@@ -235,6 +235,16 @@ export type MetricType = (typeof METRIC_TYPES)[number];
 // ---------------------------------------------------------------------------
 // Package tiers (Play Store internal testing)
 // ---------------------------------------------------------------------------
+export interface AppDetails {
+  appName: string;
+  packageName: string;
+  description?: string;
+  iconUrl?: string;
+  webOptInUrl?: string;
+  playStoreUrl?: string;
+  testerCount?: number;
+}
+
 export interface PackageTier {
   key: string;
   name: string;
@@ -242,18 +252,37 @@ export interface PackageTier {
   requiredTesters: number;
   durationDays: number;
   pricePaise: number;
+  originalPricePaise?: number;
   features: string[];
   featured?: boolean;
 }
 
 export const PACKAGES: PackageTier[] = [
   {
+    key: "closed_testing_standard",
+    name: "Playstore Closed Testing",
+    description: "Billed one time for one app, to launch in playstore. 14-days testing cycle.",
+    requiredTesters: 14,
+    durationDays: 14,
+    pricePaise: 2_999_00,
+    originalPricePaise: 3_499_00,
+    featured: true,
+    features: [
+      "14 real testers on real Android devices",
+      "Google Play closed-track compliance",
+      "Daily engagement for 14 continuous days",
+      "Proof of opt-in & install verification",
+      "Structured bug reports & feedback",
+    ],
+  },
+  {
     key: "starter",
     name: "Starter Track",
     description: "Meet Google's closed-testing requirement, or run an iOS TestFlight beta.",
     requiredTesters: 14,
     durationDays: 14,
-    pricePaise: 4_999_00,
+    pricePaise: 2_999_00,
+    originalPricePaise: 3_499_00,
     features: [
       "14 real testers, real devices",
       "Google Play closed-track or TestFlight",
@@ -268,8 +297,8 @@ export const PACKAGES: PackageTier[] = [
     description: "Closed testing plus structured bug reports from every tester.",
     requiredTesters: 20,
     durationDays: 14,
-    pricePaise: 8_999_00,
-    featured: true,
+    pricePaise: 4_999_00,
+    originalPricePaise: 5_999_00,
     features: [
       "20 real testers, real devices",
       "Google Play closed-track or TestFlight",
@@ -285,7 +314,8 @@ export const PACKAGES: PackageTier[] = [
     description: "Larger tester pool with managed QA review and severity triage.",
     requiredTesters: 30,
     durationDays: 21,
-    pricePaise: 14_999_00,
+    pricePaise: 7_999_00,
+    originalPricePaise: 9_999_00,
     features: [
       "30 real testers across Android & iOS",
       "Google Play closed-track or TestFlight",
