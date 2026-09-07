@@ -23,6 +23,7 @@ import { joinProject } from "../services/matching.js";
 import { env } from "../config/env.js";
 import { distributeTestingLinks } from "../services/verification.js";
 import { writeAudit } from "../services/audit.js";
+import { dispatch } from "../services/notify.js";
 import { badRequest, conflict, forbidden, notFound } from "../utils/errors.js";
 import { ah, ok } from "../utils/asyncHandler.js";
 
@@ -247,16 +248,65 @@ projectsRouter.post(
   }),
 );
 
-/** Manual Play mode: the verified tester email list, one click to copy. */
+/** All active tester emails for Play Console closed testing track. */
+projectsRouter.get(
+  "/:id/tester-emails",
+  requireAuth,
+  requireRole("client", "admin"),
+  ah(async (req, res) => {
+    const { clerkUserId, role } = auth(req);
+    const project = await Project.findById(req.params.id);
+    if (!project) throw notFound("Project");
+
+    if (role === "client") {
+      const user = await User.findOne({ clerkUserId });
+      const client = await Client.findOne({ userId: user?._id });
+      if (!client || String(client._id) !== String(project.clientId)) {
+        throw forbidden("Not your project");
+      }
+    }
+
+    const assignments = await Assignment.find({
+      projectId: req.params.id,
+      status: "active",
+    }).lean();
+
+    const testers = await Tester.find({
+      _id: { $in: assignments.map((a) => a.testerId) },
+    }).lean();
+
+    const users = await User.find({
+      _id: { $in: testers.map((t) => t.userId) },
+    }).lean();
+
+    const emails = users.map((u) => u.email).filter(Boolean).sort();
+    const commaSeparated = emails.join(", ");
+    const newlineSeparated = emails.join("\n");
+    const requiredTesters = project.requiredTesters || 14;
+    const isReady = emails.length >= requiredTesters;
+
+    ok(res, {
+      emails,
+      commaSeparated,
+      newlineSeparated,
+      total: emails.length,
+      requiredTesters,
+      isReady,
+      step1Verified: project.steps.find((s) => s.order === 1)?.state === "verified",
+      step2Active: project.steps.find((s) => s.order === 2)?.state === "active",
+    });
+  }),
+);
+
+/** Backwards-compatible alias for admin / legacy callers. */
 projectsRouter.get(
   "/:id/verified-tester-emails",
   requireAuth,
-  requireRole("admin"),
+  requireRole("client", "admin"),
   ah(async (req, res) => {
     const assignments = await Assignment.find({
       projectId: req.params.id,
       status: "active",
-      proofs: { $elemMatch: { step: 1, status: "verified" } },
     }).lean();
     const testers = await Tester.find({
       _id: { $in: assignments.map((a) => a.testerId) },
@@ -264,7 +314,106 @@ projectsRouter.get(
     const users = await User.find({
       _id: { $in: testers.map((t) => t.userId) },
     }).lean();
-    ok(res, { emails: users.map((u) => u.email).sort() });
+    ok(res, { emails: users.map((u) => u.email).filter(Boolean).sort() });
+  }),
+);
+
+/**
+ * Client has added all tester emails to Google Play Console:
+ * Advances Step 1 -> verified, Step 2 -> active, and unlocks opt-in links for testers.
+ */
+projectsRouter.post(
+  "/:id/advance-to-step-2",
+  requireAuth,
+  requireRole("client", "admin"),
+  ah(async (req, res) => {
+    const { clerkUserId, role } = auth(req);
+    const project = await Project.findById(req.params.id);
+    if (!project) throw notFound("Project");
+
+    const actor = await User.findOne({ clerkUserId });
+    const actorId = actor?._id;
+
+    if (role === "client") {
+      const client = await Client.findOne({ userId: actorId });
+      if (!client || String(client._id) !== String(project.clientId)) {
+        throw forbidden("Not your project");
+      }
+    }
+
+    if (project.status !== "active") {
+      throw conflict("Project is not active yet", "PROJECT_NOT_ACTIVE");
+    }
+
+    const step1 = project.steps.find((s) => s.order === 1);
+    const step2 = project.steps.find((s) => s.order === 2);
+
+    // Idempotency: if step 2 is already active or verified, return success immediately
+    if (step2?.state === "active" || step2?.state === "verified") {
+      return ok(res, { project, alreadyAdvanced: true });
+    }
+
+    // Check active tester count (allow admin override if needed)
+    const activeAssignments = await Assignment.find({
+      projectId: project._id,
+      status: "active",
+    });
+
+    const required = project.requiredTesters || 14;
+    if (role !== "admin" && activeAssignments.length < required) {
+      throw conflict(
+        `All ${required} testers must join before proceeding. Currently ${activeAssignments.length} joined.`,
+        "TESTERS_NOT_FULL",
+      );
+    }
+
+    // Advance project steps
+    if (step1) step1.state = "verified";
+    if (step2) step2.state = "active";
+
+    // Ensure optInUrl is populated from appDetails if available
+    if (!project.playIntegration?.optInUrl && project.appDetails?.webOptInUrl) {
+      project.playIntegration = {
+        ...project.playIntegration,
+        mode: "manual",
+        optInUrl: project.appDetails.webOptInUrl,
+      };
+    }
+    await project.save();
+
+    // Advance all active assignments to Step 2
+    for (const assignment of activeAssignments) {
+      if (assignment.currentStep === 1) {
+        assignment.currentStep = 2;
+        assignment.lastActivityAt = new Date();
+        await assignment.save();
+      }
+
+      // Notify tester
+      const tester = await Tester.findById(assignment.testerId).lean();
+      if (tester) {
+        await dispatch({
+          recipientId: tester.userId,
+          type: "project_update",
+          title: `Step 2 Ready — ${project.appDetails.appName}`,
+          body: "The developer has added you to Google Play Console. Open your test dashboard to opt in and install the app!",
+          link: `/tester/tests/${assignment._id}`,
+          idempotencyKey: `step2_ready:${assignment._id}`,
+        }).catch(() => {});
+      }
+    }
+
+    if (actorId) {
+      await writeAudit({
+        actorId,
+        action: "project.advance_to_step_2",
+        entityType: "Project",
+        entityId: project._id,
+        after: { step1: "verified", step2: "active" },
+      });
+    }
+
+    ok(res, { project, advanced: true });
   }),
 );
 

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PACKAGES } from "@defineux/types";
 import { createApp } from "./app.js";
-import { Invoice, MetricEvent, Project } from "./models/index.js";
+import { Assignment, Invoice, MetricEvent, Project } from "./models/index.js";
 import { clearTestDb, startTestDb, stopTestDb } from "./test/db.js";
 import { asRole, makeAdmin, makeClient, makeTester, uniqueId } from "./test/helpers.js";
 
@@ -210,5 +210,54 @@ describe("projects + payments + workflow activation", () => {
     const admin = await makeAdmin(uniqueId("clerk"));
     const all = await asRole(app, admin.clerkUserId, "admin").get("/api/v1/projects");
     expect(all.body.data.projects).toHaveLength(2);
+  });
+
+  it("client exports comma-separated tester emails and advances project to step 2", async () => {
+    const { user: clientUser } = await makeClient();
+    const created = await clientCreatesProject(clientUser.clerkUserId);
+    const projectId = created.body.data.project._id;
+
+    const admin = await makeAdmin();
+    await asRole(app, admin.clerkUserId, "admin").post(
+      `/api/v1/invoices/${created.body.data.invoice._id}/mark-paid`,
+    );
+    await asRole(app, admin.clerkUserId, "admin").post(
+      `/api/v1/projects/${projectId}/publish`,
+    );
+
+    // 14 testers join
+    for (let i = 0; i < 14; i++) {
+      const { user: testerUser } = await makeTester(`tester_${i + 1}`);
+      const joinRes = await asRole(app, testerUser.clerkUserId, "tester").post(
+        `/api/v1/projects/${projectId}/join`,
+      );
+      expect(joinRes.status).toBe(201);
+    }
+
+    // Client fetches tester emails
+    const emailsRes = await asRole(app, clientUser.clerkUserId, "client").get(
+      `/api/v1/projects/${projectId}/tester-emails`,
+    );
+    expect(emailsRes.status).toBe(200);
+    expect(emailsRes.body.data.total).toBe(14);
+    expect(emailsRes.body.data.isReady).toBe(true);
+    expect(emailsRes.body.data.commaSeparated).toContain("tester_1@test.dev");
+    expect(emailsRes.body.data.commaSeparated).toContain(", ");
+
+    // Client advances to Step 2
+    const advanceRes = await asRole(app, clientUser.clerkUserId, "client").post(
+      `/api/v1/projects/${projectId}/advance-to-step-2`,
+    );
+    expect(advanceRes.status).toBe(200);
+    expect(advanceRes.body.data.advanced).toBe(true);
+
+    const updatedProj = await Project.findById(projectId);
+    expect(updatedProj!.steps[0].state).toBe("verified");
+    expect(updatedProj!.steps[1].state).toBe("active");
+
+    // All active assignments now on step 2
+    const activeAssignments = await Assignment.find({ projectId, status: "active" });
+    expect(activeAssignments).toHaveLength(14);
+    expect(activeAssignments.every((a) => a.currentStep === 2)).toBe(true);
   });
 });

@@ -5,6 +5,7 @@ import { CheckCircle2, Clock, Lock, XCircle, Users, ExternalLink, ShieldCheck } 
 import { serverApi } from "@/lib/server-api";
 import { StatusPill } from "@/components/dash/StatusPill";
 import { RatingsForm } from "@/components/client/RatingsForm";
+import { PlayConsoleSetupCard } from "@/components/client/PlayConsoleSetupCard";
 import { formatDate, formatINR } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -252,6 +253,15 @@ export default async function ClientProjectDetail({
             Invoice ID: {invoice._id}
           </p>
         </div>
+      )}
+
+      {/* Google Play Console Setup & Emails Export */}
+      {project!.status === "active" && (
+        <PlayConsoleSetupCard
+          projectId={project!._id}
+          webOptInUrl={project!.appDetails.webOptInUrl}
+          playStoreUrl={project!.appDetails.playStoreUrl}
+        />
       )}
 
       {/* Testing Links Card */}
