@@ -1,38 +1,27 @@
-# Render Blueprint — defineux-api
-# Render Dashboard → New → Blueprint → point at this repo. Fill the sync:false
-# values in the dashboard after creation.
 services:
   - type: web
-    name: defineux-api
+    name: publishapp-api
     runtime: node
     plan: free
-    # npm workspaces install from the repo root; types must build before api
     buildCommand: npm ci --include=dev && npm run build -w @defineux/types && npm run build -w @defineux/api
-    startCommand: node apps/api/dist/server.js
+    startCommand: npm run start -w @defineux/api
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
-      # Render injects PORT automatically
+      - key: PORT
+        value: 4000
       - key: MONGODB_URI
         sync: false
       - key: CLERK_SECRET_KEY
         sync: false
       - key: CLERK_PUBLISHABLE_KEY
         sync: false
-      - key: CLERK_WEBHOOK_SECRET
+      - key: RAZORPAY_KEY_ID
         sync: false
-      - key: CLOUDINARY_CLOUD_NAME
+      - key: RAZORPAY_KEY_SECRET
         sync: false
-      - key: CLOUDINARY_API_KEY
-        sync: false
-      - key: CLOUDINARY_API_SECRET
-        sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: RESEND_FROM_EMAIL
-        value: DefineUX <no-reply@defineux.app>
       - key: WEB_BASE_URL
-        sync: false # https://<your-app>.vercel.app
+        sync: false
       - key: CORS_ORIGINS
-        sync: false # https://<your-app>.vercel.app
+        sync: false
