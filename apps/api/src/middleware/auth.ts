@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { verifyToken } from "@clerk/backend";
 import type { Role } from "@defineux/types";
 import { env } from "../config/env.js";
+import { User } from "../models/index.js";
 import { unauthorized, forbidden } from "../utils/errors.js";
 import { ah } from "../utils/asyncHandler.js";
 
@@ -36,15 +37,26 @@ async function resolveAuth(req: Request): Promise<AuthContext> {
 
   const token = header.slice("Bearer ".length);
   try {
-    const claims = await verifyToken(token, {
+    const claims = (await verifyToken(token, {
       secretKey: env.CLERK_SECRET_KEY!,
-    });
-    const metadata = (claims as Record<string, unknown>).metadata as
+    })) as Record<string, unknown>;
+
+    const metadata = (claims.metadata || claims.public_metadata || claims.publicMetadata) as
       | { role?: Role }
       | undefined;
+    let role: Role | null = metadata?.role ?? null;
+
+    // If role is not embedded in the session JWT, query database User
+    if (!role && claims.sub) {
+      const dbUser = await User.findOne({ clerkUserId: claims.sub }).select("role").lean();
+      if (dbUser?.role) {
+        role = dbUser.role as Role;
+      }
+    }
+
     return {
-      clerkUserId: claims.sub,
-      role: metadata?.role ?? null,
+      clerkUserId: claims.sub as string,
+      role,
       sessionId: (claims.sid as string) ?? null,
     };
   } catch {
