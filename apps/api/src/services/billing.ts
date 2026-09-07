@@ -20,7 +20,7 @@ export function priceForPackage(
   // If client selected custom testers above the minimum 14
   if (testerCount && testerCount > pkg.requiredTesters) {
     const extraTesters = testerCount - pkg.requiredTesters;
-    baseAmountPaise += extraTesters * 150_00; // ₹150 per additional tester
+    baseAmountPaise += extraTesters * 100_00; // ₹100 per additional tester
   }
 
   const gstPaise = Math.round(baseAmountPaise * GST_RATE);
@@ -84,7 +84,6 @@ export async function markInvoicePaid(
 
   if (invoice.projectId) {
     await activateProject(invoice.projectId, adminId);
-    await publishOpportunity(invoice.projectId, adminId);
   }
   return invoice;
 }

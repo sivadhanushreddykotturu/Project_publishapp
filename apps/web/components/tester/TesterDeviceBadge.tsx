@@ -36,14 +36,15 @@ export function TesterDeviceBadge() {
     };
   }, [getToken]);
 
-  if (!device) return null;
-
   return (
-    <div className="hidden sm:flex items-center gap-2 rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-[12.5px] shadow-sm">
-      <Smartphone className="size-3.5 text-ink-600" />
-      <span className="font-semibold text-ink-950">{device.model}</span>
-      <span className="text-ink-400">·</span>
-      <span className="font-medium text-ink-600 capitalize">{device.platform} {device.osVersion}</span>
+    <div className="hidden sm:flex flex-col items-end text-right select-none">
+      <span className="text-[13px] font-bold text-slate-900 leading-tight tracking-tight">
+        {device?.model || "OPPO TX100"}
+      </span>
+      <span className="flex items-center justify-end gap-1.5 text-[11px] font-medium text-slate-500 leading-tight mt-0.5">
+        <span>{device?.platform ? (device.platform === "android" ? "Android" : device.platform) : "Android"}</span>
+        <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
+      </span>
     </div>
   );
 }

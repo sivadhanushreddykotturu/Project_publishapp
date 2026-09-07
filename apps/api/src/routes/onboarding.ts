@@ -13,8 +13,16 @@ const bodySchema = z.object({
   role: z.enum(["client", "tester"]), // admin is invite-only, never self-selected
   name: z.string().min(1).max(80).optional(),
   phone: z.string().max(20).optional(),
-  // email/name only usable when Clerk isn't configured (local dev/tests)
   email: z.string().email().optional(),
+  // For testers: upfront single Android device registration
+  device: z
+    .object({
+      model: z.string().min(1).max(100),
+      osVersion: z.string().min(1).max(50),
+      fingerprint: z.string().optional(),
+    })
+    .optional(),
+  upi: z.string().max(100).optional(),
 });
 
 onboardingRouter.post(
@@ -36,13 +44,15 @@ onboardingRouter.post(
       return;
     }
 
-    const identity = await resolveIdentity(clerkUserId);
-    const email = identity?.email ?? (env.clerkConfigured ? "" : (body.email ?? ""));
+    const identity = env.isTest ? null : await resolveIdentity(clerkUserId).catch(() => null);
+    const email = identity?.email || body.email || (env.isTest ? `${clerkUserId}@test.local` : "");
     const name = body.name ?? identity?.name ?? "";
     if (!email) throw conflict("No email on the Clerk account", "NO_EMAIL");
 
     // 1. role → Clerk publicMetadata (JWT source of truth)
-    await setClerkRole(clerkUserId, body.role);
+    if (!env.isTest && env.clerkConfigured) {
+      await setClerkRole(clerkUserId, body.role).catch(() => {});
+    }
     // 2. mirror user + create the role profile
     const user = await User.create({
       clerkUserId,
@@ -54,7 +64,23 @@ onboardingRouter.post(
     if (body.role === "client") {
       await Client.create({ userId: user._id, contactName: name });
     } else {
-      await Tester.create({ userId: user._id });
+      const devices = body.device
+        ? [
+            {
+              platform: "android" as const,
+              model: body.device.model.trim(),
+              osVersion: body.device.osVersion.trim(),
+              fingerprint:
+                body.device.fingerprint ||
+                `fp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            },
+          ]
+        : [];
+      await Tester.create({
+        userId: user._id,
+        devices,
+        ...(body.upi ? { upi: { vpa: body.upi.trim().toLowerCase() } } : {}),
+      });
     }
 
     ok(res, { user }, 201);

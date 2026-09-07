@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, Clock, Lock, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, Lock, XCircle, Users, ExternalLink, ShieldCheck } from "lucide-react";
 import { serverApi } from "@/lib/server-api";
 import { StatusPill } from "@/components/dash/StatusPill";
 import { RatingsForm } from "@/components/client/RatingsForm";
@@ -40,6 +40,20 @@ interface InvoiceRow {
   projectId?: string;
   totalPaise: number;
   status: string;
+  gatewayRef?: string;
+}
+
+interface ProjectAssignment {
+  _id: string;
+  status: string;
+  currentStep: number;
+  queuePosition?: number;
+  joinedAt?: string;
+  createdAt: string;
+  testerId?: {
+    userId?: { name?: string; email?: string };
+    devices?: Array<{ platform?: string; model: string; osVersion: string }>;
+  };
 }
 
 const STEP_LABELS: Record<string, string> = {
@@ -51,7 +65,6 @@ const STEP_LABELS: Record<string, string> = {
   completion: "Completion",
 };
 
-/** What each stage means for the client (testers see the imperative instructions). */
 const CLIENT_STEP_DESCRIPTIONS: Record<string, string> = {
   verification:
     "We verify every tester's account and device with a screenshot proof before they're accepted onto your project.",
@@ -107,21 +120,28 @@ export default async function ClientProjectDetail({
 
   let project: ProjectDetail | null = null;
   let invoice: InvoiceRow | null = null;
+  let assignments: ProjectAssignment[] = [];
   let bugs: PublishedBug[] = [];
   let report: CompletionReport | null = null;
+
   try {
     const data = await serverApi<{ project: ProjectDetail }>(`/projects/${id}`);
     project = data.project;
-    const [inv, b] = await Promise.all([
-      serverApi<{ invoices: InvoiceRow[] }>("/invoices/me"),
-      serverApi<{ bugs: PublishedBug[] }>(`/projects/${id}/bug-reports`),
+
+    const [inv, b, assignRes] = await Promise.all([
+      serverApi<{ invoices: InvoiceRow[] }>("/invoices/me").catch(() => ({ invoices: [] })),
+      serverApi<{ bugs: PublishedBug[] }>(`/projects/${id}/bug-reports`).catch(() => ({ bugs: [] })),
+      serverApi<{ assignments: ProjectAssignment[] }>(`/projects/${id}/assignments`).catch(() => ({ assignments: [] })),
     ]);
+
     invoice = inv.invoices.find((i) => i.projectId === id) ?? null;
     bugs = b.bugs;
+    assignments = assignRes.assignments;
+
     if (project.status === "completed") {
       const r = await serverApi<{ report: CompletionReport }>(
         `/projects/${id}/completion-report`,
-      );
+      ).catch(() => ({ report: null }));
       report = r.report;
     }
   } catch {
@@ -134,11 +154,14 @@ export default async function ClientProjectDetail({
     Math.round(((project!.activeTesterCount ?? 0) / (project!.requiredTesters || 14)) * 100),
   );
 
+  const activeAssignments = assignments.filter((a) => a.status === "active");
+  const queuedAssignments = assignments.filter((a) => a.status === "queued");
+
   return (
     <div className="space-y-6">
+      {/* Top Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-4">
-          {/* App Icon with First Letter Fallback */}
           <div className="relative size-16 shrink-0 overflow-hidden rounded-[20px] border border-black/10 bg-white shadow-md flex items-center justify-center">
             {project!.appDetails.iconUrl ? (
               <img
@@ -176,48 +199,41 @@ export default async function ClientProjectDetail({
         </div>
       </div>
 
-      {/* Testing Links Card */}
-      {(project!.appDetails.webOptInUrl || project!.appDetails.playStoreUrl) && (
-        <div className="rounded-[24px] border border-black/5 bg-white p-6 shadow-sm">
-          <h3 className="text-[15px] font-bold text-ink-950 mb-3">
-            Testing Links for Closed Track
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {project!.appDetails.webOptInUrl && (
-              <div className="rounded-2xl border border-amber-200/80 bg-amber-50/50 p-4">
-                <span className="text-[12px] font-semibold text-amber-900 block uppercase tracking-wider">
-                  1. Web Opt-In Link (Join access)
-                </span>
-                <a
-                  href={project!.appDetails.webOptInUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-1 block truncate text-[14px] font-medium text-blue-600 hover:underline"
-                >
-                  {project!.appDetails.webOptInUrl}
-                </a>
-              </div>
-            )}
-            {project!.appDetails.playStoreUrl && (
-              <div className="rounded-2xl border border-sky-200/80 bg-sky-50/50 p-4">
-                <span className="text-[12px] font-semibold text-sky-900 block uppercase tracking-wider">
-                  2. Play Store Link (App download)
-                </span>
-                <a
-                  href={project!.appDetails.playStoreUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-1 block truncate text-[14px] font-medium text-blue-600 hover:underline"
-                >
-                  {project!.appDetails.playStoreUrl}
-                </a>
-              </div>
-            )}
+      {/* Admin Review Banner */}
+      {project!.status === "active" && project!.joinState === "closed" && (
+        <div className="rounded-[24px] border border-indigo-200 bg-indigo-50/70 p-6 flex items-start gap-4">
+          <div className="grid size-10 place-items-center rounded-xl bg-[#4F46E5] text-white shrink-0">
+            <ShieldCheck className="size-5" />
+          </div>
+          <div>
+            <h3 className="text-[16px] font-bold text-ink-950">
+              Payment Confirmed · Under Admin Review
+            </h3>
+            <p className="mt-1 text-[13.5px] text-ink-600 leading-relaxed max-w-2xl">
+              Your testing project and Google Play links have been received. The admin team is verifying your configuration and will publish the opportunity to Android testers shortly.
+            </p>
           </div>
         </div>
       )}
 
-      {/* payment banner */}
+      {/* Live Testers Joining Banner */}
+      {project!.joinState === "open" && (
+        <div className="rounded-[24px] border border-emerald-200 bg-emerald-50/70 p-6 flex items-start gap-4">
+          <div className="grid size-10 place-items-center rounded-xl bg-emerald-600 text-white shrink-0">
+            <Users className="size-5" />
+          </div>
+          <div>
+            <h3 className="text-[16px] font-bold text-ink-950">
+              Opportunity Live · Testers Joining
+            </h3>
+            <p className="mt-1 text-[13.5px] text-ink-600 leading-relaxed max-w-2xl">
+              Your app is live in the tester catalog. Verified Android testers are opting in and installing your app. View real-time participants below.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Pending Banner */}
       {project!.status === "awaiting_payment" && invoice && (
         <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-7">
           <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-amber-700">
@@ -230,7 +246,7 @@ export default async function ClientProjectDetail({
             </span>
           </p>
           <p className="mt-2 max-w-lg text-[14px] leading-relaxed text-ink-600">
-            Your testing project is awaiting payment confirmation. Once confirmed or approved by an admin, the opportunity publishes to testers instantly.
+            Your testing project is awaiting payment confirmation. Once payment is confirmed, the admin team prepares and publishes the project to testers.
           </p>
           <p className="mt-3 font-mono text-[12.5px] text-ink-400">
             Invoice ID: {invoice._id}
@@ -238,7 +254,50 @@ export default async function ClientProjectDetail({
         </div>
       )}
 
-      {/* tester counts */}
+      {/* Testing Links Card */}
+      {(project!.appDetails.webOptInUrl || project!.appDetails.playStoreUrl) && (
+        <div className="rounded-[24px] border border-black/5 bg-white p-6 shadow-sm">
+          <h3 className="text-[15px] font-bold text-ink-950 mb-3">
+            Testing Links for Closed Track
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {project!.appDetails.webOptInUrl && (
+              <div className="rounded-2xl border border-amber-200/80 bg-amber-50/50 p-4">
+                <span className="text-[12px] font-semibold text-amber-900 block uppercase tracking-wider">
+                  1. Google Play Web Opt-In Link
+                </span>
+                <a
+                  href={project!.appDetails.webOptInUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 flex items-center gap-1.5 truncate text-[13.5px] font-medium text-blue-600 hover:underline"
+                >
+                  <span className="truncate">{project!.appDetails.webOptInUrl}</span>
+                  <ExternalLink className="size-3.5 shrink-0" />
+                </a>
+              </div>
+            )}
+            {project!.appDetails.playStoreUrl && (
+              <div className="rounded-2xl border border-sky-200/80 bg-sky-50/50 p-4">
+                <span className="text-[12px] font-semibold text-sky-900 block uppercase tracking-wider">
+                  2. Play Store App Download Link
+                </span>
+                <a
+                  href={project!.appDetails.playStoreUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 flex items-center gap-1.5 truncate text-[13.5px] font-medium text-blue-600 hover:underline"
+                >
+                  <span className="truncate">{project!.appDetails.playStoreUrl}</span>
+                  <ExternalLink className="size-3.5 shrink-0" />
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tester Counts */}
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-[20px] border border-black/5 bg-white p-5 shadow-sm">
           <span className="text-[13px] text-ink-500">Testers on board</span>
@@ -261,7 +320,96 @@ export default async function ClientProjectDetail({
         <MiniStat label="Track Package" value={project!.packageKey} />
       </div>
 
-      {/* workflow steps */}
+      {/* REAL-TIME TESTERS JOINED SECTION */}
+      <div className="rounded-[24px] border border-black/5 bg-white p-7 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-[18px] font-bold text-ink-950">
+              Testers Joined ({activeAssignments.length}/{project!.requiredTesters})
+            </h3>
+            <p className="mt-0.5 text-[13px] text-ink-500">
+              Real Android users participating in your 14-day continuous closed testing track.
+            </p>
+          </div>
+          {queuedAssignments.length > 0 && (
+            <span className="rounded-full bg-blue-50 px-3.5 py-1 text-[12px] font-semibold text-blue-700">
+              +{queuedAssignments.length} in queue
+            </span>
+          )}
+        </div>
+
+        {activeAssignments.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-black/10 p-8 text-center bg-slate-50/50">
+            <Users className="mx-auto size-10 text-slate-300 mb-2" />
+            <p className="text-[15px] font-semibold text-ink-950">
+              {project!.joinState === "open"
+                ? "Waiting for testers to opt in"
+                : "Testing opportunity not yet published"}
+            </p>
+            <p className="mt-1 text-[13px] text-ink-500 max-w-md mx-auto">
+              {project!.joinState === "open"
+                ? "Your testing link is visible in the tester app. Testers will appear here as soon as they join."
+                : "Once admin approves and publishes your project, verified Android testers will start joining."}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-slate-100">
+            <table className="w-full text-left text-[13.5px]">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/70 text-[11.5px] font-semibold uppercase tracking-wider text-slate-500">
+                  <th className="px-5 py-3.5">Tester</th>
+                  <th className="px-5 py-3.5">Device</th>
+                  <th className="px-5 py-3.5">Progress</th>
+                  <th className="px-5 py-3.5">Joined Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {activeAssignments.map((a) => {
+                  const testerName = a.testerId?.userId?.name || "Tester";
+                  const testerEmail = a.testerId?.userId?.email || "";
+                  const maskedEmail = testerEmail
+                    ? testerEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3")
+                    : "—";
+                  const device = a.testerId?.devices?.[0];
+                  const deviceText = device
+                    ? `${device.model} (${device.platform || "Android"} ${device.osVersion})`
+                    : "Android Device";
+
+                  return (
+                    <tr key={a._id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-5 py-3.5 font-medium text-slate-900">
+                        <div className="flex items-center gap-3">
+                          <div className="size-8 rounded-full bg-[#EEF2FF] text-[#4F46E5] font-bold text-[12px] flex items-center justify-center shrink-0">
+                            {testerName.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-slate-900">{testerName}</div>
+                            <div className="text-[12px] text-slate-400 font-mono">{maskedEmail}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-600 text-[13px]">
+                        {deviceText}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[12px] font-semibold text-emerald-700">
+                          <span className="size-1.5 rounded-full bg-emerald-500" />
+                          Step {a.currentStep}/5
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-500 text-[12.5px]">
+                        {formatDate(a.joinedAt || a.createdAt)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Workflow Steps */}
       <div className="rounded-[24px] border border-black/5 bg-white p-7 shadow-sm">
         <h3 className="text-[17px] font-semibold text-ink-950">
           Testing workflow
@@ -294,7 +442,8 @@ export default async function ClientProjectDetail({
           </ol>
         )}
       </div>
-      {/* published bug findings */}
+
+      {/* Published Bug Findings */}
       {bugs.length > 0 && (
         <div className="rounded-[24px] border border-black/5 bg-white p-7 shadow-sm">
           <h3 className="text-[17px] font-semibold text-ink-950">
@@ -341,7 +490,7 @@ export default async function ClientProjectDetail({
         </div>
       )}
 
-      {/* completion report + ratings */}
+      {/* Completion Report + Ratings */}
       {report && (
         <div className="space-y-6">
           <div className="rounded-[24px] bg-navy-900 p-8 text-white">

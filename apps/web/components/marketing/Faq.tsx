@@ -5,32 +5,24 @@ import { Minus, Plus } from "lucide-react";
 
 const FAQS = [
   {
-    q: "Why does Google Play require 14 testers?",
-    a: "Since late 2023, Google asks new personal developer accounts to run a closed test with at least 14 testers who opt in and stay engaged for 14 days before the app can apply for production. It's Google's way of filtering abandoned or low-quality apps. DefineUX exists because doing this with friends, family, and WhatsApp groups rarely survives day 4.",
+    q: "Why does Google Play require 14 testers for 14 days?",
+    a: "Google requires new personal developer accounts to run a closed test with at least 14 opted-in testers for 14 continuous days before applying for production access. DefineUX coordinates the entire test with real Android testers so you pass Google's review.",
   },
   {
-    q: "Do you support iOS apps too, or only Android?",
-    a: "Both. Android tests run on your Google Play closed track; iOS tests run as a TestFlight beta via public links. The workflow is identical either way — verified testers, daily engagement, deduplicated bug reports, and a completion report at the end.",
+    q: "Do you support iOS or UX testing?",
+    a: "Our automated self-serve platform is currently dedicated exclusively to Android Google Play closed testing. iOS TestFlight and UX testing capabilities are planned for upcoming releases.",
   },
   {
-    q: "Are these real people on real devices?",
-    a: "Yes. Every tester registers a physical Android or iOS device with a device fingerprint, verifies their account with a screenshot proof, and is reviewed by an admin before your test starts. Duplicate devices and recycled screenshots are flagged automatically.",
+    q: "Are these real people on physical Android devices?",
+    a: "Yes. Every tester registers a physical Android device with hardware fingerprinting. They opt in through your Play Console track link, install your app, and submit daily usage proofs.",
   },
   {
-    q: "What happens if a tester goes quiet mid-test?",
-    a: "If a tester is inactive for more than 48 hours during the early steps, they're removed and the next person on the waiting list is promoted automatically — your 14-day clock keeps running. Later in the test, an admin is alerted and replaces them manually so your track stays intact.",
+    q: "What happens if a tester becomes inactive?",
+    a: "We continuously monitor engagement. If a tester becomes inactive, our system automatically replaces them from our waitlist so your 14-day requirement is never compromised.",
   },
   {
-    q: "Do you need my build or access to my developer account?",
-    a: "No. In the standard flow you keep full control: you upload your own build to Play Console or App Store Connect, create the track or TestFlight group, and we hand you a verified list of tester accounts to invite, plus the opt-in link to share with us. We never ask for your developer account password.",
-  },
-  {
-    q: "What do I receive when the test ends?",
-    a: "A completion report built for Play Console: the engagement timeline across all 14 days, every tester's verified proofs, and a deduplicated bug summary with severity, device info, and reproduction steps for each issue.",
-  },
-  {
-    q: "How do testers get paid?",
-    a: "Testers earn wallet credits as each step of the test is verified by an admin. They withdraw to their UPI handle; payouts are reviewed and completed within 48 hours. Happy testers are why our tests finish.",
+    q: "Do you need access to my Google Play Console?",
+    a: "No. You retain 100% control of your account, source code, and builds. You simply upload your app to Play Console's closed track and share the join link with us.",
   },
 ];
 

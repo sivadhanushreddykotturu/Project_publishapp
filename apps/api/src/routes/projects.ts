@@ -23,7 +23,7 @@ import { joinProject } from "../services/matching.js";
 import { env } from "../config/env.js";
 import { distributeTestingLinks } from "../services/verification.js";
 import { writeAudit } from "../services/audit.js";
-import { conflict, forbidden, notFound } from "../utils/errors.js";
+import { badRequest, conflict, forbidden, notFound } from "../utils/errors.js";
 import { ah, ok } from "../utils/asyncHandler.js";
 
 export const projectsRouter = Router();
@@ -57,13 +57,19 @@ projectsRouter.post(
   ah(async (req, res) => {
     const { clerkUserId } = auth(req);
     const body = createSchema.parse(req.body);
+    if (!PACKAGES.some((p) => p.key === body.packageKey)) {
+      throw badRequest(`Unknown package: ${body.packageKey}`, "UNKNOWN_PACKAGE");
+    }
     const user = await User.findOne({ clerkUserId });
     const client = await Client.findOne({ userId: user?._id });
     if (!client) throw notFound("Client profile");
 
-    // sanitize or generate a fallback package name if user did not supply one
     let pkgName = (body.appDetails.packageName || "").trim().toLowerCase();
-    if (!pkgName || !/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/i.test(pkgName)) {
+    if (pkgName) {
+      if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/i.test(pkgName)) {
+        throw badRequest("Invalid package name format", "INVALID_PACKAGE_NAME");
+      }
+    } else {
       const cleanSlug = body.appDetails.appName.toLowerCase().replace(/[^a-z0-9]/g, "") || "app";
       pkgName = `com.publishapp.${cleanSlug}`;
     }
@@ -170,16 +176,27 @@ projectsRouter.post(
   }),
 );
 
-/** Admin: every assignment for a project, with tester identity. */
 projectsRouter.get(
   "/:id/assignments",
   requireAuth,
-  requireRole("admin"),
+  requireRole("client", "admin"),
   ah(async (req, res) => {
+    const { clerkUserId, role } = auth(req);
+    const project = await Project.findById(req.params.id);
+    if (!project) throw notFound("Project");
+
+    if (role === "client") {
+      const user = await User.findOne({ clerkUserId });
+      const client = await Client.findOne({ userId: user?._id });
+      if (!client || String(client._id) !== String(project.clientId)) {
+        throw forbidden("Not your project");
+      }
+    }
+
     const assignments = await Assignment.find({ projectId: req.params.id })
       .populate({
         path: "testerId",
-        select: "userId devices upi",
+        select: "userId devices" + (role === "admin" ? " upi" : ""),
         populate: { path: "userId", select: "name email phone" },
       })
       .sort({ status: 1, queuePosition: 1, createdAt: 1 })
@@ -381,7 +398,20 @@ projectsRouter.get(
       .populate("clientId", "companyName contactName")
       .sort({ createdAt: -1 })
       .lean();
-    ok(res, { projects });
+
+    const invoices = await Invoice.find({
+      projectId: { $in: projects.map((p) => p._id) },
+    })
+      .select("projectId status totalPaise")
+      .lean();
+    const invoiceByProj = new Map(invoices.map((i) => [String(i.projectId), i]));
+
+    ok(res, {
+      projects: projects.map((p) => ({
+        ...p,
+        invoice: invoiceByProj.get(String(p._id)) ?? null,
+      })),
+    });
   }),
 );
 

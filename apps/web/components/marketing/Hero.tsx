@@ -4,18 +4,18 @@ import { ArrowRight, BadgeCheck } from "lucide-react";
 export function Hero() {
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-cream-100 via-cream-50 to-paper">
-      <div className="mx-auto max-w-6xl px-6 pb-28 pt-40 text-center md:pt-48">
+      <div className="mx-auto max-w-6xl px-6 pb-24 pt-36 text-center md:pt-44">
         {/* pill badge */}
-        <div className="mb-10 inline-flex items-center gap-2.5 rounded-full border border-black/5 bg-white px-4 py-2 shadow-sm">
+        <div className="mb-8 inline-flex items-center gap-2.5 rounded-full border border-black/5 bg-white px-4 py-2 shadow-sm">
           <span className="grid size-6 place-items-center rounded-full bg-lime-300">
             <BadgeCheck className="size-4 text-ink-950" strokeWidth={2.2} />
           </span>
           <span className="text-[13.5px] font-medium text-ink-800">
-            Google Play closed testing · iOS TestFlight
+            Google Play 14-Day Closed Testing · Real Android Testers
           </span>
         </div>
 
-        <h1 className="mx-auto max-w-4xl text-[clamp(2.9rem,8vw,6.4rem)] font-semibold leading-[1.02] tracking-display text-ink-950">
+        <h1 className="mx-auto max-w-4xl text-[clamp(2.7rem,7.5vw,5.8rem)] font-semibold leading-[1.04] tracking-display text-ink-950">
           Fourteen testers.
           <br />
           Fourteen days.
@@ -26,31 +26,31 @@ export function Hero() {
           Zero spreadsheets.
         </h1>
 
-        <p className="mx-auto mt-8 max-w-2xl text-[17px] leading-relaxed text-ink-600 md:text-[19px]">
-          Google Play asks new developers for a closed test with 14 opted-in
-          testers. DefineUX runs the whole thing — on Android and iOS —
-          recruitment, daily engagement, structured bug reports, and the
-          completion report Play Console and App Store Connect want to see.
+        <p className="mx-auto mt-7 max-w-2xl text-[17px] leading-relaxed text-ink-600 md:text-[19px]">
+          Google Play requires 14 opted-in testers engaged for 14 continuous days
+          before publishing to production. DefineUX takes care of the entire Android
+          testing cycle — tester recruitment, daily check-ins, bug reports, and the
+          completion proof for Play Console.
         </p>
 
-        <div className="mt-11 flex flex-wrap items-center justify-center gap-4">
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <Link
-            href="/sign-up"
-            className="group inline-flex items-center gap-2.5 rounded-full bg-ink-950 px-8 py-4 text-[16px] font-semibold text-white shadow-lg shadow-ink-950/10 transition-transform hover:scale-[1.03] active:scale-[0.98]"
+            href="/sign-up?role=client"
+            className="group inline-flex items-center gap-2.5 rounded-full bg-ink-950 px-8 py-4 text-[15.5px] font-semibold text-white shadow-lg shadow-ink-950/10 transition-transform hover:scale-[1.03] active:scale-[0.98]"
           >
-            START YOUR TEST
-            <ArrowRight className="size-5 transition-transform group-hover:translate-x-0.5" />
+            START CLOSED TEST
+            <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
-          <a
-            href="#pricing"
-            className="inline-flex items-center rounded-full border-2 border-lime-400 bg-lime-200/40 px-8 py-[14px] text-[16px] font-semibold text-ink-800 transition-colors hover:bg-lime-200"
+          <Link
+            href="/sign-up?role=tester"
+            className="inline-flex items-center rounded-full border-2 border-ink-950/15 bg-white px-8 py-[14px] text-[15.5px] font-semibold text-ink-800 transition-colors hover:bg-black/5"
           >
-            See packages
-          </a>
+            Become an Android Tester
+          </Link>
         </div>
 
         <p className="mt-8 text-[13.5px] text-ink-500">
-          Real devices · Admin-verified proofs · Inactive testers replaced free
+          Physical Android devices · Admin-verified proofs · Inactive testers replaced free
         </p>
       </div>
     </section>

@@ -3,7 +3,7 @@ import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { Logo } from "./LogoMark";
 
 const LINKS = [
-  { href: "/#features", label: "FEATURES" },
+  { href: "/#how-it-works", label: "HOW IT WORKS" },
   { href: "/#pricing", label: "PRICING" },
   { href: "/#faq", label: "FAQ" },
 ];

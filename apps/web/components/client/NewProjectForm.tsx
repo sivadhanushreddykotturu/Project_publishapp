@@ -6,16 +6,16 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import {
   Check,
-  Lock,
   ArrowRight,
   ArrowLeft,
   Upload,
   CheckCircle2,
+  Lock,
 } from "lucide-react";
 import { api, ApiClientError } from "@/lib/api";
 import { formatINR } from "@/lib/format";
 
-type WizardStep = "service" | "support_scope" | "package" | "details" | "payment_success";
+type WizardStep = "service" | "package" | "details" | "payment_success";
 
 interface RazorpaySuccessResponse {
   razorpay_payment_id: string;
@@ -45,21 +45,14 @@ export function NewProjectForm() {
   // Wizard state
   const [step, setStep] = useState<WizardStep>("service");
 
-  // Step 1: Service selection
-  const [selectedService, setSelectedService] = useState<"playstore" | "ux" | "ios">(
-    "playstore",
-  );
+  // Step 1: Service selection (Playstore is active; iOS and UX are disabled/admin-contact)
+  const [selectedService] = useState<"playstore">("playstore");
 
-  // Step 2: Support scope
-  const [supportScope, setSupportScope] = useState<"standard_14" | "console_setup">(
-    "standard_14",
-  );
-
-  // Step 3: Package & Testers count
+  // Step 2: Package & Testers count
   const [testerCount, setTesterCount] = useState<number>(14);
   const packageKey = "closed_testing_standard";
 
-  // Step 4: App Details
+  // Step 3: App Details & Links
   const [appName, setAppName] = useState("");
   const [packageName, setPackageName] = useState("");
   const [appIcon, setAppIcon] = useState<string>("");
@@ -72,7 +65,6 @@ export function NewProjectForm() {
   const [error, setError] = useState<string | null>(null);
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(5);
-  // isRedirecting not needed externally
 
   // Auto-generate package name slug if empty
   useEffect(() => {
@@ -82,7 +74,7 @@ export function NewProjectForm() {
     }
   }, [appName, packageName]);
 
-  // Handle countdown timer for Step 5
+  // Handle countdown timer for Step 4
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (step === "payment_success" && createdProjectId && countdown > 0) {
@@ -95,10 +87,10 @@ export function NewProjectForm() {
     return () => clearTimeout(timer);
   }, [step, countdown, createdProjectId, router]);
 
-  // Pricing math
-  const basePrice = 2999_00; // ₹2,999 for 14 testers
+  // Pricing math: ₹2,999 base (14 testers) + ₹100 per additional tester
+  const basePrice = 2999_00;
   const extraTesters = Math.max(0, testerCount - 14);
-  const extraPrice = extraTesters * 150_00; // ₹150 per extra tester
+  const extraPrice = extraTesters * 100_00;
   const subtotalPaise = basePrice + extraPrice;
   const gstPaise = Math.round(subtotalPaise * 0.18);
   const totalPaise = subtotalPaise + gstPaise;
@@ -175,14 +167,15 @@ export function NewProjectForm() {
         setCountdown(5);
       };
 
-      // Check if Razorpay script is present or can be loaded
       const win = window as typeof window & { Razorpay?: RazorpayConstructor };
       if (typeof window !== "undefined" && !win.Razorpay && !rzpOrder.isTestMode) {
         const script = document.createElement("script");
         script.src = "https://checkout.razorpay.com/v1/checkout.js";
         script.async = true;
         document.body.appendChild(script);
-        await new Promise((resolve) => { script.onload = resolve; });
+        await new Promise((resolve) => {
+          script.onload = resolve;
+        });
       }
 
       if (win.Razorpay && !rzpOrder.isTestMode) {
@@ -196,7 +189,7 @@ export function NewProjectForm() {
           handler: async (response: RazorpaySuccessResponse) => {
             await triggerVerification(response.razorpay_payment_id);
           },
-          theme: { color: "#000000" },
+          theme: { color: "#4F46E5" },
         });
         rzp.open();
         setBusy(false);
@@ -218,8 +211,8 @@ export function NewProjectForm() {
       {step === "service" && (
         <div className="space-y-8 animate-in fade-in duration-300">
           <div>
-            <h2 className="text-[34px] font-bold tracking-tight text-ink-950">
-              What do you need help with ?
+            <h2 className="text-[32px] font-bold tracking-tight text-ink-950">
+              What do you need help with?
             </h2>
             <p className="mt-2 text-[15px] text-ink-500">
               Select your release track to get compliant real testers.
@@ -228,14 +221,7 @@ export function NewProjectForm() {
 
           <div className="space-y-4">
             {/* Playstore Closed Testing (Active) */}
-            <div
-              onClick={() => setSelectedService("playstore")}
-              className={`relative cursor-pointer rounded-[24px] border-2 p-6 transition-all ${
-                selectedService === "playstore"
-                  ? "border-ink-950 bg-white shadow-lg ring-1 ring-black/5"
-                  : "border-black/10 bg-white/70 hover:border-black/30"
-              }`}
-            >
+            <div className="relative rounded-[24px] border-2 border-ink-950 bg-white p-6 shadow-md">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-3">
@@ -247,142 +233,55 @@ export function NewProjectForm() {
                     </span>
                   </div>
                   <p className="mt-1 text-[14px] text-ink-500">
-                    14 - days testing cycle · 14 real Android testers
+                    14-day testing cycle · 14+ verified real Android testers
                   </p>
                 </div>
-                <div
-                  className={`grid size-7 place-items-center rounded-full transition-colors ${
-                    selectedService === "playstore"
-                      ? "bg-ink-950 text-white"
-                      : "border border-black/20"
-                  }`}
-                >
+                <div className="grid size-7 place-items-center rounded-full bg-ink-950 text-white">
                   <Check className="size-4" strokeWidth={3} />
                 </div>
               </div>
             </div>
 
-            {/* User Experience Testing (Disabled / Blocked) */}
-            <div className="relative cursor-not-allowed rounded-[24px] border border-black/10 bg-zinc-50 p-6 opacity-65">
+            {/* IOS App Publishing & Testing (Contact Admin) */}
+            <div className="relative rounded-[24px] border border-black/10 bg-slate-50/70 p-6 opacity-75 cursor-not-allowed">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2.5">
-                    <h3 className="text-[19px] font-semibold text-ink-400">
-                      User Experience Testing
+                    <h3 className="text-[19px] font-bold text-slate-700">
+                      iOS App Publishing & Testing
                     </h3>
-                    <span className="flex items-center gap-1 rounded-full bg-zinc-200 px-2.5 py-0.5 text-[11px] font-medium text-zinc-700">
-                      <Lock className="size-3" /> Coming soon
+                    <span className="rounded-full bg-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 flex items-center gap-1">
+                      <Lock className="size-3" /> Contact Admin
                     </span>
                   </div>
-                  <p className="mt-1 text-[13.5px] text-ink-400">
-                    Test with real users for deep UX feedback
+                  <p className="mt-1 text-[13.5px] text-slate-500">
+                    Direct admin consultation for App Store & TestFlight tracks.
                   </p>
                 </div>
-                <Lock className="size-5 text-zinc-400" />
               </div>
             </div>
 
-            {/* IOS App Publishing (Disabled / Blocked) */}
-            <div className="relative cursor-not-allowed rounded-[24px] border border-black/10 bg-zinc-50 p-6 opacity-65">
+            {/* User Experience Testing (Contact Admin) */}
+            <div className="relative rounded-[24px] border border-black/10 bg-slate-50/70 p-6 opacity-75 cursor-not-allowed">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2.5">
-                    <h3 className="text-[19px] font-semibold text-ink-400">
-                      IOS App Publishing
+                    <h3 className="text-[19px] font-bold text-slate-700">
+                      User Experience (UX) Testing
                     </h3>
-                    <span className="flex items-center gap-1 rounded-full bg-zinc-200 px-2.5 py-0.5 text-[11px] font-medium text-zinc-700">
-                      <Lock className="size-3" /> Coming soon
+                    <span className="rounded-full bg-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 flex items-center gap-1">
+                      <Lock className="size-3" /> Contact Admin
                     </span>
                   </div>
-                  <p className="mt-1 text-[13.5px] text-ink-400">
-                    Setting up App Content and TestFlight runs
+                  <p className="mt-1 text-[13.5px] text-slate-500">
+                    Direct admin coordination for specialized UX feedback studies.
                   </p>
                 </div>
-                <Lock className="size-5 text-zinc-400" />
               </div>
             </div>
           </div>
 
           <div className="flex justify-end pt-4">
-            <button
-              type="button"
-              onClick={() => setStep("support_scope")}
-              className="flex items-center gap-2 rounded-full bg-ink-950 px-8 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-black hover:scale-[1.02]"
-            >
-              Next <ArrowRight className="size-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ================= STEP 2: SUPPORT SCOPE ================= */}
-      {step === "support_scope" && (
-        <div className="space-y-8 animate-in fade-in duration-300">
-          <div>
-            <h2 className="text-[34px] font-bold tracking-tight text-ink-950">
-              Need any technical support ?
-            </h2>
-            <p className="mt-2 text-[15px] text-ink-500">
-              Pick the level of assistance you need for your Play Console testing track.
-            </p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div
-              onClick={() => setSupportScope("standard_14")}
-              className={`cursor-pointer rounded-[24px] border-2 p-6 transition-all ${
-                supportScope === "standard_14"
-                  ? "border-ink-950 bg-white shadow-lg"
-                  : "border-black/10 bg-white/70 hover:border-black/30"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[18px] font-bold text-ink-950">
-                  Need only 14 testers
-                </span>
-                {supportScope === "standard_14" && (
-                  <span className="grid size-6 place-items-center rounded-full bg-ink-950 text-white">
-                    <Check className="size-3.5" strokeWidth={3} />
-                  </span>
-                )}
-              </div>
-              <p className="mt-2 text-[13.5px] text-ink-500">
-                Closed Testing · You manage your console, we deliver the active testers.
-              </p>
-            </div>
-
-            <div
-              onClick={() => setSupportScope("console_setup")}
-              className={`cursor-pointer rounded-[24px] border-2 p-6 transition-all ${
-                supportScope === "console_setup"
-                  ? "border-ink-950 bg-white shadow-lg"
-                  : "border-black/10 bg-white/70 hover:border-black/30"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[18px] font-bold text-ink-950">
-                  PlayConsole App Setup
-                </span>
-                {supportScope === "console_setup" && (
-                  <span className="grid size-6 place-items-center rounded-full bg-ink-950 text-white">
-                    <Check className="size-3.5" strokeWidth={3} />
-                  </span>
-                )}
-              </div>
-              <p className="mt-2 text-[13.5px] text-ink-500">
-                Console Management · Dedicated guidance through Google Play setup.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-4">
-            <button
-              type="button"
-              onClick={() => setStep("service")}
-              className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-6 py-3 text-[14.5px] font-medium text-ink-700 hover:bg-zinc-50"
-            >
-              <ArrowLeft className="size-4" /> Back
-            </button>
             <button
               type="button"
               onClick={() => setStep("package")}
@@ -394,31 +293,33 @@ export function NewProjectForm() {
         </div>
       )}
 
-      {/* ================= STEP 3: PACKAGE & PRICING ================= */}
+      {/* ================= STEP 2: PACKAGE & PRICING ================= */}
       {step === "package" && (
         <div className="space-y-8 animate-in fade-in duration-300">
           <div>
-            <h2 className="text-[34px] font-bold tracking-tight text-ink-950">
-              Play Store Closed Testing
+            <h2 className="text-[32px] font-bold tracking-tight text-ink-950">
+              Play Store Closed Testing Package
             </h2>
             <p className="mt-2 text-[15px] text-ink-500">
-              Billed one time for one app, to launch in playstore.
+              Billed one time per app. Guaranteed 14-day continuous testing by real Android users.
             </p>
           </div>
 
-          {/* Pricing Card matching Figma Node 266:1020 & 286:1168 */}
+          {/* Pricing Card */}
           <div className="relative overflow-hidden rounded-[28px] border-2 border-ink-950 bg-white p-8 shadow-xl">
             <div className="absolute right-6 top-6">
               <span className="rounded-full bg-amber-100 px-3.5 py-1 text-[12px] font-semibold text-amber-900">
-                Most Popular Opt
+                14 Days Testing
               </span>
             </div>
 
             <div className="space-y-2">
               <h3 className="text-[22px] font-bold text-ink-950">
-                Playstore Closed Testing
+                Standard Closed Testing Track
               </h3>
-              <p className="text-[14px] text-ink-500">14 - days testing cycle</p>
+              <p className="text-[14px] text-ink-500">
+                Min 14 testers required by Google Play Console policy
+              </p>
             </div>
 
             <div className="mt-6 flex items-baseline gap-3">
@@ -446,24 +347,24 @@ export function NewProjectForm() {
                     type="button"
                     onClick={() => setTesterCount((prev) => Math.max(14, prev - 1))}
                     disabled={testerCount <= 14}
-                    className="grid size-10 place-items-center rounded-xl border border-black/15 bg-zinc-50 text-[18px] font-bold text-ink-900 disabled:opacity-40"
+                    className="grid size-10 place-items-center rounded-xl border border-black/15 bg-zinc-50 text-[18px] font-bold text-ink-900 disabled:opacity-40 hover:bg-zinc-100 transition-colors"
                   >
                     -
                   </button>
-                  <span className="text-[20px] font-bold text-ink-950 w-12 text-center">
+                  <span className="text-[22px] font-bold text-ink-950 w-12 text-center">
                     {testerCount}
                   </span>
                   <button
                     type="button"
                     onClick={() => setTesterCount((prev) => prev + 1)}
-                    className="grid size-10 place-items-center rounded-xl border border-black/15 bg-zinc-50 text-[18px] font-bold text-ink-900"
+                    className="grid size-10 place-items-center rounded-xl border border-black/15 bg-zinc-50 text-[18px] font-bold text-ink-900 hover:bg-zinc-100 transition-colors"
                   >
                     +
                   </button>
-                  <span className="text-[13px] text-ink-500">
+                  <span className="text-[13px] text-ink-600">
                     {testerCount > 14
-                      ? `(+₹${(extraTesters * 150).toLocaleString()} for ${extraTesters} extra testers)`
-                      : "Standard 14 testers bundle"}
+                      ? `(+₹${(extraTesters * 100).toLocaleString()} for ${extraTesters} extra testers @ ₹100/tester)`
+                      : "Standard 14 testers bundle (₹2,999)"}
                   </span>
                 </div>
               </label>
@@ -473,7 +374,7 @@ export function NewProjectForm() {
           <div className="flex items-center justify-between pt-4">
             <button
               type="button"
-              onClick={() => setStep("support_scope")}
+              onClick={() => setStep("service")}
               className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-6 py-3 text-[14.5px] font-medium text-ink-700 hover:bg-zinc-50"
             >
               <ArrowLeft className="size-4" /> Back
@@ -483,21 +384,21 @@ export function NewProjectForm() {
               onClick={() => setStep("details")}
               className="flex items-center gap-2 rounded-full bg-ink-950 px-8 py-3.5 text-[15px] font-semibold text-white transition-all hover:bg-black hover:scale-[1.02]"
             >
-              Continue to App Setup <ArrowRight className="size-4" />
+              Continue to App Details <ArrowRight className="size-4" />
             </button>
           </div>
         </div>
       )}
 
-      {/* ================= STEP 4: APP INFORMATION & DUAL LINKS ================= */}
+      {/* ================= STEP 3: APP DETAILS & 2 LINKS ================= */}
       {step === "details" && (
         <div className="space-y-8 animate-in fade-in duration-300">
           <div>
-            <h2 className="text-[34px] font-bold tracking-tight text-ink-950">
+            <h2 className="text-[32px] font-bold tracking-tight text-ink-950">
               App Details & Testing Links
             </h2>
             <p className="mt-2 text-[15px] text-ink-500">
-              Upload your app icon and provide the two Google Play testing URLs.
+              Provide your app profile and the two Google Play testing URLs.
             </p>
           </div>
 
@@ -548,7 +449,7 @@ export function NewProjectForm() {
                   required
                   value={appName}
                   onChange={(e) => setAppName(e.target.value)}
-                  placeholder="e.g. BlinkIt"
+                  placeholder="e.g. Blinkit"
                   className={inputCls}
                 />
               </label>
@@ -570,19 +471,17 @@ export function NewProjectForm() {
             </div>
 
             {/* LINK 1: Web Opt-In Link */}
-            <div className="rounded-2xl bg-amber-50/60 border border-amber-200/70 p-4">
+            <div className="rounded-2xl bg-amber-50/70 border border-amber-200/80 p-4">
               <label className="block">
                 <span className="flex items-center gap-2 text-[14px] font-semibold text-amber-950">
-                  1. Web Opt-In Link (Where users join testing){" "}
+                  1. Google Play Web Opt-In Link (Where testers opt in){" "}
                   <span className="text-orange-500">*</span>
                 </span>
                 <span className="mt-1 block text-[12.5px] text-amber-800">
-                  The Google Play link where users click to get access to your product for
-                  testing (e.g.{" "}
-                  <code className="bg-amber-100/70 px-1 py-0.5 rounded text-[11.5px]">
+                  The link from Google Play Console where testers accept your testing invite:
+                  <code className="ml-1 bg-amber-100/90 px-1.5 py-0.5 rounded text-[11.5px] font-mono">
                     https://play.google.com/apps/testing/...
                   </code>
-                  ).
                 </span>
                 <input
                   required
@@ -595,20 +494,18 @@ export function NewProjectForm() {
               </label>
             </div>
 
-            {/* LINK 2: Play Store App Link */}
-            <div className="rounded-2xl bg-sky-50/60 border border-sky-200/70 p-4">
+            {/* LINK 2: Play Store App Download Link */}
+            <div className="rounded-2xl bg-sky-50/70 border border-sky-200/80 p-4">
               <label className="block">
                 <span className="flex items-center gap-2 text-[14px] font-semibold text-sky-950">
-                  2. Play Store Link (Download Link){" "}
+                  2. Google Play Store Download Link{" "}
                   <span className="text-orange-500">*</span>
                 </span>
                 <span className="mt-1 block text-[12.5px] text-sky-800">
-                  Direct Google Play Store link where testers download the app after
-                  opting in (e.g.{" "}
-                  <code className="bg-sky-100/70 px-1 py-0.5 rounded text-[11.5px]">
+                  Direct Google Play Store link where testers download your app:
+                  <code className="ml-1 bg-sky-100/90 px-1.5 py-0.5 rounded text-[11.5px] font-mono">
                     https://play.google.com/store/apps/details?id=...
                   </code>
-                  ).
                 </span>
                 <input
                   required
@@ -631,7 +528,7 @@ export function NewProjectForm() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={2}
-                  placeholder="Any particular features, test accounts, or test instructions..."
+                  placeholder="Any particular features, demo credentials, or testing instructions for users..."
                   className={`${inputCls} resize-none`}
                 />
               </label>
@@ -656,7 +553,7 @@ export function NewProjectForm() {
               type="button"
               disabled={busy || !appName || !webOptInUrl || !playStoreUrl}
               onClick={handleCheckout}
-              className="flex items-center gap-2 rounded-full bg-ink-950 px-9 py-4 text-[15.5px] font-semibold text-white transition-all hover:bg-black hover:scale-[1.02] disabled:opacity-40"
+              className="flex items-center gap-2 rounded-full bg-[#4F46E5] px-9 py-4 text-[15.5px] font-semibold text-white transition-all hover:bg-[#4338CA] hover:scale-[1.02] disabled:opacity-40 shadow-sm"
             >
               {busy ? "Processing Payment…" : `Pay ${formatINR(totalPaise)} with Razorpay`}
             </button>
@@ -664,7 +561,7 @@ export function NewProjectForm() {
         </div>
       )}
 
-      {/* ================= STEP 5: PAYMENT SUCCESS & 5-SECOND REDIRECT ================= */}
+      {/* ================= STEP 4: PAYMENT SUCCESS & REDIRECT ================= */}
       {step === "payment_success" && (
         <div className="rounded-[32px] border border-black/10 bg-white p-10 text-center shadow-xl animate-in zoom-in-95 duration-300">
           <div className="mx-auto grid size-20 place-items-center rounded-full bg-emerald-100 text-emerald-600 mb-6">
@@ -674,11 +571,11 @@ export function NewProjectForm() {
           <h2 className="text-[30px] font-extrabold tracking-tight text-ink-950">
             Payment Completed!
           </h2>
-          <p className="mt-2 text-[16px] text-ink-600">
-            Your Play Store testing project is activated and publishing to testers.
+          <p className="mt-2 text-[16px] text-ink-600 max-w-md mx-auto">
+            Your Play Store testing project is registered and sent to the admin team for review and publishing to testers.
           </p>
 
-          <div className="mt-8 rounded-2xl bg-zinc-50 p-6 border border-black/5">
+          <div className="mt-8 rounded-2xl bg-zinc-50 p-6 border border-black/5 max-w-md mx-auto">
             <p className="text-[14.5px] font-medium text-ink-700">
               Redirecting to your project in{" "}
               <span className="font-bold text-ink-950 text-[20px] mx-1">
@@ -686,10 +583,9 @@ export function NewProjectForm() {
               </span>{" "}
               seconds...
             </p>
-            {/* Animated progress bar */}
             <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-zinc-200">
               <div
-                className="h-full bg-ink-950 transition-all duration-1000 ease-linear"
+                className="h-full bg-[#4F46E5] transition-all duration-1000 ease-linear"
                 style={{ width: `${((5 - countdown) / 5) * 100}%` }}
               />
             </div>
@@ -711,4 +607,4 @@ export function NewProjectForm() {
 }
 
 const inputCls =
-  "w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-[15px] outline-none transition-colors placeholder:text-ink-400 focus:border-ink-950";
+  "w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-[15px] outline-none transition-colors placeholder:text-ink-400 focus:border-[#4F46E5]";

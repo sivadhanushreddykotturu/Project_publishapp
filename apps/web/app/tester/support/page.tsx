@@ -1,5 +1,6 @@
 import { serverApi } from "@/lib/server-api";
-import { SupportCenter, type TicketSummary } from "@/components/dash/SupportCenter";
+import { type TicketSummary } from "@/components/dash/SupportCenter";
+import { TesterSupportView } from "@/components/tester/TesterSupportView";
 
 export const dynamic = "force-dynamic";
 
@@ -11,5 +12,6 @@ export default async function TesterSupportPage() {
   } catch {
     tickets = [];
   }
-  return <SupportCenter tickets={tickets} isAdmin={false} />;
+
+  return <TesterSupportView tickets={tickets} />;
 }

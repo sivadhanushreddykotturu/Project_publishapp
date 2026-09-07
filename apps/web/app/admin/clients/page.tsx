@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Building2 } from "lucide-react";
 import { serverApi } from "@/lib/server-api";
 import { EmptySection } from "@/components/dash/EmptySection";
@@ -61,12 +62,14 @@ export default async function AdminClientsPage() {
           {c.projects.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-2">
               {c.projects.map((p) => (
-                <span
+                <Link
                   key={p._id}
-                  className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-paper px-3 py-1.5 text-[12px] font-medium text-ink-800"
+                  href={`/admin/projects/${p._id}`}
+                  className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-paper px-3.5 py-1.5 text-[12.5px] font-medium text-ink-800 hover:border-black/20 hover:bg-zinc-100 transition-colors"
                 >
-                  {p.appDetails?.appName ?? "—"} <StatusPill status={p.status} />
-                </span>
+                  <span className="font-semibold text-ink-950">{p.appDetails?.appName ?? "Project"}</span>
+                  <StatusPill status={p.status} />
+                </Link>
               ))}
             </div>
           )}

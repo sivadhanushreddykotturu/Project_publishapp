@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { NewProjectForm } from "@/components/client/NewProjectForm";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,9 @@ export default function NewProjectPage() {
         prepare your tester workflow.
       </p>
       <div className="mt-8">
-        <NewProjectForm />
+        <Suspense fallback={<div className="py-12 text-center text-ink-400">Loading form...</div>}>
+          <NewProjectForm />
+        </Suspense>
       </div>
     </div>
   );

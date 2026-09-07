@@ -84,34 +84,19 @@ export function TesterSetup() {
             <Smartphone className="size-6" />
           </span>
           <h2 className="mt-5 text-[24px] font-semibold tracking-tight text-ink-950">
-            First — your devices
+            First — your Android devices
           </h2>
           <p className="mt-2 text-[14.5px] leading-relaxed text-ink-500">
-            Add the Android or iOS devices you&apos;ll test on. This powers
-            fraud checks and matches you to the right projects. You can add or
-            remove devices anytime later.
+            Add the Android device you&apos;ll test on. Only physical Android
+            devices are accepted for Google Play closed testing.
           </p>
 
           <div className="mt-6 space-y-3">
             {devices.map((d, i) => (
               <div key={i} className="flex flex-wrap items-center gap-2.5">
-                <select
-                  value={d.platform}
-                  onChange={(e) =>
-                    setDevices((ds) =>
-                      ds.map((x, j) =>
-                        j === i
-                          ? { ...x, platform: e.target.value as "android" | "ios" }
-                          : x,
-                      ),
-                    )
-                  }
-                  aria-label="Platform"
-                  className="w-[110px] rounded-2xl border border-black/10 bg-white px-3 py-3 text-[14px] outline-none focus:border-ink-950"
-                >
-                  <option value="android">Android</option>
-                  <option value="ios">iOS</option>
-                </select>
+                <span className="rounded-2xl border border-black/10 bg-zinc-100 px-4 py-3 text-[14px] font-semibold text-ink-800">
+                  Android
+                </span>
                 <input
                   value={d.model}
                   onChange={(e) =>
@@ -119,7 +104,7 @@ export function TesterSetup() {
                       ds.map((x, j) => (j === i ? { ...x, model: e.target.value } : x)),
                     )
                   }
-                  placeholder={d.platform === "ios" ? "iPhone 15" : "Pixel 8a"}
+                  placeholder="e.g. Pixel 8a or Galaxy S23"
                   className="min-w-[130px] flex-1 rounded-2xl border border-black/10 px-4 py-3 text-[14px] outline-none placeholder:text-ink-400 focus:border-ink-950"
                 />
                 <input
@@ -131,7 +116,7 @@ export function TesterSetup() {
                       ),
                     )
                   }
-                  placeholder={d.platform === "ios" ? "iOS 18" : "Android 15"}
+                  placeholder="e.g. Android 14"
                   className="w-[120px] rounded-2xl border border-black/10 px-4 py-3 text-[14px] outline-none placeholder:text-ink-400 focus:border-ink-950"
                 />
                 {devices.length > 1 && (

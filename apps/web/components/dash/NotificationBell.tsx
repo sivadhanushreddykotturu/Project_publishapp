@@ -14,7 +14,7 @@ interface InAppNotification {
   createdAt: string;
 }
 
-export function NotificationBell() {
+export function NotificationBell({ variant = "default" }: { variant?: "default" | "purple" }) {
   const { getToken } = useAuth();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<InAppNotification[]>([]);
@@ -68,9 +68,13 @@ export function NotificationBell() {
           setOpen((o) => !o);
           if (!open) void load();
         }}
-        className="relative grid size-10 place-items-center rounded-full border border-black/5 bg-white text-ink-800 transition-colors hover:border-black/15"
+        className={`relative grid size-10 place-items-center rounded-full transition-all ${
+          variant === "purple"
+            ? "bg-[#4F46E5] text-white shadow-sm hover:bg-[#4338CA]"
+            : "border border-black/5 bg-white text-ink-800 hover:border-black/15"
+        }`}
       >
-        <Bell className="size-[18px]" strokeWidth={1.8} />
+        <Bell className="size-[18px]" strokeWidth={2} />
         {unread > 0 && (
           <span className="absolute -right-0.5 -top-0.5 grid min-size-5 place-items-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white">
             {unread > 9 ? "9+" : unread}
