@@ -1,0 +1,9 @@
+{
+  "name": "@launchops/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "npm run build -w @defineux/api",
+    "start": "npm run start -w @defineux/api"
+  }
+}
