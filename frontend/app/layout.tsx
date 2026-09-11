@@ -3,8 +3,13 @@ import type { ReactNode } from "react";
 import "../src/index.css";
 
 export const metadata: Metadata = {
-  title: "LaunchOps - Mobile App Crowd-Testing Platform",
+  title: "UXOS - Mobile App Crowd-Testing Platform",
   description: "Get real user feedback, track device compatibility, log detailed bug diagnostics, and release your Android apps with confidence.",
+  icons: {
+    icon: "/launchops-logo.png",
+    shortcut: "/launchops-logo.png",
+    apple: "/launchops-logo.png",
+  },
 };
 
 export default function RootLayout({

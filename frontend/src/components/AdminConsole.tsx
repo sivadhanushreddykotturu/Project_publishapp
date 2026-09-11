@@ -192,7 +192,7 @@ export default function AdminConsole({
             <h1 className={`text-xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
               Good morning, Admin! 👋
             </h1>
-            <p className="text-[10px] text-slate-500 mt-0.5">Here's what's happening on LaunchOps today.</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Here's what's happening on UXOS today.</p>
           </div>
 
           <div className="flex items-center gap-4">

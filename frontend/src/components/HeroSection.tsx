@@ -10,7 +10,7 @@ const heroImageSrc = (typeof heroImage === 'object' && heroImage && 'src' in her
 interface HeroSectionProps {
   onStartTesting: () => void;
   onWatchVideo: () => void;
-  onTabChange: (tab: string) => void;
+  onTabChange?: (tab: string, subtab?: string) => void;
   isDarkMode: boolean;
 }
 
@@ -126,27 +126,39 @@ export default function HeroSection({ onStartTesting, onWatchVideo, onTabChange,
             </p>
 
             {/* Calls to Action */}
-            <div className="flex flex-wrap items-center gap-6 mb-12">
+            <div className="flex flex-wrap items-center gap-4 mb-12">
               <button 
-                onClick={onStartTesting}
-                className="bg-indigo-600 hover:bg-indigo-500 px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-lg shadow-indigo-600/20 transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer text-white border-0 text-sm md:text-base animate-glow-pulse"
+                onClick={() => onTabChange ? onTabChange('client', 'new-app') : onStartTesting()}
+                className="bg-[#4F37FE] hover:bg-[#432ee0] px-7 py-4 rounded-xl font-bold flex items-center gap-2.5 shadow-lg shadow-indigo-600/25 transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer text-white border-0 text-sm md:text-base animate-glow-pulse"
                 id="hero-primary-cta"
               >
-                Start Your First Test 
+                <span>Client App Setup (14 Testers)</span>
                 <ArrowRight className="w-5 h-5" />
               </button>
 
               <button 
+                onClick={() => onTabChange ? onTabChange('tester') : onStartTesting()}
+                className={`px-6 py-4 rounded-xl font-bold flex items-center gap-2 border transition-all duration-200 cursor-pointer text-sm md:text-base ${
+                  isDarkMode 
+                    ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white' 
+                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 shadow-xs'
+                }`}
+                id="hero-tester-cta"
+              >
+                <span>Tester Portal</span>
+              </button>
+
+              <button 
                 onClick={onWatchVideo}
-                className="flex items-center gap-3 group cursor-pointer text-left bg-transparent border-0 outline-none"
+                className="flex items-center gap-3 group cursor-pointer text-left bg-transparent border-0 outline-none ml-1"
                 id="hero-secondary-cta"
               >
-                <div className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all duration-300 group-hover:border-indigo-400 group-hover:scale-110 ${
+                <div className={`w-11 h-11 rounded-full border flex items-center justify-center transition-all duration-300 group-hover:border-indigo-400 group-hover:scale-110 ${
                   isDarkMode 
                     ? 'border-white/10 bg-white/5 group-hover:bg-white/10' 
                     : 'border-slate-200 bg-slate-50 group-hover:bg-slate-100'
                 }`}>
-                  <Play className={`w-5 h-5 transition-colors ${
+                  <Play className={`w-4 h-4 transition-colors ${
                     isDarkMode 
                       ? 'text-slate-300 fill-slate-300 group-hover:text-indigo-400 group-hover:fill-indigo-400' 
                       : 'text-slate-700 fill-slate-700 group-hover:text-indigo-600 group-hover:fill-indigo-600'
@@ -155,7 +167,7 @@ export default function HeroSection({ onStartTesting, onWatchVideo, onTabChange,
                 <span className={`font-bold text-xs tracking-widest uppercase transition-colors ${
                   isDarkMode ? 'text-slate-400 group-hover:text-white' : 'text-slate-600 group-hover:text-indigo-600'
                 }`}>
-                  Watch how it works
+                  Watch video
                 </span>
               </button>
             </div>
@@ -260,7 +272,7 @@ export default function HeroSection({ onStartTesting, onWatchVideo, onTabChange,
             {/* Visual Phone Model Overlay */}
             <div className="relative z-20 w-full max-w-[580px] drop-shadow-[0_20px_50px_rgba(99,102,241,0.08)] hover:scale-[1.01] transition-transform duration-500">
               <img
-                alt="LaunchOps Interactive Android Performance Dashboard Graphic"
+                alt="UXOS Interactive Android Performance Dashboard Graphic"
                 className="w-full h-auto rounded-2xl"
                 style={{
                   WebkitMaskImage: 'radial-gradient(ellipse, rgba(0,0,0,1) 75%, rgba(0,0,0,0) 100%)',

@@ -7,9 +7,11 @@ import {
 } from 'lucide-react';
 import { Tester, TestApp, TesterAssignment, BugReport, Transaction, WithdrawalRequest } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
+import TesterExperienceManager from './tester/TesterExperienceManager';
 
 interface TesterDashboardProps {
   isDarkMode: boolean;
+  onToggleDarkMode?: () => void;
   activeTester: Tester;
   projects: TestApp[];
   assignments: TesterAssignment[];
@@ -33,6 +35,7 @@ interface TesterDashboardProps {
 
 export default function TesterDashboard({
   isDarkMode,
+  onToggleDarkMode,
   activeTester,
   projects,
   assignments,
@@ -52,6 +55,13 @@ export default function TesterDashboard({
   initialTab,
   onTabChange
 }: TesterDashboardProps) {
+  return (
+    <TesterExperienceManager
+      isDarkMode={isDarkMode}
+      onToggleDarkMode={onToggleDarkMode || (() => {})}
+      onLogout={onLogout}
+    />
+  );
   // Tabs: 'dashboard' (Active), 'explore' (Projects), 'wallet', 'bugs' (Support/Bugs), 'profile'
   const [activeTab, setActiveTab] = useState<'dashboard' | 'explore' | 'wallet' | 'bugs' | 'profile'>(() => {
     if (initialTab && ['dashboard', 'explore', 'wallet', 'bugs', 'profile'].includes(initialTab)) {

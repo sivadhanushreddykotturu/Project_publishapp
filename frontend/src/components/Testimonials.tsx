@@ -5,7 +5,7 @@ import { Star, ChevronLeft, ChevronRight } from 'lucide-react';
 const testimonials = [
   {
     id: 1,
-    quote: "LaunchOps helped us find critical issues we missed internally. Our crash rate dropped by 42% after launch.",
+    quote: "UXOS helped us find critical issues we missed internally. Our crash rate dropped by 42% after launch.",
     author: "Rohit Sharma",
     role: "CTO, FitTrack",
     avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&fit=crop&q=80"
@@ -75,7 +75,7 @@ export default function Testimonials({ isDarkMode = false }: TestimonialsProps) 
           <h2 className={`text-3xl md:text-4xl font-black tracking-tight ${
             isDarkMode ? 'text-white' : 'text-slate-900'
           }`}>
-            Trust LaunchOps to ship perfection
+            Trust UXOS to ship perfection
           </h2>
         </div>
 

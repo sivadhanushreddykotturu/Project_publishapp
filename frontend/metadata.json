@@ -1,5 +1,5 @@
 {
-  "name": "LaunchOps",
+  "name": "UXOS",
   "description": "Verified Android testing platform with real testers and real devices.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
