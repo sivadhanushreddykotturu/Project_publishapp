@@ -75,7 +75,7 @@ export default function AuthScreen({ isDarkMode, onLoginSuccess, onBackToHome }:
             <span className="font-extrabold italic text-lg">LT</span>
           </div>
           <h2 className={`text-3xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-950'}`}>
-            {isSignUp ? 'Create your account' : 'Sign in to LaunchOps'}
+            {isSignUp ? 'Create your account' : 'Sign in to UXOS'}
           </h2>
           <p className={`mt-2 text-sm font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
             {isSignUp ? 'Start earning as an Android Tester today' : 'Access your dashboard & pending tasks'}
@@ -101,11 +101,11 @@ export default function AuthScreen({ isDarkMode, onLoginSuccess, onBackToHome }:
                   type="button"
                   onClick={() => {
                     setRole(r);
-                    if (r === 'client' || r === 'admin') setIsSignUp(false); // Force login for client/admin
+                    if (r === 'admin') setIsSignUp(false);
                   }}
                   className={`py-1.5 text-center text-[10px] font-extrabold uppercase rounded-lg cursor-pointer transition-all ${
                     role === r
-                      ? 'bg-[#4F46E5] text-white shadow-sm'
+                      ? 'bg-[#4F37FE] text-white shadow-sm'
                       : isDarkMode ? 'text-slate-400 hover:text-white hover:bg-white/5' : 'text-slate-600 hover:text-slate-950 hover:bg-black/5'
                   }`}
                 >
@@ -118,21 +118,21 @@ export default function AuthScreen({ isDarkMode, onLoginSuccess, onBackToHome }:
             </p>
           </div>
 
-          {/* Toggle Sign Up / Login (only if Tester) */}
-          {role === 'tester' && (
+          {/* Toggle Sign Up / Login (for Tester and Client) */}
+          {(role === 'tester' || role === 'client') && (
             <div className="flex justify-center mb-6">
               <div className={`inline-flex p-1 rounded-xl border ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-slate-100 border-slate-200'}`}>
                 <button
                   type="button"
                   onClick={() => setIsSignUp(false)}
-                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${!isSignUp ? (isDarkMode ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 shadow-sm') : 'text-slate-500'}`}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${!isSignUp ? (isDarkMode ? 'bg-[#4F37FE] text-white' : 'bg-white text-[#4F37FE] shadow-sm') : 'text-slate-500'}`}
                 >
                   Sign In
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsSignUp(true)}
-                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${isSignUp ? (isDarkMode ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 shadow-sm') : 'text-slate-500'}`}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${isSignUp ? (isDarkMode ? 'bg-[#4F37FE] text-white' : 'bg-white text-[#4F37FE] shadow-sm') : 'text-slate-500'}`}
                 >
                   Register
                 </button>

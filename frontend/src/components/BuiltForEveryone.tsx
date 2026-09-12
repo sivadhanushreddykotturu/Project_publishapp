@@ -49,7 +49,7 @@ export default function BuiltForEveryone({ isDarkMode = false }: BuiltForEveryon
           <p className={`text-sm md:text-base leading-relaxed max-w-2xl mx-auto font-medium ${
             isDarkMode ? 'text-slate-400' : 'text-slate-500'
           }`}>
-            Whether you own an app or love testing new ones, LaunchOps <br className="hidden md:inline" />
+            Whether you own an app or love testing new ones, UXOS <br className="hidden md:inline" />
             gives you the tools, people, and platform to succeed.
           </p>
         </div>

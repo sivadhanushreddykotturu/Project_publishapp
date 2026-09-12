@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { TestApp, BugReport } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
+import ClientOnboardingWizard from './client-flow/ClientOnboardingWizard';
 
 interface ClientDashboardProps {
   isDarkMode: boolean;
@@ -135,6 +136,24 @@ export default function ClientDashboard({
     setNewProjectSuccess(true);
   };
 
+  const handleWizardFinish = (campaignData: any) => {
+    onCreateProject({
+      name: campaignData.appDetails?.appName || 'UXOS',
+      version: 'v1.0.0',
+      category: 'Productivity',
+      devices: ['Google Pixel 8 Pro', 'Samsung Galaxy S24 Ultra'],
+      packageTier: 'testers_only',
+      testersRequired: parseInt(campaignData.tier?.testers) || 14,
+      launchDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      projectName: `${campaignData.appDetails?.appName || 'UXOS'} Testing Track`,
+      apkUrl: campaignData.appDetails?.appLink || 'https://play.google.com/store/apps',
+      optInUrl: campaignData.appDetails?.webLink || 'https://play.google.com/apps/testing',
+      releaseNotes: '14-day Play Store closed testing campaign initiated.',
+      instructions: 'Please follow Google Play closed testing steps and check in daily.'
+    });
+    setActiveTab('apps');
+  };
+
   const handleVerificationSubmit = (e: React.FormEvent, projectId: string) => {
     e.preventDefault();
     setVerificationError('');
@@ -174,14 +193,18 @@ export default function ClientDashboard({
       }`}>
         <div className="space-y-8">
           {/* Logo */}
-          <div className="flex items-center gap-2 px-2">
-            <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center transform rotate-12 shadow-md shadow-indigo-600/30">
+          <button 
+            onClick={onLogout}
+            className="flex items-center gap-2 px-2 border-0 bg-transparent cursor-pointer group text-left"
+            title="Return to UXOS Home"
+          >
+            <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center transform rotate-12 group-hover:rotate-0 transition-transform shadow-md shadow-indigo-600/30">
               <span className="text-white font-extrabold italic text-sm">LO</span>
             </div>
-            <span className="font-black tracking-wider text-lg uppercase font-display">
+            <span className="font-black tracking-wider text-lg uppercase font-display group-hover:text-indigo-600 transition-colors">
               Launch<span className="text-indigo-600">Ops</span>
             </span>
-          </div>
+          </button>
 
           {/* Navigation Links */}
           <nav className="space-y-1.5">
@@ -253,14 +276,7 @@ export default function ClientDashboard({
             <p className="text-[10px] text-slate-500 mt-0.5">Manage closed testing releases, verify apps, and audit reports.</p>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className={`flex items-center gap-2 px-3 py-1.5 border rounded-xl text-xs font-bold ${
-              isDarkMode ? 'bg-zinc-900/60 border-zinc-800 text-slate-300' : 'bg-slate-550 border-slate-200 text-slate-700'
-            }`}>
-              <Calendar className="w-4 h-4 text-indigo-500" />
-              <span>Developer Panel</span>
-            </div>
-
+          <div className="flex items-center gap-3">
             <button 
               onClick={() => handleTabSelect('new-app')}
               className="px-4 py-2 text-white text-xs font-black rounded-xl border-0 cursor-pointer shadow-md"
@@ -418,12 +434,62 @@ export default function ClientDashboard({
                           <div className={`p-4 border rounded-2xl space-y-3 ${
                             isDarkMode ? 'bg-black/30 border-white/5' : 'bg-slate-50 border-slate-200'
                           }`}>
-                            <div className="text-xs font-semibold text-slate-500">
-                              <p className="text-green-500 font-extrabold flex items-center gap-1.5 mb-2">
-                                <CheckCircle className="w-4 h-4" /> Opportunity published
-                              </p>
-                              <p className="text-[11px] leading-relaxed">Eligible active testers have been notified. Enrollment accepts 14 testers and up to 3 waitlisted testers.</p>
-                            </div>
+                            {selectedProject.verificationStatus === 'none' && (
+                              <div className="text-xs font-semibold text-slate-500">
+                                <p className="text-amber-500 font-extrabold flex items-center gap-1.5 mb-2">
+                                  <AlertCircle className="w-4 h-4" /> Vetting Required
+                                </p>
+                                <p className="text-[11px] leading-relaxed mb-3">Upload verification console screenshot proof to activate whitelists.</p>
+                                <form onSubmit={(e) => handleVerificationSubmit(e, selectedProject.id)} className="space-y-3">
+                                  <input
+                                    type="text"
+                                    required
+                                    placeholder="Enter proof screenshot link (e.g. imgur.com/ref)"
+                                    value={consoleProofUrl}
+                                    onChange={(e) => setConsoleProofUrl(e.target.value)}
+                                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                                      isDarkMode 
+                                        ? `${verificationError ? 'border-red-500 bg-red-500/5' : 'bg-[#09090B] border-zinc-800'} text-white` 
+                                        : `${verificationError ? 'border-red-500 bg-red-500/5' : 'bg-white border-slate-200'} text-slate-800`
+                                    }`}
+                                  />
+                                  {verificationError && <p className="text-[10px] font-bold text-red-500">{verificationError}</p>}
+                                  <button 
+                                    type="submit" 
+                                    className="px-4 py-2 text-white text-xs font-black rounded-xl border-0 cursor-pointer"
+                                    style={{ backgroundColor: '#4F46E5' }}
+                                  >
+                                    Submit Screenshot Proof
+                                  </button>
+                                </form>
+                              </div>
+                            )}
+
+                            {selectedProject.verificationStatus === 'pending' && (
+                              <div className="text-xs font-semibold text-slate-500">
+                                <p className="text-amber-500 font-extrabold flex items-center gap-1.5 mb-2">
+                                  <Clock className="w-4 h-4" /> Awaiting Vetting
+                                </p>
+                                <p className="text-[11px] leading-relaxed">Admin is currently validating your screenshot proof.whitelisting begins immediately upon validation.</p>
+                              </div>
+                            )}
+
+                            {selectedProject.verificationStatus === 'approved' && (
+                              <div className="text-xs font-semibold text-slate-500 space-y-2">
+                                <p className="text-green-500 font-extrabold flex items-center gap-1.5">
+                                  <CheckCircle className="w-4 h-4" /> Verified Dashboard
+                                </p>
+                                <p className="text-[11px]">Play Store closed testing sync whitelisting link is active.</p>
+                                <a 
+                                  href={selectedProject.optInUrl || 'https://play.google.com/apps/testing/com.launchops.app'} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="inline-flex items-center gap-1 text-indigo-500 hover:underline"
+                                >
+                                  Join Play Store Track <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -468,223 +534,14 @@ export default function ClientDashboard({
             </div>
           )}
 
-          {/* TAB 2: REQUEST NEW APP FORM */}
+          {/* TAB 2: REQUEST NEW APP ONBOARDING WIZARD */}
           {activeTab === 'new-app' && (
-            <div className="max-w-2xl mx-auto">
-              <div className={`border rounded-3xl p-8 relative overflow-hidden ${
-                isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200 shadow-sm'
-              }`}>
-                {/* Accent Header line */}
-                <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: '#4F46E5' }} />
-
-                <h3 className={`text-xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Request New App</h3>
-                <p className="text-[11px] text-slate-500 mb-6">Submit your app details below. Our admin team will review and set up your testing project.</p>
-                
-                {newProjectSuccess && (
-                  <div className="mb-6 p-4 border border-green-500/20 bg-green-500/5 rounded-2xl flex items-center gap-3 text-xs text-green-550 font-bold">
-                    <CheckCircle className="w-5 h-5" /> Your app request has been sent to the admin for review.
-                  </div>
-                )}
-
-                <form onSubmit={handleCreateProjectSubmit} className="space-y-6">
-                  {/* Project & App Name Fields */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                      <label className="text-[10px] font-black uppercase text-slate-500 block mb-2 font-mono">Project Name</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. FitTrack Q2 Test Track"
-                        value={projectName}
-                        onChange={(e) => setProjectName(e.target.value)}
-                        className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500 ${
-                          isDarkMode 
-                            ? `${formErrors.projectName ? 'border-red-500 bg-red-500/5' : 'bg-[#09090B] border-zinc-800'} text-white` 
-                            : `${formErrors.projectName ? 'border-red-500 bg-red-500/5' : 'bg-white border-slate-200'} text-slate-800`
-                        }`}
-                      />
-                      {formErrors.projectName && <p className="text-[10px] font-bold text-red-500 mt-1.5">{formErrors.projectName}</p>}
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-black uppercase text-slate-500 block mb-2 font-mono">App Display Name</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. FitTrack Pro"
-                        value={appName}
-                        onChange={(e) => setAppName(e.target.value)}
-                        className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500 ${
-                          isDarkMode 
-                            ? `${formErrors.appName ? 'border-red-500 bg-red-500/5' : 'bg-[#09090B] border-zinc-800'} text-white` 
-                            : `${formErrors.appName ? 'border-red-500 bg-red-500/5' : 'bg-white border-slate-200'} text-slate-800`
-                        }`}
-                      />
-                      {formErrors.appName && <p className="text-[10px] font-bold text-red-500 mt-1.5">{formErrors.appName}</p>}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-black uppercase text-slate-500 block mb-2 font-mono">Required Device Models (Optional)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Google Pixel 8 Pro, Samsung Galaxy S24"
-                      value={devices.join(', ')}
-                      onChange={(e) => setDevices(e.target.value.split(',').map((device) => device.trim()).filter(Boolean))}
-                      className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500 ${
-                        isDarkMode ? 'bg-[#09090B] border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-800'
-                      }`}
-                    />
-                    <p className="text-[10px] text-slate-500 mt-1.5">Leave blank to notify all active testers. Device names must match a tester's registered device.</p>
-                  </div>
-
-                  {/* Package Name & APK Link Fields */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                      <label className="text-[10px] font-black uppercase text-slate-500 block mb-2 font-mono">Play Store Package ID</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. com.company.app"
-                        value={packageName}
-                        onChange={(e) => setPackageName(e.target.value)}
-                        className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500 ${
-                          isDarkMode 
-                            ? `${formErrors.packageName ? 'border-red-500 bg-red-500/5' : 'bg-[#09090B] border-zinc-800'} text-white` 
-                            : `${formErrors.packageName ? 'border-red-500 bg-red-500/5' : 'bg-white border-slate-200'} text-slate-800`
-                        }`}
-                      />
-                      {formErrors.packageName && <p className="text-[10px] font-bold text-red-500 mt-1.5">{formErrors.packageName}</p>}
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-black uppercase text-slate-500 block mb-2 font-mono">Upload APK/AAB or Testing Link</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. https://drive.google.com/apk or play store link"
-                        value={apkUrl}
-                        onChange={(e) => setApkUrl(e.target.value)}
-                        className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500 ${
-                          isDarkMode ? 'bg-[#09090B] border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-800'
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                      <label className="text-[10px] font-black uppercase text-slate-500 block mb-2 font-mono">Version Tag</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. v1.0.0"
-                        value={version}
-                        onChange={(e) => setVersion(e.target.value)}
-                        className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500 ${
-                          isDarkMode ? 'bg-[#09090B] border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-800'
-                        }`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-black uppercase text-slate-500 block mb-2 font-mono">Category</label>
-                      <select
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                        className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500 ${
-                          isDarkMode ? 'bg-[#09090B] border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-800'
-                        }`}
-                      >
-                        <option>Productivity</option>
-                        <option>Finance</option>
-                        <option>Health & Fitness</option>
-                        <option>Social</option>
-                        <option>Games</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Release Notes & Demo Credentials */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                      <label className="text-[10px] font-black uppercase text-slate-500 block mb-2 font-mono">Release Notes</label>
-                      <textarea
-                        rows={2}
-                        placeholder="What should testers focus on in this build?"
-                        value={releaseNotes}
-                        onChange={(e) => setReleaseNotes(e.target.value)}
-                        className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500 ${
-                          isDarkMode ? 'bg-[#09090B] border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-800'
-                        }`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-black uppercase text-slate-500 block mb-2 font-mono">Test Credentials / Demo Account</label>
-                      <textarea
-                        rows={2}
-                        placeholder="Login: testuser@company.com / Pass: 12345"
-                        value={demoCredentials}
-                        onChange={(e) => setDemoCredentials(e.target.value)}
-                        className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500 ${
-                          isDarkMode ? 'bg-[#09090B] border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-800'
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Testing Instructions Path */}
-                  <div>
-                    <label className="text-[10px] font-black uppercase text-slate-500 block mb-2 font-mono">Testing Instructions / Task Flow Path</label>
-                    <textarea
-                      rows={3}
-                      placeholder="Detail step-by-step instructions for whitelisted testers to follow..."
-                      value={instructions}
-                      onChange={(e) => setInstructions(e.target.value)}
-                      className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500 ${
-                        isDarkMode ? 'bg-[#09090B] border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-800'
-                      }`}
-                    />
-                  </div>
-
-                  {/* Plan Cards Selection */}
-                  <div>
-                    <label className="text-[10px] font-black uppercase text-slate-500 block mb-3 font-mono">Select Testing Package Tier</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      {[
-                        { id: 'testers_only', title: 'Testers Only', desc: '14 whitelisted users slot allotment.', price: '₹4,999' },
-                        { id: 'managed_testing', title: 'Managed Track', desc: '14 whitelists + weekly telemetry.', price: '₹12,499' },
-                        { id: 'launch_ready', title: 'Launch Ready', desc: '14 whitelists + continuous logs.', price: '₹24,999' }
-                      ].map((tier) => {
-                        const isChosen = packageTier === tier.id;
-                        return (
-                          <button
-                            key={tier.id}
-                            type="button"
-                            onClick={() => {
-                              setPackageTier(tier.id as any);
-                              setTestersRequired(14);
-                            }}
-                            className={`p-5 border rounded-2xl text-left transition-all duration-300 cursor-pointer ${
-                              isChosen 
-                                ? (isDarkMode ? 'bg-indigo-600/10 border-indigo-500/50' : 'bg-indigo-50/50 border-indigo-650 shadow-md')
-                                : (isDarkMode ? 'bg-black/30 border-white/5 hover:border-zinc-800' : 'bg-white border-slate-200 hover:border-slate-350')
-                            }`}
-                          >
-                            <span className={`block font-black text-xs ${isChosen ? 'text-indigo-500' : (isDarkMode ? 'text-white' : 'text-slate-800')}`}>{tier.title}</span>
-                            <span className="text-[9px] text-slate-500 block mt-1.5 leading-relaxed">{tier.desc}</span>
-                            <span className="block font-mono text-xs font-black text-indigo-500 mt-3">{tier.price}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-3 text-white text-xs font-black rounded-xl border-0 cursor-pointer shadow-md hover:opacity-90 transition-all"
-                    style={{ backgroundColor: '#4F46E5' }}
-                  >
-                    Publish Testing Request
-                  </button>
-                </form>
-              </div>
+            <div className="w-full -mt-6">
+              <ClientOnboardingWizard
+                isDarkMode={isDarkMode}
+                onFinish={handleWizardFinish}
+                onCancel={() => setActiveTab('apps')}
+              />
             </div>
           )}
 

@@ -3,10 +3,11 @@ import { ArrowRight, Phone } from 'lucide-react';
 
 interface CallToActionProps {
   onStartTesting: () => void;
+  onTalkToSales?: () => void;
   isDarkMode?: boolean;
 }
 
-export default function CallToAction({ onStartTesting, isDarkMode = false }: CallToActionProps) {
+export default function CallToAction({ onStartTesting, onTalkToSales, isDarkMode = false }: CallToActionProps) {
   return (
     <section className={`py-24 relative overflow-hidden transition-colors duration-500 ${
       isDarkMode ? 'bg-[#050505]' : 'bg-slate-50'
@@ -44,7 +45,7 @@ export default function CallToAction({ onStartTesting, isDarkMode = false }: Cal
             <p className={`text-sm md:text-base leading-relaxed mb-8 font-medium ${
               isDarkMode ? 'text-slate-400' : 'text-slate-500'
             }`}>
-              Monitor your project progress in real-time, track bug reports, and coordinate with our admin team to publish your app. LaunchOps handles the QA — you focus on building.
+              Monitor your project progress in real-time, track bug reports, and coordinate with our admin team to publish your app. UXOS handles the QA — you focus on building.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
@@ -52,10 +53,10 @@ export default function CallToAction({ onStartTesting, isDarkMode = false }: Cal
                 onClick={onStartTesting}
                 className="w-full sm:w-auto px-8 py-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-bold text-sm tracking-wide text-white transition-all shadow-md shadow-indigo-600/10 hover:scale-[1.02] flex items-center justify-center gap-2 cursor-pointer border-0 animate-glow-pulse"
               >
-                Start Testing Now <ArrowRight className="w-4 h-4" />
+                Start Closed Testing <ArrowRight className="w-4 h-4" />
               </button>
               <button 
-                onClick={onStartTesting}
+                onClick={onTalkToSales || onStartTesting}
                 className={`w-full sm:w-auto px-8 py-4 rounded-xl border font-bold text-sm transition-all text-center flex items-center justify-center gap-2 cursor-pointer shadow-xs ${
                   isDarkMode 
                     ? 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-200' 

@@ -1,4 +1,4 @@
-# LaunchOps — Backend Handoff & API Specification Document
+# UXOS - Backend Architecture & Production Handoff Specification Document
 
 > **Target Audience**: Backend Developers / API Engineers  
 > **Frontend Stack**: Next.js 15, React 19, TypeScript, TailwindCSS  

@@ -17,6 +17,7 @@ import CallToAction from './components/CallToAction';
 import Footer from './components/Footer';
 import AuthScreen from './components/AuthScreen';
 import ClientDashboard from './components/ClientDashboard';
+import ClientFlowManager from './components/client-flow/ClientFlowManager';
 import AdminConsole from './components/AdminConsole';
 
 import { MapPin, Users, Heart, ShieldCheck, Sparkles, Star } from 'lucide-react';
@@ -86,25 +87,48 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
       const parts = window.location.pathname.split('/').filter(Boolean);
       if (parts.length > 0) {
         const mainTab = parts[0];
-        if (['home', 'auth', 'tester', 'client', 'admin', 'solutions', 'resources', 'pricing', 'company'].includes(mainTab)) {
+        if (mainTab === 'wizard') {
+          setCurrentTab('client');
+          setInitialSubTab('new-app');
+        } else if (mainTab === 'client') {
+          setCurrentTab('client');
+          if (parts[1] === 'wizard' || parts[1] === 'new-app') {
+            setInitialSubTab('new-app');
+          } else if (parts[1]) {
+            setInitialSubTab(parts[1]);
+          }
+        } else if (['home', 'auth', 'tester', 'client', 'admin', 'solutions', 'resources', 'pricing', 'company'].includes(mainTab)) {
           setCurrentTab(mainTab);
           if (parts[1]) {
             setInitialSubTab(parts[1]);
           }
         }
       } else {
-        const saved = localStorage.getItem('launchops_current_tab');
-        if (saved) {
-          setCurrentTab(saved);
-        }
+        // Root path "/" ALWAYS defaults to home marketing page — never force redirect to tester dashboard
+        setCurrentTab('home');
+        setInitialSubTab('');
+        localStorage.removeItem('launchops_current_tab');
       }
 
       const handlePopState = () => {
         const subparts = window.location.pathname.split('/').filter(Boolean);
         const p = subparts[0] || 'home';
-        setCurrentTab(p);
-        if (subparts[1]) {
-          setInitialSubTab(subparts[1]);
+        if (p === 'wizard') {
+          setCurrentTab('client');
+          setInitialSubTab('new-app');
+        } else if (p === 'client' && (subparts[1] === 'wizard' || subparts[1] === 'new-app')) {
+          setCurrentTab('client');
+          setInitialSubTab('new-app');
+        } else if (['home', 'auth', 'tester', 'client', 'admin', 'solutions', 'resources', 'pricing', 'company'].includes(p)) {
+          setCurrentTab(p);
+          if (subparts[1]) {
+            setInitialSubTab(subparts[1]);
+          } else {
+            setInitialSubTab('');
+          }
+        } else {
+          setCurrentTab('home');
+          setInitialSubTab('');
         }
       };
       window.addEventListener('popstate', handlePopState);
@@ -114,11 +138,9 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
 
   const handleSetTab = (tab: string, subtab?: string) => {
     setCurrentTab(tab);
-    if (subtab) {
-      setInitialSubTab(subtab);
-    }
+    setInitialSubTab(subtab || '');
     if (typeof window !== 'undefined') {
-      if (tab === 'home' || tab === 'solutions' || tab === 'pricing' || tab === 'resources') {
+      if (tab === 'home' || tab === 'solutions' || tab === 'pricing' || tab === 'resources' || tab === 'company') {
         localStorage.removeItem('launchops_current_tab');
       } else {
         localStorage.setItem('launchops_current_tab', tab);
@@ -784,7 +806,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
         <Navbar 
           currentTab={currentTab} 
           onTabChange={handleSetTab} 
-          onStartTesting={() => handleSetTab('auth')} 
+          onStartTesting={() => handleSetTab('client', 'new-app')} 
           isDarkMode={isDarkMode}
           onToggleDarkMode={toggleDarkMode}
         />
@@ -807,7 +829,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             >
               <HeroSection 
-                onStartTesting={() => handleSetTab('auth')} 
+                onStartTesting={() => handleSetTab('client', 'new-app')} 
                 onWatchVideo={() => setIsWatchWorksOpen(true)} 
                 onTabChange={handleSetTab}
                 isDarkMode={isDarkMode}
@@ -816,7 +838,11 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
               <HowItWorks isDarkMode={isDarkMode} />
               <BuiltForEveryone isDarkMode={isDarkMode} />
               <Testimonials isDarkMode={isDarkMode} />
-              <CallToAction onStartTesting={() => handleSetTab('auth')} isDarkMode={isDarkMode} />
+              <CallToAction 
+                onStartTesting={() => handleSetTab('client', 'new-app')} 
+                onTalkToSales={() => handleSetTab('pricing')}
+                isDarkMode={isDarkMode} 
+              />
             </motion.div>
           )}
 
@@ -834,8 +860,19 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                   if (role === 'admin') {
                     handleSetTab('admin');
                   } else if (role === 'client') {
-                    handleSetTab('client');
+                    const hasPublished = typeof window !== 'undefined' && localStorage.getItem('launchops_client_has_published') === 'true';
+                    if (hasPublished) {
+                      handleSetTab('client', 'dashboard');
+                    } else {
+                      handleSetTab('client', 'wizard');
+                    }
                   } else {
+                    const existingTester = MOCK_TESTERS.find(t => t.name.toLowerCase() === name.toLowerCase());
+                    if (existingTester) {
+                      setActiveTester(existingTester);
+                    } else {
+                      setActiveTester(MOCK_TESTERS[0]); 
+                    }
                     handleSetTab('tester');
                   }
                 },
@@ -856,6 +893,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 <DashboardLoadingScreen isDarkMode={isDarkMode} />
               ) : <TesterDashboard
                 isDarkMode={isDarkMode}
+                onToggleDarkMode={toggleDarkMode}
                 activeTester={activeTester}
                 projects={apps}
                 assignments={assignments}
@@ -886,19 +924,11 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             >
-              {dashboardLoading ? (
-                <DashboardLoadingScreen isDarkMode={isDarkMode} />
-              ) : <ClientDashboard
+              <ClientFlowManager
                 isDarkMode={isDarkMode}
-                projects={apps}
-                bugs={bugs}
-                onCreateProject={apiCreateProject}
-                onSubmitVerification={apiSubmitVerification}
-                onPayInvoice={apiPayInvoice}
-                onLogout={() => { void handleLogout(); }}
-                initialTab={initialSubTab}
-                onTabChange={(tab) => handleSetTab('client', tab)}
-              />}
+                onBackToHome={() => handleSetTab('home')}
+                initialView={initialSubTab === 'dashboard' ? 'dashboard' : initialSubTab === 'wizard' ? 'wizard' : undefined}
+              />
             </motion.div>
           )}
 
@@ -1012,7 +1042,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                   <p className={`text-sm leading-relaxed mb-6 font-medium ${
                     isDarkMode ? 'text-slate-400' : 'text-slate-500'
                   }`}>
-                    In an era dominated by simulated emulators and AI-generated logs, LaunchOps remains fiercely committed to human authenticity. We believe that critical connection anomalies, BLE packet losses, tactile layout errors, and battery drain anomalies can only be authentically audited on real physical hardware.
+                    In an era dominated by simulated emulators and AI-generated logs, UXOS remains fiercely committed to human authenticity. We believe that critical connection anomalies, BLE packet losses, tactile layout errors, and battery drain anomalies can only be authentically audited on real physical hardware.
                   </p>
                   <div className={`space-y-3 text-sm font-semibold ${
                     isDarkMode ? 'text-slate-300' : 'text-slate-600'
