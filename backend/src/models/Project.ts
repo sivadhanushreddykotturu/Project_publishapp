@@ -16,6 +16,8 @@ import {
   PlayIntegrationMode,
   CLIENT_VERIFICATION_STATUSES,
   ClientVerificationStatus,
+  SERVICE_TYPES,
+  ServiceType,
 } from "./enums";
 
 export interface IClientVerification {
@@ -79,6 +81,8 @@ export interface IProject extends Document {
     playStoreUrl?: string;
   };
   projectType: ProjectType;
+  serviceType: ServiceType;
+  serviceOption: string;
   requiredTesters: number;
   activeTesterCount: number;
   waitlistCount: number;
@@ -89,6 +93,7 @@ export interface IProject extends Document {
   stepTemplateVersion: number;
   playIntegration: IPlayIntegration;
   verification: IClientVerification;
+  clientFiles: Array<{ name: string; key: string; contentType: string; size: number; uploadedAt: Date }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -149,6 +154,8 @@ const projectSchema = new Schema<IProject>(
       playStoreUrl: { type: String, trim: true },
     },
     projectType: { type: String, enum: PROJECT_TYPES, default: "play_store_internal_testing" },
+    serviceType: { type: String, enum: SERVICE_TYPES, default: "play_store_closed_testing", index: true },
+    serviceOption: { type: String, default: "testers_only", trim: true },
     requiredTesters: { type: Number, required: true, min: 1 },
     // Atomic slot counter — incremented only via guarded findOneAndUpdate
     // (activeTesterCount < requiredTesters) so concurrent joins can never overfill a project.
@@ -161,6 +168,10 @@ const projectSchema = new Schema<IProject>(
     stepTemplateVersion: { type: Number, default: 1 },
     playIntegration: { type: playIntegrationSchema, default: () => ({}) },
     verification: { type: clientVerificationSchema, default: () => ({}) },
+    clientFiles: {
+      type: [{ name: String, key: String, contentType: String, size: Number, uploadedAt: { type: Date, default: Date.now } }],
+      default: [],
+    },
   },
   { timestamps: true }
 );

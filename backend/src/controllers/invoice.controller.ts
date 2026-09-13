@@ -7,6 +7,9 @@ import { ApiError } from "../utils/apiError";
 import { asyncHandler } from "../utils/asyncHandler";
 import { getPagination, buildPageMeta } from "../utils/pagination";
 import { createCheckoutOrder, verifyWebhookSignature, handlePaymentCapturedWebhook, markInvoicePaidManually } from "../services/payment.service";
+import crypto from "crypto";
+import { razorpayClient } from "../config/razorpay";
+import { env } from "../config/env";
 import { logger } from "../config/logger";
 
 export const listInvoices = asyncHandler(async (req: Request, res: Response) => {
@@ -40,6 +43,42 @@ export const checkoutInvoice = asyncHandler(async (req: Request, res: Response) 
 
   const result = await createCheckoutOrder(invoice._id);
   res.status(200).json({ data: result });
+});
+
+const onboardingTiers = [
+  { testers: 14, amount: 299900 },
+  { testers: 20, amount: 399900 },
+  { testers: 25, amount: 499900 },
+] as const;
+
+/** Creates a Razorpay order for the self-serve wizard before project activation. */
+export const checkoutOnboardingTier = asyncHandler(async (req: Request, res: Response) => {
+  const tierIndex = Number(req.body?.tierIndex);
+  const tier = onboardingTiers[tierIndex];
+  if (!tier) throw ApiError.badRequest("Select a fixed-price testing tier");
+
+  const order = await razorpayClient.orders.create({
+    amount: tier.amount,
+    currency: "INR",
+    receipt: `onboard_${req.dbUser!._id}_${Date.now()}`.slice(0, 40),
+    notes: { userId: req.dbUser!._id.toString(), testers: String(tier.testers) },
+  });
+  res.status(200).json({ data: { order, keyId: env.razorpay.keyId } });
+});
+
+/** Verifies the browser checkout result before the wizard can continue. */
+export const verifyOnboardingPayment = asyncHandler(async (req: Request, res: Response) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body ?? {};
+  if (![razorpay_order_id, razorpay_payment_id, razorpay_signature].every((value) => typeof value === "string" && value)) {
+    throw ApiError.badRequest("Incomplete Razorpay payment confirmation");
+  }
+  const expected = crypto
+    .createHmac("sha256", env.razorpay.keySecret)
+    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+    .digest("hex");
+  const valid = expected.length === razorpay_signature.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(razorpay_signature));
+  if (!valid) throw ApiError.badRequest("Payment verification failed");
+  res.status(200).json({ data: { verified: true, paymentId: razorpay_payment_id } });
 });
 
 const manualPaySchema = z.object({ note: z.string().optional() });

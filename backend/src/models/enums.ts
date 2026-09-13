@@ -4,6 +4,9 @@ export type Role = (typeof ROLES)[number];
 export const PROJECT_TYPES = ["play_store_internal_testing"] as const;
 export type ProjectType = (typeof PROJECT_TYPES)[number];
 
+export const SERVICE_TYPES = ["ios_app_publishing", "play_store_closed_testing", "user_experience_testing"] as const;
+export type ServiceType = (typeof SERVICE_TYPES)[number];
+
 // "custom" is a bespoke, admin-negotiated deal — always requires client verification and
 // has no fixed PACKAGE_CONFIG pricing (see constants/packages.ts); the admin sets the
 // invoice amount directly when approving verification.
@@ -105,6 +108,7 @@ export const NOTIFICATION_TYPES = [
   "withdrawal_completed",
   "withdrawal_rejected",
   "support_reply",
+  "support_request",
   "project_completed",
   "install_scheduled",
   "email_review_reminder",

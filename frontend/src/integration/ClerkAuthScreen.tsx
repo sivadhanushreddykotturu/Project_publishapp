@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { SignInButton, SignOutButton, SignUpButton, UserButton, useAuth, useUser } from "@clerk/nextjs";
-import { ArrowLeft, CheckCircle2, Loader2, LogOut, UserPlus } from "lucide-react";
+import { CheckCircle2, Loader2, LogOut, UserPlus } from "lucide-react";
 import { syncLaunchOpsUser, type LaunchOpsUser } from "../lib/launchops-api";
 
 type ClerkAuthScreenProps = {
   isDarkMode: boolean;
+  initialRole?: "tester" | "client";
   onLoginSuccess: (name: string, role: "tester" | "client" | "admin") => void;
   onBackToHome: () => void;
 };
@@ -27,7 +28,7 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessa
   }
 }
 
-export default function ClerkAuthScreen({ isDarkMode, onLoginSuccess, onBackToHome }: ClerkAuthScreenProps) {
+export default function ClerkAuthScreen({ isDarkMode, initialRole = "tester", onLoginSuccess, onBackToHome }: ClerkAuthScreenProps) {
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const { isLoaded: isUserLoaded, user } = useUser();
   const [syncState, setSyncState] = useState<SyncState>("idle");
@@ -35,8 +36,9 @@ export default function ClerkAuthScreen({ isDarkMode, onLoginSuccess, onBackToHo
   const [launchOpsUser, setLaunchOpsUser] = useState<LaunchOpsUser | null>(null);
   const [syncAttempt, setSyncAttempt] = useState(0);
   const [selectedRole, setSelectedRole] = useState<"tester" | "client">(() => {
-    if (typeof window === "undefined") return "tester";
-    return sessionStorage.getItem(intendedRoleKey) === "client" ? "client" : "tester";
+    if (typeof window === "undefined") return initialRole;
+    const storedRole = sessionStorage.getItem(intendedRoleKey);
+    return storedRole === "client" || storedRole === "tester" ? storedRole : initialRole;
   });
   const syncStartedRef = useRef(false);
   const getTokenRef = useRef(getToken);
@@ -129,16 +131,6 @@ export default function ClerkAuthScreen({ isDarkMode, onLoginSuccess, onBackToHo
       />
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4">
-        <button
-          onClick={onBackToHome}
-          className={`inline-flex items-center gap-2 mb-8 text-sm font-semibold transition-colors cursor-pointer ${
-            isDarkMode ? "text-slate-400 hover:text-white" : "text-slate-600 hover:text-slate-900"
-          }`}
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Home
-        </button>
-
         <div className="text-center">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 mb-4 transform rotate-12">
             <span className="font-extrabold italic text-lg">LT</span>

@@ -30,11 +30,12 @@ async function sendViaChannel(
   payload: Record<string, unknown>
 ): Promise<void> {
   if (channel === "email") {
+    const details = payload.email as { subject?: string; body?: string } | undefined;
     await resendClient.emails.send({
       from: env.resend.fromEmail,
       to: recipientEmail,
-      subject: emailSubject(type),
-      html: emailBody(type, payload),
+      subject: details?.subject ?? emailSubject(type),
+      html: details?.body ?? emailBody(type, payload),
     });
     return;
   }
@@ -55,6 +56,7 @@ function emailSubject(type: NotificationType): string {
     withdrawal_completed: "Your withdrawal is complete — funds sent",
     withdrawal_rejected: "Your withdrawal request was rejected",
     support_reply: "New reply on your support ticket",
+    support_request: "Support request sent",
     project_completed: "Your project is complete",
     install_scheduled: "It's your turn — install the app today",
     email_review_reminder: "Google's tester-list review window has passed — check Play Console",
@@ -108,6 +110,21 @@ export async function attemptSend(notificationId: Types.ObjectId) {
   }
 
   try {
+    if (notification.channel === "email") {
+      notification.payload = {
+        ...notification.payload,
+        email: {
+          subject: emailSubject(notification.type),
+          from: env.resend.fromEmail,
+          to: [user.email],
+          cc: [],
+          body: emailBody(notification.type, notification.payload),
+          slaHours: 24,
+          slaDueAt: new Date(notification.createdAt.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+        },
+      };
+      notification.markModified("payload");
+    }
     await sendViaChannel(notification.channel, user.email, notification.type, notification.payload);
     notification.status = "sent";
     notification.sentAt = new Date();

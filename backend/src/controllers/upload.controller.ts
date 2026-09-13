@@ -6,7 +6,7 @@ import { createUploadUrl, createDownloadUrl } from "../services/storage.service"
 const presignSchema = z.object({
   filename: z.string().min(1),
   contentType: z.string().min(1),
-  scope: z.enum(["proofs", "bug-reports", "aab-uploads", "upi-qr"]),
+  scope: z.enum(["proofs", "bug-reports", "aab-uploads", "upi-qr", "testing-files"]),
 });
 
 /** Presigned PUT URL for direct browser -> R2 upload — the API never proxies binaries. */

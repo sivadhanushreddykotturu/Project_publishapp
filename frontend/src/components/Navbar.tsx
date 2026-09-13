@@ -24,9 +24,8 @@ export default function Navbar({
   const [isOpen, setIsOpen] = useState(false);
 
   const navItems: { label: string; tab: string; subtab?: string; badge?: string }[] = [
-    { label: 'Client Setup', tab: 'client', subtab: 'new-app', badge: '14 Testers' },
+    { label: 'Client Setup', tab: 'auth', subtab: 'client', badge: '14 Testers' },
     { label: 'Tester Hub', tab: 'tester' },
-    { label: 'Admin Console', tab: 'admin' },
     { label: 'Solutions', tab: 'solutions' },
     { label: 'Pricing', tab: 'pricing' }
   ];
@@ -44,7 +43,11 @@ export default function Navbar({
       <nav className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
         {/* Logo */}
         <button 
-          onClick={() => { onTabChange('home'); setIsOpen(false); }}
+          onClick={() => {
+            const role = typeof window !== 'undefined' ? localStorage.getItem('launchops_user_role') : null;
+            onTabChange(role === 'client' ? 'client' : role === 'tester' ? 'tester' : 'home', role === 'client' ? 'dashboard' : undefined);
+            setIsOpen(false);
+          }}
           className="flex items-center gap-2 cursor-pointer group text-left border-0 bg-transparent"
           id="nav-logo-btn"
         >
@@ -112,7 +115,7 @@ export default function Navbar({
 
           {/* Tester Portal button */}
           <button
-            onClick={() => onTabChange('tester')}
+            onClick={() => onTabChange('auth', 'tester')}
             className={`px-4 py-2.5 rounded-full text-xs font-bold border transition-all cursor-pointer ${
               currentTab === 'tester'
                 ? 'bg-[#4F37FE]/15 text-[#4F37FE] border-[#4F37FE]'
@@ -127,7 +130,7 @@ export default function Navbar({
 
           {/* Client Setup CTA */}
           <button 
-            onClick={() => onTabChange('client', 'new-app')}
+            onClick={() => onTabChange('auth', 'client')}
             className="bg-[#4F37FE] hover:bg-[#432ee0] px-5 py-2.5 rounded-full text-xs md:text-sm font-bold flex items-center gap-2 transition hover:shadow-lg hover:shadow-indigo-500/20 cursor-pointer text-white border-0"
             id="nav-client-setup-btn"
           >
@@ -198,7 +201,7 @@ export default function Navbar({
           <div className="pt-4 border-t border-slate-200 dark:border-white/10 flex flex-col gap-2.5">
             <button
               onClick={() => {
-                onTabChange('client', 'new-app');
+                onTabChange('auth', 'client');
                 setIsOpen(false);
               }}
               className="w-full bg-[#4F37FE] hover:bg-[#432ee0] py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-white shadow-md cursor-pointer border-0"
@@ -208,7 +211,7 @@ export default function Navbar({
             </button>
             <button
               onClick={() => {
-                onTabChange('tester');
+                onTabChange('auth', 'tester');
                 setIsOpen(false);
               }}
               className={`w-full py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 border cursor-pointer ${

@@ -8,10 +8,14 @@ export interface TestApp {
   launchDate: string;
   category: string;
   progress: number;
+  testingWindowEnded?: boolean;
   devices: string[];
   
   // Simulation & Workflow Extensions
   packageTier?: 'testers_only' | 'managed_testing' | 'launch_ready' | 'custom';
+  serviceType?: 'ios_app_publishing' | 'play_store_closed_testing' | 'user_experience_testing';
+  serviceOption?: string;
+  packageName?: string;
   verificationRequired?: boolean;
   verificationStatus?: 'pending' | 'approved' | 'rejected' | 'none';
   invoiceStatus?: 'none' | 'awaiting_payment' | 'paid';

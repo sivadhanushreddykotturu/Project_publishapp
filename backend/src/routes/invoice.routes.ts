@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listInvoices, checkoutInvoice, markInvoicePaid } from "../controllers/invoice.controller";
+import { listInvoices, checkoutInvoice, markInvoicePaid, checkoutOnboardingTier, verifyOnboardingPayment } from "../controllers/invoice.controller";
 import { requireAuth, requireRole } from "../middleware/auth";
 
 const router = Router();
@@ -25,6 +25,8 @@ const router = Router();
  *                 meta: { $ref: '#/components/schemas/PaginationMeta' }
  */
 router.get("/", requireAuth(), requireRole("client", "admin"), listInvoices);
+router.post("/onboarding-checkout", requireAuth(), requireRole("client"), checkoutOnboardingTier);
+router.post("/onboarding-checkout/verify", requireAuth(), requireRole("client"), verifyOnboardingPayment);
 
 /**
  * @openapi

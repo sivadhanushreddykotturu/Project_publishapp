@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { TestApp, BugReport, TesterAssignment, Tester, WithdrawalRequest } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { BackendNotification } from '../lib/launchops-api';
+import type { BackendNotification, BackendProjectFile } from '../lib/launchops-api';
 
 interface AdminConsoleProps {
   isDarkMode: boolean;
@@ -29,6 +29,9 @@ interface AdminConsoleProps {
   onAddTesterToProject: (projectId: string, testerId: string) => void;
   onRemoveTesterFromProject: (projectId: string, testerId: string) => void;
   onApproveTesterStep1: (projectId: string, testerId: string) => void;
+  onListProjectFiles: (projectId: string) => Promise<BackendProjectFile[]>;
+  onDownloadProjectFile: (key: string) => Promise<void>;
+  onClearProjectFiles: (projectId: string) => Promise<number>;
   initialTab?: string;
   onTabChange?: (tab: string) => void;
 }
@@ -54,6 +57,9 @@ export default function AdminConsole({
   onAddTesterToProject,
   onRemoveTesterFromProject,
   onApproveTesterStep1,
+  onListProjectFiles,
+  onDownloadProjectFile,
+  onClearProjectFiles,
   initialTab,
   onTabChange
 }: AdminConsoleProps) {
@@ -81,6 +87,21 @@ export default function AdminConsole({
   const [addingTesterProjectId, setAddingTesterProjectId] = useState<string | null>(null);
   const [selectedTesterToAssign, setSelectedTesterToAssign] = useState<string>('');
   const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
+  const [projectFiles, setProjectFiles] = useState<Record<string, BackendProjectFile[]>>({});
+  const [fileActionError, setFileActionError] = useState('');
+  const [clearingFilesProjectId, setClearingFilesProjectId] = useState<string | null>(null);
+
+  const toggleProject = async (projectId: string) => {
+    if (expandedProjectId === projectId) { setExpandedProjectId(null); return; }
+    setExpandedProjectId(projectId);
+    setFileActionError('');
+    try {
+      const files = await onListProjectFiles(projectId);
+      setProjectFiles((current) => ({ ...current, [projectId]: files }));
+    } catch (error) {
+      setFileActionError(error instanceof Error ? error.message : 'Could not load project files.');
+    }
+  };
 
   useEffect(() => {
     if (initialTab && ['dashboard', 'projects', 'testers', 'verifications', 'bugs', 'cashouts'].includes(initialTab)) {
@@ -478,7 +499,7 @@ export default function AdminConsole({
                   >
                     {/* Project Header Row */}
                     <div 
-                      onClick={() => setExpandedProjectId(isExpanded ? null : proj.id)}
+                      onClick={() => { void toggleProject(proj.id); }}
                       className="p-6 flex items-center justify-between gap-4 cursor-pointer hover:bg-slate-500/5 transition-colors"
                     >
                       <div className="flex items-center gap-4">
@@ -657,6 +678,49 @@ export default function AdminConsole({
                               })}
                             </div>
                           )}
+                        </div>
+
+                        <div className={`rounded-2xl border p-5 ${isDarkMode ? 'border-white/10 bg-black/30' : 'border-slate-200 bg-slate-50'}`}>
+                          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                            <div>
+                              <h4 className="text-xs font-black uppercase tracking-wider">Client testing files</h4>
+                              <p className="mt-1 text-[10px] text-slate-500">Files uploaded by the client for this project.</p>
+                            </div>
+                            <button
+                              disabled={!proj.testingWindowEnded || clearingFilesProjectId === proj.id || !(projectFiles[proj.id]?.length)}
+                              onClick={async () => {
+                                if (!window.confirm(`Permanently delete all files for ${proj.name}? This cannot be undone.`)) return;
+                                setClearingFilesProjectId(proj.id);
+                                setFileActionError('');
+                                try {
+                                  await onClearProjectFiles(proj.id);
+                                  setProjectFiles((current) => ({ ...current, [proj.id]: [] }));
+                                } catch (error) {
+                                  setFileActionError(error instanceof Error ? error.message : 'Could not clear files.');
+                                } finally {
+                                  setClearingFilesProjectId(null);
+                                }
+                              }}
+                              className="rounded-xl bg-red-600 px-4 py-2 text-[10px] font-black uppercase text-white disabled:cursor-not-allowed disabled:opacity-40"
+                              title={proj.testingWindowEnded ? 'Delete files from R2 and MongoDB' : 'Available after the testing window ends'}
+                            >
+                              {clearingFilesProjectId === proj.id ? 'Clearing…' : 'Clear files'}
+                            </button>
+                          </div>
+                          {fileActionError && <p className="mb-3 text-xs font-semibold text-red-500">{fileActionError}</p>}
+                          <div className="space-y-2">
+                            {(projectFiles[proj.id] ?? []).map((file) => (
+                              <div key={file.key} className="flex items-center justify-between gap-3 rounded-xl border border-slate-500/10 p-3">
+                                <div className="min-w-0">
+                                  <p className="truncate text-xs font-bold">{file.name}</p>
+                                  <p className="text-[9px] text-slate-500">{(file.size / 1024).toFixed(1)} KB · {new Date(file.uploadedAt).toLocaleString()}</p>
+                                </div>
+                                <button onClick={() => { void onDownloadProjectFile(file.key); }} className="rounded-lg bg-indigo-500/10 px-3 py-1.5 text-[10px] font-black text-indigo-500">Download</button>
+                              </div>
+                            ))}
+                            {(projectFiles[proj.id] ?? []).length === 0 && <p className="py-4 text-center text-xs text-slate-500">No client files uploaded.</p>}
+                          </div>
+                          {!proj.testingWindowEnded && <p className="mt-3 text-[10px] font-semibold text-amber-500">Cleanup unlocks when the project is completed, closed, or cancelled.</p>}
                         </div>
                       </div>
                     )}

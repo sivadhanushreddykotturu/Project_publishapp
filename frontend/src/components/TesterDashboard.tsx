@@ -8,6 +8,7 @@ import {
 import { Tester, TestApp, TesterAssignment, BugReport, Transaction, WithdrawalRequest } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import TesterExperienceManager from './tester/TesterExperienceManager';
+import type { BackendNotification } from '../lib/launchops-api';
 
 interface TesterDashboardProps {
   isDarkMode: boolean;

@@ -8,6 +8,7 @@ export interface AppDetailsFormData {
   appName: string;
   webLink: string;
   appLink: string;
+  packageName?: string;
 }
 
 interface Step4AppDetailsProps {
@@ -37,7 +38,8 @@ export default function Step4AppDetails({
     onNext({
       appName: appName.trim(),
       webLink: webLink.trim(),
-      appLink: appLink.trim()
+      appLink: appLink.trim(),
+      packageName: initialData?.packageName,
     });
   };
 

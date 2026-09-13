@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, ArrowLeft, Sparkles } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Sparkles } from 'lucide-react';
 
 interface AuthScreenProps {
   isDarkMode: boolean;
+  initialRole?: 'tester' | 'client';
   onLoginSuccess: (name: string, role: 'tester' | 'client' | 'admin') => void;
   onBackToHome: () => void;
 }
 
-export default function AuthScreen({ isDarkMode, onLoginSuccess, onBackToHome }: AuthScreenProps) {
+export default function AuthScreen({ isDarkMode, initialRole = 'tester', onLoginSuccess, onBackToHome }: AuthScreenProps) {
   const [isSignUp, setIsSignUp] = useState(false);
-  const [role, setRole] = useState<'tester' | 'client' | 'admin'>('tester');
+  const [role, setRole] = useState<'tester' | 'client' | 'admin'>(initialRole);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -59,17 +60,6 @@ export default function AuthScreen({ isDarkMode, onLoginSuccess, onBackToHome }:
       }`} />
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4">
-        {/* Back Button */}
-        <button
-          onClick={onBackToHome}
-          className={`inline-flex items-center gap-2 mb-8 text-sm font-semibold transition-colors cursor-pointer ${
-            isDarkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Home
-        </button>
-
         <div className="text-center">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 mb-4 transform rotate-12">
             <span className="font-extrabold italic text-lg">LT</span>

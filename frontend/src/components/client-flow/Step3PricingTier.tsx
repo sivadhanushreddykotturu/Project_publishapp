@@ -50,15 +50,36 @@ interface Step3PricingTierProps {
   isDarkMode: boolean;
   onNext: (tier: TierInfo) => void;
   onBack: () => void;
+  onPay?: (tier: TierInfo) => Promise<boolean>;
 }
 
 export default function Step3PricingTier({
   isDarkMode,
   onNext,
-  onBack
+  onBack,
+  onPay
 }: Step3PricingTierProps) {
   const [selectedTierIndex, setSelectedTierIndex] = useState<number>(0);
   const currentTier = TIERS[selectedTierIndex];
+  const [paidTierIndex, setPaidTierIndex] = useState<number | null>(null);
+  const [isPaying, setIsPaying] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const isPaid = paidTierIndex === selectedTierIndex;
+
+  const handlePay = async () => {
+    setPaymentError('');
+    setIsPaying(true);
+    try {
+      if (onPay && await onPay(currentTier)) {
+        setPaidTierIndex(selectedTierIndex);
+        onNext(currentTier);
+      }
+    } catch (error) {
+      setPaymentError(error instanceof Error ? error.message : 'Unable to start payment.');
+    } finally {
+      setIsPaying(false);
+    }
+  };
 
   const features = [
     { title: '14+ Real Testers' },
@@ -221,12 +242,22 @@ export default function Step3PricingTier({
         </button>
 
         <button
+          onClick={handlePay}
+          disabled={isPaying || isPaid || selectedTierIndex === 3}
+          className="px-12 py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-600/50 disabled:cursor-not-allowed text-white text-[15px] font-bold rounded-2xl shadow-md transition-all cursor-pointer"
+        >
+          {isPaying ? 'Opening Razorpay…' : isPaid ? 'Payment Confirmed' : selectedTierIndex === 3 ? 'Contact Sales' : 'Pay Now'}
+        </button>
+
+        <button
           onClick={() => onNext(currentTier)}
-          className="px-16 py-3.5 bg-[#4F37FE] hover:bg-[#432EE0] text-white text-[15px] font-bold rounded-2xl shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer"
+          disabled={!isPaid}
+          className="px-16 py-3.5 bg-[#4F37FE] hover:bg-[#432EE0] disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none disabled:cursor-not-allowed text-white text-[15px] font-bold rounded-2xl shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer"
         >
           Start Testing
         </button>
       </div>
+      {paymentError && <p className="text-center text-sm font-semibold text-red-500">{paymentError}</p>}
     </div>
   );
 }

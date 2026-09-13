@@ -63,6 +63,14 @@ export type BackendInvoice = {
   status: "pending" | "paid" | "manual_paid" | "failed" | "refunded";
 };
 
+export type BackendProjectFile = {
+  name: string;
+  key: string;
+  contentType: string;
+  size: number;
+  uploadedAt: string;
+};
+
 export type PublicTesterProfile = {
   _id: string;
   userId: { _id: string; name: string };
@@ -76,6 +84,8 @@ export type PublicTesterProfile = {
 export type BackendProject = {
   _id: string;
   package: "testers_only" | "managed_testing" | "launch_ready" | "custom";
+  serviceType: "ios_app_publishing" | "play_store_closed_testing" | "user_experience_testing";
+  serviceOption: string;
   appDetails: {
     appName: string;
     packageName?: string;
@@ -171,8 +181,11 @@ export type BackendBugReport = {
 export type BackendNotification = {
   _id: string;
   type: "project_request" | "project_opportunity" | string;
+  channel: "email" | "push" | "sms" | "whatsapp";
   payload: { projectId?: string; appName?: string; joinPath?: string; requiredDeviceModels?: string[]; [key: string]: unknown };
   status: "queued" | "sent" | "failed";
+  sentAt?: string;
+  lastError?: string;
   readAt?: string;
   createdAt: string;
 };
@@ -298,6 +311,8 @@ export function listProjects(token: string) {
 
 export function createClientProject(input: {
   package: BackendProject["package"];
+  serviceType: BackendProject["serviceType"];
+  serviceOption: string;
   requiredTesters?: number;
   requiredDeviceModels?: string[];
   appDetails: BackendProject["appDetails"];
@@ -338,6 +353,18 @@ export function checkoutInvoice(invoiceId: string, token: string) {
   });
 }
 
+export function checkoutOnboardingTier(tierIndex: number, token: string) {
+  return apiRequest<ApiEnvelope<{ order: { id: string; amount: number; currency: string }; keyId: string }>>("/api/v1/invoices/onboarding-checkout", {
+    method: "POST", token, body: { tierIndex },
+  });
+}
+
+export function verifyOnboardingPayment(input: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }, token: string) {
+  return apiRequest<ApiEnvelope<{ verified: boolean; paymentId: string }>>("/api/v1/invoices/onboarding-checkout/verify", {
+    method: "POST", token, body: input,
+  });
+}
+
 export function listProjectBugReports(projectId: string, token: string) {
   return apiRequest<ApiEnvelope<BackendBugReport[]>>(`/api/v1/projects/${projectId}/bug-reports?limit=100`, { token });
 }
@@ -352,6 +379,36 @@ export function listPublicTesterDirectory() {
 
 export function listProjectAssignments(projectId: string, token: string) {
   return apiRequest<ApiEnvelope<BackendAssignment[]>>(`/api/v1/projects/${projectId}/queue?all=true`, { token });
+}
+
+export function listClientProjectAssignments(projectId: string, token: string) {
+  return apiRequest<ApiEnvelope<BackendAssignment[]>>(`/api/v1/projects/${projectId}/client-assignments`, { token });
+}
+
+export function listProjectFiles(projectId: string, token: string) {
+  return apiRequest<ApiEnvelope<BackendProjectFile[]>>(`/api/v1/projects/${projectId}/files`, { token });
+}
+
+export function clearAdminProjectFiles(projectId: string, token: string) {
+  return apiRequest<ApiEnvelope<{ deleted: number }>>(`/api/v1/projects/${projectId}/files`, { method: "DELETE", token });
+}
+
+export function requestTestingFileUpload(filename: string, contentType: string, token: string) {
+  return apiRequest<ApiEnvelope<{ uploadUrl: string; key: string; expiresIn: number }>>("/api/v1/uploads/presign", {
+    method: "POST", token, body: { filename, contentType, scope: "testing-files" },
+  });
+}
+
+export function registerProjectFile(projectId: string, file: Omit<BackendProjectFile, "uploadedAt">, token: string) {
+  return apiRequest<ApiEnvelope<BackendProjectFile>>(`/api/v1/projects/${projectId}/files`, { method: "POST", token, body: file });
+}
+
+export function getProjectFileDownload(key: string, token: string) {
+  return apiRequest<ApiEnvelope<{ downloadUrl: string; expiresIn: number }>>(`/api/v1/uploads/presign-download?key=${encodeURIComponent(key)}`, { token });
+}
+
+export function createSupportTicket(input: { subject: string; message: string; projectId?: string; cc?: string[] }, token: string) {
+  return apiRequest<ApiEnvelope<unknown>>("/api/v1/support-tickets", { method: "POST", token, body: input });
 }
 
 export function assignTesterToProject(projectId: string, testerId: string, token: string) {

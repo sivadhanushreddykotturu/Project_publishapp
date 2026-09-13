@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, GetObjectCommand, DeleteObjectsCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { r2Client } from "../config/r2";
 import { env } from "../config/env";
@@ -11,7 +11,7 @@ import { ApiError } from "../utils/apiError";
  * Virus/type scanning happens asynchronously post-upload (out of scope for this endpoint);
  * objects are considered quarantined until a scan-clean webhook flips their status.
  */
-const ALLOWED_EXTENSIONS = ["png", "jpg", "jpeg", "mp4", "mov", "pdf", "aab", "apk"] as const;
+const ALLOWED_EXTENSIONS = ["png", "jpg", "jpeg", "mp4", "mov", "pdf", "doc", "docx", "aab", "apk"] as const;
 const PUT_URL_EXPIRY_SECONDS = 300;
 const GET_URL_EXPIRY_SECONDS = 3600;
 
@@ -46,6 +46,14 @@ export async function createDownloadUrl(key: string) {
   const command = new GetObjectCommand({ Bucket: env.r2.bucket, Key: key });
   const downloadUrl = await getSignedUrl(r2Client, command, { expiresIn: GET_URL_EXPIRY_SECONDS });
   return { downloadUrl, expiresIn: GET_URL_EXPIRY_SECONDS };
+}
+
+export async function deleteObjects(keys: string[]) {
+  if (keys.length === 0) return;
+  await r2Client.send(new DeleteObjectsCommand({
+    Bucket: env.r2.bucket,
+    Delete: { Objects: keys.map((Key) => ({ Key })), Quiet: true },
+  }));
 }
 
 /**

@@ -18,6 +18,10 @@ import {
   updatePlayIntegrationConfig,
   syncProjectPlayRelease,
   getCompletionReport,
+  listClientProjectAssignments,
+  listProjectFiles,
+  addProjectFile,
+  clearProjectFiles,
 } from "../controllers/project.controller";
 import { requireAuth, requireRole } from "../middleware/auth";
 
@@ -105,6 +109,10 @@ router.get("/opportunities", requireAuth(), requireRole("tester"), listTesterOpp
  *       404: { description: Not found }
  */
 router.get("/:id", requireAuth(), requireRole("client", "admin"), getProjectById);
+router.get("/:id/client-assignments", requireAuth(), requireRole("client"), listClientProjectAssignments);
+router.get("/:id/files", requireAuth(), requireRole("client", "admin"), listProjectFiles);
+router.post("/:id/files", requireAuth(), requireRole("client"), addProjectFile);
+router.delete("/:id/files", requireAuth(), requireRole("admin"), clearProjectFiles);
 
 /**
  * @openapi

@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   LayoutGrid, Activity, Building2, Headphones, LogOut, Sun, Moon,
-  ArrowLeft, Bell, Download, UploadCloud, FileText, CheckCircle2,
-  ArrowUp, ArrowDown, Folder, X, Plus, ChevronRight, Share2, Phone
+  ArrowLeft, Bell, Download, FileText, CheckCircle2,
+  ArrowUp, ArrowDown, X, Plus, ChevronRight, Share2, Phone, Mail
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import type { TestApp } from '../../types';
+import type { BackendAssignment, BackendNotification, BackendProjectFile, LaunchOpsUser } from '../../lib/launchops-api';
 
 export interface ClientAppItem {
   id: string;
@@ -21,33 +23,6 @@ export interface ClientAppItem {
   buttonLabel: string;
 }
 
-const INITIAL_CLIENT_APPS: ClientAppItem[] = [
-  {
-    id: 'blinkit',
-    name: 'Blinkit',
-    category: 'Playstore closed Testing',
-    logo: 'blinkit',
-    bgColor: '#FFDE43',
-    statusText: 'Filling up - Aug 20',
-    statusColor: 'orange',
-    testersCount: '4+',
-    description: 'The people selected for this panel will be expected to remain active, responsive and consistent when testing projects are assigned.',
-    buttonLabel: 'Play Store Closed Testing'
-  },
-  {
-    id: 'deloitte',
-    name: 'Deloitte',
-    category: 'Playstore closed Testing',
-    logo: 'deloitte',
-    bgColor: '#000000',
-    statusText: 'Wait in line - Aug 20',
-    statusColor: 'yellow',
-    testersCount: '4+',
-    description: 'this our business right now so I will say the nature of the business and i WILL tell you the exactly the market that we want to build upon so here we go in this process like this - first I will explain the what business we are and I will tell you the how we want to position it.',
-    buttonLabel: 'UX Testing'
-  }
-];
-
 interface TesterRowData {
   id: string;
   name: string;
@@ -56,6 +31,18 @@ interface TesterRowData {
   appInstalled: string;
   hasBugReport: boolean;
   bugReportFileName: string;
+}
+
+interface EmailDetails {
+  subject: string;
+  from: string;
+  sentVia?: string;
+  to: string[];
+  cc: string[];
+  replyTo?: string;
+  body: string;
+  slaHours: number;
+  slaDueAt?: string;
 }
 
 const DEFAULT_TESTERS: TesterRowData[] = [
@@ -102,6 +89,14 @@ interface ClientAppDashboardProps {
   onToggleDarkMode?: () => void;
   onLogout: () => void;
   onNewAppWizard: () => void;
+  projects: TestApp[];
+  isLoading?: boolean;
+  error?: string;
+  currentUser: LaunchOpsUser | null;
+  notifications: BackendNotification[];
+  onLoadProjectDetails: (projectId: string) => Promise<{ assignments: BackendAssignment[]; files: BackendProjectFile[] }>;
+  onDownloadProjectFile: (key: string) => Promise<void>;
+  onSendSupport: (input: { subject: string; message: string; cc: string[] }, projectId?: string) => Promise<void>;
   newRegisteredApp?: {
     appName: string;
     category?: string;
@@ -118,7 +113,14 @@ export default function ClientAppDashboard({
   onToggleDarkMode,
   onLogout,
   onNewAppWizard,
-  newRegisteredApp
+  projects,
+  isLoading = false,
+  error = '',
+  currentUser,
+  notifications,
+  onLoadProjectDetails,
+  onDownloadProjectFile,
+  onSendSupport
 }: ClientAppDashboardProps) {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(initialDarkMode);
   const [activeNav, setActiveNav] = useState<'dashboard' | 'testing' | 'services' | 'support'>('testing');
@@ -126,41 +128,35 @@ export default function ClientAppDashboard({
   const [selectedApp, setSelectedApp] = useState<ClientAppItem | null>(null);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [supportMessage, setSupportMessage] = useState('');
+  const [supportSubject, setSupportSubject] = useState('Client dashboard support request');
+  const [supportCc, setSupportCc] = useState('');
   const [supportSent, setSupportSent] = useState(false);
+  const [supportSending, setSupportSending] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [projectAssignments, setProjectAssignments] = useState<BackendAssignment[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<BackendProjectFile[]>([]);
+  const [selectedEmail, setSelectedEmail] = useState<BackendNotification | null>(null);
 
-  // File Upload State
-  const [isDragging, setIsDragging] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(49);
-  const [uploadedFiles, setUploadedFiles] = useState([
-    { name: 'Blinkit Screens.pdf', sub: 'Sent to testers group' }
-  ]);
-
-  // Merge registered app if passed
-  const [apps, setApps] = useState<ClientAppItem[]>(() => {
-    if (newRegisteredApp && newRegisteredApp.appName) {
-      const isPlayStore = !newRegisteredApp.category || newRegisteredApp.category === 'Playstore closed Testing';
-      const customApp: ClientAppItem = {
-        id: newRegisteredApp.appName.toLowerCase().replace(/\s+/g, '-'),
-        name: newRegisteredApp.appName,
-        category: newRegisteredApp.category || 'Playstore closed Testing',
-        logo: 'kanma',
-        bgColor: newRegisteredApp.category === 'IOS App Publishing' 
-          ? '#1D1E2C' 
-          : newRegisteredApp.category === 'User Experience Testing' 
-            ? '#3B1E54' 
-            : '#7A000A',
-        statusText: isPlayStore ? 'Active - Aug 21' : 'Consultation Scheduled',
-        statusColor: isPlayStore ? 'green' : 'orange',
-        testersCount: isPlayStore ? '14+' : 'Contacting',
-        description: newRegisteredApp.description || (isPlayStore 
-          ? 'Automated 14-day closed testing track with dedicated verified testers providing daily engagement and continuous telemetry.'
-          : 'App submitted for dedicated specialist direct review and launch coordination.'),
-        buttonLabel: newRegisteredApp.category || 'Play Store Closed Testing'
-      };
-      return [customApp, ...INITIAL_CLIENT_APPS];
-    }
-    return INITIAL_CLIENT_APPS;
-  });
+  const apps: ClientAppItem[] = projects
+    .filter((project) => activeFilterTab !== 'active' || project.status === 'Testing')
+    .map((project) => ({
+      id: project.id,
+      name: project.name,
+      category: project.category.replace(/_/g, ' '),
+      logo: 'project',
+      bgColor: '#4F37FE',
+      statusText: `${project.status} - ${project.launchDate}`,
+      statusColor: project.status === 'Testing' ? 'green' : project.status === 'Completed' ? 'yellow' : 'orange',
+      testersCount: `${project.testersCount}/${project.testersRequired ?? 14}`,
+      description: project.instructions || project.releaseNotes || 'Play Store closed testing project managed by UXOS.',
+      buttonLabel: project.serviceType === 'play_store_closed_testing'
+        ? project.serviceOption === 'console_setup'
+          ? 'Play Console App Setup'
+          : `${project.testersRequired ?? 14} Testers - Closed Testing`
+        : project.category,
+    }));
 
   const handleToggleDark = () => {
     setIsDarkMode(!isDarkMode);
@@ -181,11 +177,39 @@ export default function ClientAppDashboard({
     URL.revokeObjectURL(url);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setUploadedFiles(prev => [...prev, { name: file.name, sub: 'Sent to testers group' }]);
-    }
+  useEffect(() => {
+    if (!selectedApp) return;
+    setDetailLoading(true);
+    setDetailError('');
+    void onLoadProjectDetails(selectedApp.id)
+      .then((result) => { setProjectAssignments(result.assignments); setUploadedFiles(result.files); })
+      .catch((err) => setDetailError(err instanceof Error ? err.message : 'Could not load project details.'))
+      .finally(() => setDetailLoading(false));
+  }, [selectedApp?.id]);
+
+  const emailTimeline = notifications.filter((notification) =>
+    notification.channel === 'email' &&
+    (!notification.payload.projectId || notification.payload.projectId === selectedApp?.id)
+  );
+
+  const emailTitle = (type: string) => type
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
+  const getEmailDetails = (notification: BackendNotification): EmailDetails => {
+    const stored = notification.payload.email as Partial<EmailDetails> | undefined;
+    return {
+      subject: stored?.subject || String(notification.payload.subject || emailTitle(notification.type)),
+      from: stored?.from || 'UXOS Support <support@uxos.in>',
+      sentVia: stored?.sentVia,
+      to: stored?.to || [],
+      cc: stored?.cc || [],
+      replyTo: stored?.replyTo,
+      body: stored?.body || 'Email content was not recorded for this earlier event.',
+      slaHours: stored?.slaHours || 24,
+      slaDueAt: stored?.slaDueAt,
+    };
   };
 
   return (
@@ -356,8 +380,7 @@ export default function ClientAppDashboard({
             ) : null}
           </div>
 
-          {/* Right Header Badges: Kanma Active Testing + Bell + Avatar */}
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-5 relative">
             {/* Support Pill button if inside app detail */}
             {selectedApp && (
               <button
@@ -373,10 +396,13 @@ export default function ClientAppDashboard({
               </button>
             )}
 
-            {/* Kanma Active Testing Badge */}
-            <div className="text-right">
+            <div
+              className="text-right cursor-pointer"
+              onMouseEnter={() => setProfileOpen(true)}
+              onClick={() => setProfileOpen((open) => !open)}
+            >
               <div className="text-[15px] font-black text-slate-900 dark:text-white">
-                Kanma
+                {currentUser?.name || 'Client'}
               </div>
               <div className="flex items-center gap-1.5 text-[12px] font-bold text-slate-400 justify-end">
                 <span>Active Testing</span>
@@ -389,14 +415,16 @@ export default function ClientAppDashboard({
               <Bell className="w-5 h-5 stroke-[2.3]" />
             </div>
 
-            {/* User Profile Avatar */}
-            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm">
-              <img
-                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-                alt="Kanma Profile"
-                className="w-full h-full object-cover"
-              />
+            <div onMouseEnter={() => setProfileOpen(true)} onClick={() => setProfileOpen((open) => !open)} className="w-10 h-10 rounded-full bg-[#4F37FE] text-white flex items-center justify-center border-2 border-white dark:border-slate-800 shadow-sm font-black cursor-pointer">
+              {(currentUser?.name || currentUser?.email || 'C').charAt(0).toUpperCase()}
             </div>
+            {profileOpen && (
+              <div onMouseLeave={() => setProfileOpen(false)} className={`absolute right-0 top-12 z-50 w-72 rounded-2xl border p-4 shadow-xl ${isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200'}`}>
+                <p className="font-black">{currentUser?.name || 'Client'}</p>
+                <p className="mt-1 text-sm text-slate-500 break-all">{currentUser?.email || 'No email available'}</p>
+                <p className="mt-3 text-xs font-bold uppercase tracking-wider text-[#4F37FE]">Client account</p>
+              </div>
+            )}
           </div>
         </header>
 
@@ -455,6 +483,14 @@ export default function ClientAppDashboard({
                 </div>
 
                 {/* Cards Grid (Blinkit, Deloitte, etc.) */}
+                {error && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-600">{error}</div>}
+                {isLoading && <div className="py-16 text-center text-sm font-semibold text-slate-500">Loading projects from MongoDB…</div>}
+                {!isLoading && !error && apps.length === 0 && (
+                  <div className="rounded-3xl border border-dashed border-slate-300 bg-white/60 py-16 text-center">
+                    <p className="font-bold text-slate-700">No matching projects found</p>
+                    <button onClick={onNewAppWizard} className="mt-4 rounded-xl bg-[#4F37FE] px-5 py-2.5 text-sm font-bold text-white">Create a testing project</button>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {apps.map((app) => (
                     <div
@@ -616,189 +652,172 @@ export default function ClientAppDashboard({
 
                     {/* Table Body Rows */}
                     <div className="divide-y divide-slate-100 dark:divide-white/5">
-                      {DEFAULT_TESTERS.map((tester) => (
+                      {projectAssignments.map((assignment) => {
+                        const tester = typeof assignment.testerId === 'object' ? assignment.testerId.userId : undefined;
+                        const testerName = tester?.name || tester?.email || 'Assigned tester';
+                        return (
                         <div
-                          key={tester.id}
+                          key={assignment._id}
                           className="grid grid-cols-12 items-center py-4 text-[14px] font-medium"
                         >
                           {/* Tester Name with Up/Down Arrow Icon */}
                           <div className="col-span-4 flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full border-2 border-[#4F37FE] text-[#4F37FE] flex items-center justify-center shrink-0">
-                              {tester.direction === 'up' ? (
+                              {assignment.status === 'active' || assignment.status === 'completed' ? (
                                 <ArrowUp className="w-4 h-4 stroke-[2.5]" />
                               ) : (
                                 <ArrowDown className="w-4 h-4 stroke-[2.5]" />
                               )}
                             </div>
                             <span className="font-bold text-slate-800 dark:text-slate-200">
-                              {tester.name}
+                              {testerName}
                             </span>
                           </div>
 
                           {/* Became Tester Status */}
                           <div className="col-span-3 text-center text-slate-600 dark:text-slate-400">
-                            {tester.becameTester}
+                            {assignment.currentStep > 1 ? 'Completed' : 'Pending'}
                           </div>
 
                           {/* App Installed Status */}
                           <div className="col-span-3 text-center text-slate-600 dark:text-slate-400">
-                            {tester.appInstalled}
+                            {assignment.currentStep > 3 ? 'Installed' : 'Pending'}
                           </div>
 
                           {/* Bug Report Download Button */}
                           <div className="col-span-2 flex justify-end">
-                            <button
-                              onClick={() => handleDownloadBugReport(tester)}
-                              className="px-5 py-2 bg-[#4F37FE] hover:bg-[#432EE0] text-white text-[13px] font-bold rounded-xl shadow-sm transition-all cursor-pointer"
-                            >
-                              Download
-                            </button>
+                            <span className="text-xs font-semibold text-slate-400">From bug reports</span>
                           </div>
                         </div>
-                      ))}
+                      )})}
+                      {!detailLoading && projectAssignments.length === 0 && <div className="py-8 text-center text-sm text-slate-500">No testers assigned yet.</div>}
                     </div>
                   </div>
 
-                  {/* RIGHT: All Testing Files (4 cols) */}
+                  {/* RIGHT: Email timeline (4 cols) */}
                   <div className={`lg:col-span-4 rounded-3xl border p-7 shadow-sm flex flex-col justify-between ${
                     isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200/90'
                   }`}>
                     <div>
-                      <h3 className="text-[18px] font-black text-center text-slate-900 dark:text-white">
-                        All Testing files
-                      </h3>
-
-                      {/* Decorative fade line */}
+                      <div className="flex items-center justify-center gap-2">
+                        <Mail className="w-5 h-5 text-[#4F37FE]" />
+                        <h3 className="text-[18px] font-black text-slate-900 dark:text-white">Email timeline</h3>
+                      </div>
                       <div className="h-[1.5px] bg-gradient-to-r from-transparent via-[#4F37FE]/40 to-transparent my-4" />
-
-                      <div className="space-y-4">
-                        <div className="text-[13px] font-semibold text-slate-400">
-                          Uploaded files
-                        </div>
-
-                        {/* File Item (PDF) */}
-                        {uploadedFiles.map((file, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/10"
-                          >
-                            <div className="w-10 h-11 bg-[#E02636] rounded-xl text-white font-black text-[10px] flex flex-col items-center justify-center shrink-0 shadow-sm">
-                              <span>PDF</span>
+                      <div className="space-y-3">
+                        {emailTimeline.map((notification, index) => (
+                          <div key={notification._id} className="flex gap-3">
+                            <div className="flex flex-col items-center">
+                              <span className={`mt-1 w-2.5 h-2.5 rounded-full ${notification.status === 'sent' ? 'bg-emerald-500' : notification.status === 'failed' ? 'bg-red-500' : 'bg-amber-400'}`} />
+                              {index < emailTimeline.length - 1 && <span className="w-px flex-1 min-h-10 bg-slate-200 dark:bg-white/10" />}
                             </div>
-
-                            <div className="min-w-0 flex-1">
-                              <div className="text-[14px] font-bold text-slate-900 dark:text-white truncate">
-                                {file.name}
-                              </div>
-                              <div className="text-[11px] font-medium text-slate-400">
-                                {file.sub}
-                              </div>
-                            </div>
+                            <button onClick={() => setSelectedEmail(notification)} className="flex-1 pb-4 text-left text-sm font-bold text-slate-900 dark:text-white hover:text-[#4F37FE] transition-colors">
+                              {getEmailDetails(notification).subject}
+                            </button>
                           </div>
                         ))}
+                        {emailTimeline.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No emails yet.</p>}
                       </div>
-                    </div>
-
-                    <div className="pt-6">
-                      <button
-                        onClick={() => alert("All reports package downloaded!")}
-                        className="w-full py-3 bg-[#4F37FE]/10 hover:bg-[#4F37FE]/20 text-[#4F37FE] font-bold text-[13px] rounded-2xl transition-colors cursor-pointer text-center"
-                      >
-                        Download Full Archive (.ZIP)
-                      </button>
                     </div>
                   </div>
                 </div>
 
-                {/* BOTTOM ROW: Upload Testing files */}
+                {/* BOTTOM ROW: All Testing Files */}
                 <div className={`rounded-3xl border p-8 shadow-sm ${
                   isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200/90'
                 }`}>
-                  <div className="text-center mb-6">
-                    <h3 className="text-[20px] font-black text-slate-900 dark:text-white">
-                      Upload Testing files
-                    </h3>
-                    <p className="text-[12px] font-medium text-slate-400 mt-0.5">
-                      File should be Pdf, word
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                    {/* Left: Drag & Drop Zone */}
-                    <div className="lg:col-span-7">
-                      <label
-                        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                        onDragLeave={() => setIsDragging(false)}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          setIsDragging(false);
-                          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                            const file = e.dataTransfer.files[0];
-                            setUploadedFiles(prev => [...prev, { name: file.name, sub: 'Sent to testers group' }]);
-                          }
-                        }}
-                        className={`h-48 border-2 border-dashed rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-all ${
-                          isDragging
-                            ? 'border-[#4F37FE] bg-[#4F37FE]/10 scale-[1.01]'
-                            : 'border-[#4F37FE]/40 hover:border-[#4F37FE] bg-slate-50/50 dark:bg-white/5'
-                        }`}
-                      >
-                        <input
-                          type="file"
-                          accept=".pdf,.doc,.docx"
-                          onChange={handleFileUpload}
-                          className="hidden"
-                        />
-                        {/* Purple Folder Icon */}
-                        <div className="w-16 h-14 bg-[#4F37FE] rounded-2xl flex items-center justify-center text-white shadow-md shadow-[#4F37FE]/30 mb-3">
-                          <Folder className="w-8 h-8 fill-white/20 stroke-white stroke-[2]" />
-                        </div>
-                        <span className="text-[14px] font-semibold text-slate-500 dark:text-slate-400">
-                          Drag & Drop your files here
-                        </span>
-                      </label>
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-11 h-11 rounded-2xl bg-[#4F37FE]/10 text-[#4F37FE] flex items-center justify-center">
+                      <FileText className="w-5 h-5" />
                     </div>
-
-                    {/* Right: Uploading files status */}
-                    <div className="lg:col-span-5 space-y-4">
-                      <div className="text-[13px] font-semibold text-slate-400">
-                        Uploading files
-                      </div>
-
-                      <div className="space-y-3 p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/10">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-11 bg-[#E02636] rounded-xl text-white font-black text-[10px] flex flex-col items-center justify-center shrink-0 shadow-sm">
-                            <span>PDF</span>
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[14px] font-bold text-slate-900 dark:text-white truncate">
-                                Blinkit Test scenarios.pdf
-                              </span>
-                              <span className="text-[12px] font-bold text-slate-400">
-                                {uploadProgress}%
-                              </span>
-                            </div>
-
-                            {/* Progress bar */}
-                            <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden mt-2">
-                              <div
-                                style={{ width: `${uploadProgress}%` }}
-                                className="bg-[#4F37FE] h-full rounded-full transition-all duration-300"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                    <div>
+                      <h3 className="text-[20px] font-black text-slate-900 dark:text-white">All Testing Files</h3>
+                      <p className="text-[12px] font-medium text-slate-400 mt-0.5">Files shared for this testing project</p>
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {uploadedFiles.map((file, idx) => (
+                      <div key={idx} className="flex items-center gap-3.5 p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/10">
+                        <div className="w-10 h-11 bg-[#E02636] rounded-xl text-white font-black text-[10px] flex items-center justify-center shrink-0"><span>FILE</span></div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold truncate">{file.name}</p>
+                          <p className="text-[11px] text-slate-400">{(file.size / 1024).toFixed(1)} KB</p>
+                        </div>
+                        <button onClick={() => void onDownloadProjectFile(file.key)} className="text-xs font-bold text-[#4F37FE]">Download</button>
+                      </div>
+                    ))}
+                    {uploadedFiles.length === 0 && <p className="py-8 text-sm text-slate-500">No testing files available.</p>}
+                  </div>
+                  {uploadedFiles.length > 0 && <button onClick={() => uploadedFiles.forEach((file) => void onDownloadProjectFile(file.key))} className="mt-6 px-5 py-3 bg-[#4F37FE]/10 hover:bg-[#4F37FE]/20 text-[#4F37FE] font-bold text-sm rounded-2xl">Download All Files</button>}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </main>
       </div>
+
+      {/* Email detail modal */}
+      {selectedEmail && (() => {
+        const details = getEmailDetails(selectedEmail);
+        const triggeredAt = new Date(selectedEmail.createdAt);
+        const dueAt = details.slaDueAt ? new Date(details.slaDueAt) : new Date(triggeredAt.getTime() + details.slaHours * 3600000);
+        return (
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setSelectedEmail(null)}>
+            <div onClick={(event) => event.stopPropagation()} className={`w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-[28px] border shadow-2xl ${isDarkMode ? 'bg-[#0F1017] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+              <div className="p-7 sm:p-9 border-b border-slate-200 dark:border-white/10 flex items-start justify-between gap-5">
+                <div className="flex items-start gap-4 min-w-0">
+                  <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border-4 border-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0"><Mail className="w-8 h-8" /></div>
+                  <div className="min-w-0">
+                    <p className="text-sm text-slate-500">Email</p>
+                    <h2 className="text-2xl sm:text-3xl font-black mt-1 break-words">{details.subject}</h2>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedEmail(null)} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center shrink-0"><X className="w-5 h-5" /></button>
+              </div>
+
+              <div className="p-7 sm:p-9 space-y-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                  <div><p className="text-xs uppercase font-bold text-slate-400">From</p><p className="mt-2 text-sm font-semibold break-all">{details.from}</p></div>
+                  <div><p className="text-xs uppercase font-bold text-slate-400">Sent via</p><p className="mt-2 text-sm font-semibold break-all">{details.sentVia || details.from}</p></div>
+                  <div><p className="text-xs uppercase font-bold text-slate-400">To</p><p className="mt-2 text-sm font-semibold break-all">{details.to.join(', ') || 'Not recorded'}</p></div>
+                  <div><p className="text-xs uppercase font-bold text-slate-400">CC</p><p className="mt-2 text-sm font-semibold break-all">{details.cc.join(', ') || 'None'}</p></div>
+                  <div><p className="text-xs uppercase font-bold text-slate-400">Status</p><span className={`inline-flex mt-2 px-3 py-1 rounded-lg text-xs font-bold capitalize ${selectedEmail.status === 'sent' ? 'bg-emerald-500/10 text-emerald-600' : selectedEmail.status === 'failed' ? 'bg-red-500/10 text-red-600' : 'bg-amber-500/10 text-amber-600'}`}>{selectedEmail.status}</span></div>
+                </div>
+
+                {details.replyTo && <div><p className="text-xs uppercase font-bold text-slate-400">Reply-to</p><p className="mt-2 text-sm font-semibold break-all">{details.replyTo}</p></div>}
+
+                <div>
+                  <p className="text-xs uppercase font-bold text-slate-400 mb-4">SLA timeline</p>
+                  <div className="rounded-2xl border border-dotted border-slate-300 dark:border-white/15 p-7 bg-slate-50/60 dark:bg-white/[0.03]">
+                    <div className="grid grid-cols-3 relative">
+                      <div className="absolute top-5 left-[16.66%] right-[16.66%] h-0.5 bg-slate-200 dark:bg-white/10" />
+                      {[
+                        { label: 'Triggered', time: triggeredAt, done: true },
+                        { label: selectedEmail.status === 'failed' ? 'Delivery failed' : 'Email sent', time: selectedEmail.sentAt ? new Date(selectedEmail.sentAt) : triggeredAt, done: selectedEmail.status === 'sent' },
+                        { label: `${details.slaHours}h SLA`, time: dueAt, done: false },
+                      ].map((step) => (
+                        <div key={step.label} className="relative z-10 text-center">
+                          <div className={`mx-auto w-10 h-10 rounded-xl border flex items-center justify-center font-black ${step.done ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-white dark:bg-[#0F1017] border-slate-200 dark:border-white/15 text-slate-400'}`}>{step.done ? '✓' : '○'}</div>
+                          <p className="mt-3 text-xs sm:text-sm font-bold">{step.label}</p>
+                          <p className="mt-1 text-[10px] sm:text-xs text-slate-400">{step.time.toLocaleString()}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="inline-flex rounded-xl bg-slate-100 dark:bg-white/10 px-4 py-2 text-sm font-bold">Configuration</span>
+                  <div className="mt-4 rounded-2xl border border-slate-200 dark:border-white/10 p-6">
+                    <p className="text-lg font-black">Email body</p>
+                    <div className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-slate-600 dark:text-slate-300">{details.body.replace(/<[^>]*>/g, '')}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Floating Support Modal */}
       {isSupportOpen && (
@@ -832,6 +851,25 @@ export default function ClientAppDashboard({
               </div>
             ) : (
               <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500">Subject</label>
+                  <input
+                    value={supportSubject}
+                    onChange={(e) => setSupportSubject(e.target.value)}
+                    placeholder="Email subject"
+                    className={`mt-1.5 w-full p-3.5 rounded-2xl border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#4F37FE] ${isDarkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-slate-50 border-slate-200'}`}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500">CC <span className="font-normal text-slate-400">(optional, comma separated)</span></label>
+                  <input
+                    type="text"
+                    value={supportCc}
+                    onChange={(e) => setSupportCc(e.target.value)}
+                    placeholder="person@example.com, team@example.com"
+                    className={`mt-1.5 w-full p-3.5 rounded-2xl border text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#4F37FE] ${isDarkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-slate-50 border-slate-200'}`}
+                  />
+                </div>
                 <textarea
                   rows={4}
                   value={supportMessage}
@@ -842,15 +880,26 @@ export default function ClientAppDashboard({
                   }`}
                 />
                 <button
-                  onClick={() => {
-                    if (supportMessage.trim()) {
-                      setSupportSent(true);
-                      setSupportMessage('');
+                  onClick={async () => {
+                    if (supportSubject.trim() && supportMessage.trim()) {
+                      setSupportSending(true);
+                      try {
+                        const cc = supportCc.split(',').map((email) => email.trim()).filter(Boolean);
+                        await onSendSupport({ subject: supportSubject.trim(), message: supportMessage.trim(), cc }, selectedApp?.id);
+                        setSupportSent(true);
+                        setSupportMessage('');
+                        setSupportCc('');
+                      } catch (err) {
+                        setDetailError(err instanceof Error ? err.message : 'Could not send support request.');
+                      } finally {
+                        setSupportSending(false);
+                      }
                     }
                   }}
+                  disabled={supportSending || !supportSubject.trim() || !supportMessage.trim()}
                   className="w-full py-3.5 bg-[#4F37FE] hover:bg-[#432EE0] text-white font-bold rounded-2xl transition-all cursor-pointer"
                 >
-                  Send Message
+                  {supportSending ? 'Sending…' : 'Send to support@uxos.in'}
                 </button>
               </div>
             )}

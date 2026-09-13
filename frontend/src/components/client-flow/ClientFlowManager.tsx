@@ -12,17 +12,39 @@ import PlayConsoleSetupFlow from './PlayConsoleSetupFlow';
 import ClientContactFlow from './ClientContactFlow';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Headphones, Sparkles, Plus, ArrowRight, ShieldCheck } from 'lucide-react';
+import type { TestApp } from '../../types';
+import type { BackendAssignment, BackendNotification, BackendProjectFile, LaunchOpsUser } from '../../lib/launchops-api';
 
 interface ClientFlowManagerProps {
   isDarkMode: boolean;
   onBackToHome: () => void;
   initialView?: 'wizard' | 'dashboard';
+  onCheckoutTier: (tierIndex: number) => Promise<boolean>;
+  projects: TestApp[];
+  isLoading?: boolean;
+  error?: string;
+  onCreateProject: (project: Omit<TestApp, 'id' | 'testersCount' | 'bugsFound' | 'progress' | 'status'>) => Promise<void>;
+  currentUser: LaunchOpsUser | null;
+  notifications: BackendNotification[];
+  onLoadProjectDetails: (projectId: string) => Promise<{ assignments: BackendAssignment[]; files: BackendProjectFile[] }>;
+  onDownloadProjectFile: (key: string) => Promise<void>;
+  onSendSupport: (input: { subject: string; message: string; cc: string[] }, projectId?: string) => Promise<void>;
 }
 
 export default function ClientFlowManager({
   isDarkMode,
   onBackToHome,
-  initialView = 'wizard'
+  initialView = 'wizard',
+  onCheckoutTier,
+  projects,
+  isLoading,
+  error,
+  onCreateProject,
+  currentUser,
+  notifications,
+  onLoadProjectDetails,
+  onDownloadProjectFile,
+  onSendSupport
 }: ClientFlowManagerProps) {
   // Mode: wizard vs dashboard
   const [viewMode, setViewMode] = useState<'wizard' | 'dashboard'>(() => {
@@ -85,13 +107,41 @@ export default function ClientFlowManager({
   };
 
   // Step 5: Tester emails completion -> REDIRECT DIRECTLY TO CLIENT DASHBOARD
-  const handleStep5Completed = () => {
+  const handleStep5Completed = async () => {
+    const serviceType = selectedService === 'ios'
+      ? 'ios_app_publishing'
+      : selectedService === 'ux'
+        ? 'user_experience_testing'
+        : 'play_store_closed_testing';
+    const serviceLabel = selectedService === 'ios'
+      ? 'iOS App Publishing'
+      : selectedService === 'ux'
+        ? 'User Experience Testing'
+        : 'Play Store Closed Testing';
+    const serviceOption = selectedService === 'playstore' ? techSupport : 'standard';
+    const requiredTesters = Number.parseInt(selectedTier?.testers ?? '14', 10) || 14;
     const summary = {
       appName: appDetails.appName || 'UXOS',
-      category: 'Playstore closed Testing',
+      category: serviceLabel,
       tier: selectedTier ? `${selectedTier.testers} Onboarding (${selectedTier.price})` : '14 Testers Onboarding (₹2999/-)',
-      service: 'Play Store Closed Testing (14 Days)'
+      service: serviceLabel,
     };
+    await onCreateProject({
+      name: appDetails.appName || 'UXOS',
+      version: '1.0.0',
+      category: serviceLabel,
+      devices: [],
+      packageTier: serviceOption === 'console_setup' ? 'managed_testing' : 'testers_only',
+      serviceType,
+      serviceOption,
+      packageName: appDetails.packageName,
+      testersRequired: requiredTesters,
+      launchDate: new Date(Date.now() + 14 * 86400000).toLocaleDateString('en-IN'),
+      projectName: `${appDetails.appName || 'UXOS'} Testing Track`,
+      apkUrl: appDetails.appLink,
+      optInUrl: appDetails.webLink,
+      instructions: selectedService === 'playstore' ? '14-day Play Store closed testing campaign.' : `${serviceLabel} service request.`,
+    });
     setCompletedProjectSummary(summary);
     if (typeof window !== 'undefined') {
       localStorage.setItem('launchops_client_has_published', 'true');
@@ -121,6 +171,14 @@ export default function ClientFlowManager({
         onLogout={onBackToHome}
         onNewAppWizard={handleStartNewApp}
         newRegisteredApp={completedProjectSummary}
+        projects={projects}
+        isLoading={isLoading}
+        error={error}
+        currentUser={currentUser}
+        notifications={notifications}
+        onLoadProjectDetails={onLoadProjectDetails}
+        onDownloadProjectFile={onDownloadProjectFile}
+        onSendSupport={onSendSupport}
       />
     );
   }
@@ -187,7 +245,7 @@ export default function ClientFlowManager({
                   isDarkMode={isDarkMode}
                   onBack={() => setCurrentStep(2)}
                   onComplete={(details) => {
-                    setAppDetails(prev => ({ ...prev, appName: details.appName }));
+                    setAppDetails(prev => ({ ...prev, appName: details.appName, packageName: details.packageName }));
                     setCurrentStep(3); // proceed to tier slider
                   }}
                 />
@@ -208,6 +266,7 @@ export default function ClientFlowManager({
                   isDarkMode={isDarkMode}
                   onNext={handleStep3Next}
                   onBack={() => setCurrentStep(techSupport === 'console_setup' ? 25 : 2)}
+                  onPay={(tier) => onCheckoutTier(tier.index)}
                 />
               </motion.div>
             )}

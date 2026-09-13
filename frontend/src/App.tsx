@@ -28,10 +28,11 @@ import {
   listAdminTesters, listAdminWithdrawals, listInvoices, listMyAssignments, listMyBugReports,
   listMyNotifications, markNotificationRead,
   listProjectAssignments, listProjectBugReports, listProjects, listTesterOpportunities,
+  listClientProjectAssignments, listProjectFiles, clearAdminProjectFiles, requestTestingFileUpload, registerProjectFile, getProjectFileDownload, createSupportTicket,
   mergeBugReports, publishBugReport, rejectAdminWithdrawal, replaceAssignment,
   requestWalletWithdrawal, reviewProjectVerification, submitAssignmentProof,
   submitClientVerification, submitProjectBugReport, updateMyTesterProfile, verifyAssignment,
-  type BackendInvoice, type BackendNotification, type BackendTesterProfile, type LaunchOpsUser,
+  type BackendInvoice, type BackendNotification, type BackendTesterProfile, type BackendProjectFile, type LaunchOpsUser,
 } from './lib/launchops-api';
 import {
   mapAssignment, mapBugReport, mapProject, mapTesterProfile, mapWallet, mapWithdrawal,
@@ -43,6 +44,7 @@ const emptyTester: Tester = { id: '', name: 'Tester', avatar: '', country: 'Indi
 
 type AuthScreenRenderProps = {
   isDarkMode: boolean;
+  initialRole?: 'tester' | 'client';
   onLoginSuccess: (name: string, role: 'tester' | 'client' | 'admin') => void;
   onBackToHome: () => void;
 };
@@ -179,6 +181,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   const [dashboardError, setDashboardError] = useState('');
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [notifications, setNotifications] = useState<BackendNotification[]>([]);
+  const [currentUser, setCurrentUser] = useState<LaunchOpsUser | null>(null);
 
   // Tester Flow Data States
   const [activeTester, setActiveTester] = useState<Tester>(emptyTester);
@@ -224,7 +227,10 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
 
   const refreshClientData = async () => {
     const token = await getTokenOrThrow();
-    const [projectResponse, invoiceResponse] = await Promise.all([listProjects(token), listInvoices(token)]);
+    const [me, projectResponse, invoiceResponse, notificationResponse] = await Promise.all([
+      getCurrentLaunchOpsUser(token), listProjects(token), listInvoices(token), listMyNotifications(token),
+    ]);
+    setCurrentUser(me.data.user);
     const projectBugs = await Promise.all(projectResponse.data.map((project) => listProjectBugReports(project._id, token)));
     const clientTester = { ...emptyTester, name: 'Verified tester' };
     const allBugs = projectBugs.flatMap((response) => response.data.map((report) => mapBugReport(report, clientTester)));
@@ -238,6 +244,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     }));
     setInvoices(invoiceResponse.data);
     setBugs(allBugs);
+    setNotifications(notificationResponse.data);
   };
 
   const refreshAdminData = async () => {
@@ -692,6 +699,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
 
   const handleLogout = async () => {
     localStorage.removeItem('launchops_current_tab');
+    localStorage.removeItem('launchops_user_role');
     sessionStorage.removeItem('launchops_intended_role');
     setApps([]);
     setAssignments([]);
@@ -761,7 +769,14 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   };
 
   const apiCreateProject = async (project: Omit<TestApp, 'id' | 'testersCount' | 'bugsFound' | 'progress' | 'status'>) => {
-    await createClientProject({ package: project.packageTier ?? 'managed_testing', requiredTesters: 14, requiredDeviceModels: project.devices, appDetails: { appName: project.name, packageName: project.playIntegration?.packageName || project.version, description: project.instructions, playStoreUrl: project.apkUrl } }, await getTokenOrThrow());
+    await createClientProject({
+      package: project.packageTier ?? 'managed_testing',
+      serviceType: project.serviceType ?? 'play_store_closed_testing',
+      serviceOption: project.serviceOption ?? project.packageTier ?? 'testers_only',
+      requiredTesters: project.testersRequired ?? 14,
+      requiredDeviceModels: project.devices,
+      appDetails: { appName: project.name, packageName: project.packageName || project.playIntegration?.packageName || project.version, description: project.instructions, playStoreUrl: project.apkUrl },
+    }, await getTokenOrThrow());
     await refreshClientData();
   };
   const apiSubmitVerification = async (projectId: string, proofUrl: string) => { await submitClientVerification(projectId, proofUrl, await getTokenOrThrow()); await refreshClientData(); };
@@ -785,6 +800,42 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
       document.head.appendChild(script);
     });
   };
+
+  const apiCheckoutOnboardingTier = async (tierIndex: number): Promise<boolean> => {
+    // Temporary local-development bypass until Razorpay credentials are enabled.
+    return tierIndex >= 0 && tierIndex < 3;
+  };
+
+  const apiLoadClientProjectDetails = async (projectId: string) => {
+    const token = await getTokenOrThrow();
+    const [assignmentResponse, fileResponse] = await Promise.all([
+      listClientProjectAssignments(projectId, token),
+      listProjectFiles(projectId, token),
+    ]);
+    return { assignments: assignmentResponse.data, files: fileResponse.data };
+  };
+
+  const apiUploadClientProjectFile = async (projectId: string, file: File): Promise<BackendProjectFile> => {
+    const token = await getTokenOrThrow();
+    const contentType = file.type || 'application/octet-stream';
+    const presigned = await requestTestingFileUpload(file.name, contentType, token);
+    const upload = await fetch(presigned.data.uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: file });
+    if (!upload.ok) throw new Error('File upload failed.');
+    const saved = await registerProjectFile(projectId, { name: file.name, key: presigned.data.key, contentType, size: file.size }, token);
+    return saved.data;
+  };
+
+  const apiDownloadClientProjectFile = async (key: string) => {
+    const response = await getProjectFileDownload(key, await getTokenOrThrow());
+    window.open(response.data.downloadUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const apiSendClientSupport = async (input: { subject: string; message: string; cc: string[] }, projectId?: string) => {
+    await createSupportTicket({ ...input, projectId }, await getTokenOrThrow());
+    await refreshClientData();
+  };
+  const apiListAdminProjectFiles = async (projectId: string) => (await listProjectFiles(projectId, await getTokenOrThrow())).data;
+  const apiClearAdminProjectFiles = async (projectId: string) => (await clearAdminProjectFiles(projectId, await getTokenOrThrow())).data.deleted;
 
   const apiReviewVerification = async (projectId: string, approve: boolean, customAmount?: number) => { await reviewProjectVerification(projectId, approve, await getTokenOrThrow(), customAmount); await refreshAdminData(); };
   const apiAdvanceMilestone = async (projectId: string, step: number, payload?: { optInUrl?: string }) => { await advanceProjectMilestone(projectId, step, await getTokenOrThrow(), payload?.optInUrl); await refreshAdminData(); };
@@ -856,7 +907,9 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
             >
               {(renderAuthScreen ?? ((props) => <AuthScreen {...props} />))({
                 isDarkMode,
+                initialRole: initialSubTab === 'client' ? 'client' : 'tester',
                 onLoginSuccess: (name, role) => {
+                  localStorage.setItem('launchops_user_role', role);
                   if (role === 'admin') {
                     handleSetTab('admin');
                   } else if (role === 'client') {
@@ -867,12 +920,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                       handleSetTab('client', 'wizard');
                     }
                   } else {
-                    const existingTester = MOCK_TESTERS.find(t => t.name.toLowerCase() === name.toLowerCase());
-                    if (existingTester) {
-                      setActiveTester(existingTester);
-                    } else {
-                      setActiveTester(MOCK_TESTERS[0]); 
-                    }
+                    setActiveTester({ ...emptyTester, name });
                     handleSetTab('tester');
                   }
                 },
@@ -928,6 +976,16 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 isDarkMode={isDarkMode}
                 onBackToHome={() => handleSetTab('home')}
                 initialView={initialSubTab === 'dashboard' ? 'dashboard' : initialSubTab === 'wizard' ? 'wizard' : undefined}
+                onCheckoutTier={apiCheckoutOnboardingTier}
+                projects={apps}
+                isLoading={dashboardLoading}
+                error={dashboardError}
+                onCreateProject={apiCreateProject}
+                currentUser={currentUser}
+                notifications={notifications}
+                onLoadProjectDetails={apiLoadClientProjectDetails}
+                onDownloadProjectFile={apiDownloadClientProjectFile}
+                onSendSupport={apiSendClientSupport}
               />
             </motion.div>
           )}
@@ -963,6 +1021,9 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 onAddTesterToProject={(projectId, testerId) => { void apiAddTester(projectId, testerId); }}
                 onRemoveTesterFromProject={(projectId, testerId) => { void apiRemoveTester(projectId, testerId); }}
                 onApproveTesterStep1={(projectId, testerId) => { void apiApproveStep1(projectId, testerId); }}
+                onListProjectFiles={apiListAdminProjectFiles}
+                onDownloadProjectFile={apiDownloadClientProjectFile}
+                onClearProjectFiles={apiClearAdminProjectFiles}
                 initialTab={initialSubTab}
                 onTabChange={(tab) => handleSetTab('admin', tab)}
               />}

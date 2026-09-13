@@ -6,11 +6,16 @@ import { ApiError } from "../utils/apiError";
 import { asyncHandler } from "../utils/asyncHandler";
 import { getPagination, buildPageMeta } from "../utils/pagination";
 import { dispatchNotification } from "../services/notification.service";
+import { resendClient } from "../config/resend";
+import { env } from "../config/env";
+import { logger } from "../config/logger";
+import { Notification } from "../models/Notification";
 
 const createSchema = z.object({
   subject: z.string().min(1),
   message: z.string().min(1),
   projectId: z.string().optional(),
+  cc: z.array(z.string().email()).max(10).default([]),
 });
 
 export const createSupportTicket = asyncHandler(async (req: Request, res: Response) => {
@@ -29,6 +34,54 @@ export const createSupportTicket = asyncHandler(async (req: Request, res: Respon
       await client.save();
     }
   }
+
+  let deliveryStatus: "sent" | "failed" = "sent";
+  let deliveryError: string | undefined;
+  let sentAt: Date | undefined;
+  try {
+    const result = await resendClient.emails.send({
+      from: env.resend.fromEmail,
+      to: "support@uxos.in",
+      cc: body.cc,
+      replyTo: req.dbUser!.email,
+      subject: `[UXOS Support] ${body.subject}`,
+      text: `${body.message}\n\nFrom: ${req.dbUser!.name} <${req.dbUser!.email}>`,
+    });
+    if (result.error) throw new Error(result.error.message);
+    sentAt = new Date();
+  } catch (error) {
+    deliveryStatus = "failed";
+    deliveryError = error instanceof Error ? error.message : String(error);
+    logger.warn({ error, ticketId: ticket._id }, "Support ticket saved but mailbox delivery failed");
+  }
+
+  await Notification.create({
+    recipientId: req.dbUser!._id,
+    type: "support_request",
+    channel: "email",
+    payload: {
+      projectId: body.projectId,
+      subject: body.subject,
+      recipient: "support@uxos.in",
+      ticketId: ticket._id.toString(),
+      email: {
+        subject: `[UXOS Support] ${body.subject}`,
+        from: `${req.dbUser!.name} <${req.dbUser!.email}>`,
+        sentVia: env.resend.fromEmail,
+        to: ["support@uxos.in"],
+        cc: body.cc,
+        replyTo: req.dbUser!.email,
+        body: `${body.message}\n\nFrom: ${req.dbUser!.name} <${req.dbUser!.email}>`,
+        slaHours: 24,
+        slaDueAt: new Date(ticket.createdAt.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+      },
+    },
+    status: deliveryStatus,
+    idempotencyKey: `${req.dbUser!._id}:support_request:${ticket._id}`,
+    attempts: deliveryStatus === "failed" ? 3 : 0,
+    lastError: deliveryError,
+    sentAt,
+  });
 
   res.status(201).json({ data: ticket });
 });

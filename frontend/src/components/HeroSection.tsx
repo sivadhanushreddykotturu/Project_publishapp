@@ -135,7 +135,7 @@ export default function HeroSection({
             {/* Calls to Action */}
             <div className="flex flex-wrap items-center gap-4 mb-12">
               <button 
-                onClick={() => onTabChange ? onTabChange('client', 'new-app') : onStartTesting()}
+                onClick={() => onTabChange ? onTabChange('auth', 'client') : onStartTesting()}
                 className="bg-[#4F37FE] hover:bg-[#432ee0] px-7 py-4 rounded-xl font-bold flex items-center gap-2.5 shadow-lg shadow-indigo-600/25 transition-all duration-300 hover:scale-[1.02] active:scale-95 cursor-pointer text-white border-0 text-sm md:text-base animate-glow-pulse"
                 id="hero-primary-cta"
               >
@@ -144,7 +144,7 @@ export default function HeroSection({
               </button>
 
               <button 
-                onClick={() => onTabChange ? onTabChange('tester') : onStartTesting()}
+                onClick={() => onTabChange ? onTabChange('auth', 'tester') : onStartTesting()}
                 className={`px-6 py-4 rounded-xl font-bold flex items-center gap-2 border transition-all duration-200 cursor-pointer text-sm md:text-base ${
                   isDarkMode 
                     ? 'bg-white/5 hover:bg-white/10 border-white/10 text-white' 

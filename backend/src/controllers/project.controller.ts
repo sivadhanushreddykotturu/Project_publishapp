@@ -6,7 +6,7 @@ import { Client } from "../models/Client";
 import { Tester } from "../models/Tester";
 import { Assignment } from "../models/Assignment";
 import { BugReport } from "../models/BugReport";
-import { PACKAGES, PLAY_INTEGRATION_MODES } from "../models/enums";
+import { PACKAGES, PLAY_INTEGRATION_MODES, SERVICE_TYPES } from "../models/enums";
 import { ApiError } from "../utils/apiError";
 import { asyncHandler } from "../utils/asyncHandler";
 import { getPagination, buildPageMeta } from "../utils/pagination";
@@ -25,9 +25,12 @@ import { env } from "../config/env";
 import { User } from "../models/User";
 import { dispatchNotification } from "../services/notification.service";
 import { activateProject } from "../services/workflowEngine.service";
+import { deleteObjects } from "../services/storage.service";
 
 const createProjectSchema = z.object({
   package: z.enum(PACKAGES),
+  serviceType: z.enum(SERVICE_TYPES).default("play_store_closed_testing"),
+  serviceOption: z.string().min(1).max(80).default("testers_only"),
   requiredTesters: z.number().int().min(1).optional(),
   requiredDeviceModels: z.array(z.string().min(1)).max(10).optional(),
   appDetails: z.object({
@@ -50,10 +53,12 @@ export const createProject = asyncHandler(async (req: Request, res: Response) =>
   const client = await Client.findOne({ userId: req.dbUser!._id });
   if (!client) throw ApiError.notFound("Client profile not found");
 
-  const requiredTesters = 14;
+  const requiredTesters = body.requiredTesters ?? 14;
   const project = await Project.create({
     clientId: client._id,
     package: body.package,
+    serviceType: body.serviceType,
+    serviceOption: body.serviceOption,
     appDetails: body.appDetails,
     requiredTesters,
     requiredDeviceModels: body.requiredDeviceModels ?? [],
@@ -97,6 +102,60 @@ export const listProjects = asyncHandler(async (req: Request, res: Response) => 
     Project.countDocuments(filter),
   ]);
   res.status(200).json({ data: items, meta: buildPageMeta(page, limit, total) });
+});
+
+async function loadVisibleProject(req: Request) {
+  if (req.dbUser!.role === "admin") {
+    const project = await Project.findById(req.params.id);
+    if (!project) throw ApiError.notFound("Project not found");
+    return project;
+  }
+  const client = await Client.findOne({ userId: req.dbUser!._id });
+  if (!client) throw ApiError.notFound("Client profile not found");
+  const project = await Project.findOne({ _id: req.params.id, clientId: client._id });
+  if (!project) throw ApiError.notFound("Project not found");
+  return project;
+}
+
+export const listClientProjectAssignments = asyncHandler(async (req: Request, res: Response) => {
+  await loadVisibleProject(req);
+  const assignments = await Assignment.find({ projectId: req.params.id, status: { $in: ["active", "queued", "completed"] } })
+    .populate({ path: "testerId", populate: { path: "userId", select: "name email" } })
+    .sort({ createdAt: 1 });
+  res.status(200).json({ data: assignments });
+});
+
+const projectFileSchema = z.object({
+  name: z.string().min(1).max(255),
+  key: z.string().min(1),
+  contentType: z.string().min(1),
+  size: z.number().int().min(0),
+});
+
+export const listProjectFiles = asyncHandler(async (req: Request, res: Response) => {
+  const project = await loadVisibleProject(req);
+  res.status(200).json({ data: project.clientFiles });
+});
+
+export const addProjectFile = asyncHandler(async (req: Request, res: Response) => {
+  const project = await loadVisibleProject(req);
+  const file = { ...projectFileSchema.parse(req.body), uploadedAt: new Date() };
+  project.clientFiles.push(file);
+  await project.save();
+  res.status(201).json({ data: file });
+});
+
+export const clearProjectFiles = asyncHandler(async (req: Request, res: Response) => {
+  const project = await Project.findById(req.params.id);
+  if (!project) throw ApiError.notFound("Project not found");
+  if (!["closed", "completed", "cancelled"].includes(project.status)) {
+    throw ApiError.conflict("Files can only be cleared after the testing window has ended");
+  }
+  const keys = project.clientFiles.map((file) => file.key);
+  await deleteObjects(keys);
+  project.clientFiles = [];
+  await project.save();
+  res.status(200).json({ data: { deleted: keys.length } });
 });
 
 export const listTesterOpportunities = asyncHandler(async (req: Request, res: Response) => {
