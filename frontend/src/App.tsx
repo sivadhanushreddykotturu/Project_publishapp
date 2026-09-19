@@ -988,12 +988,9 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                   if (role === 'admin') {
                     handleSetTab('admin');
                   } else if (role === 'client') {
-                    const hasPublished = typeof window !== 'undefined' && localStorage.getItem('launchops_client_has_published') === 'true';
-                    if (hasPublished) {
-                      handleSetTab('client', 'dashboard');
-                    } else {
-                      handleSetTab('client', 'wizard');
-                    }
+                    // The backend project list decides whether this returning client
+                    // lands on the dashboard or the new-project wizard.
+                    handleSetTab('client');
                   } else {
                     setActiveTester({ ...emptyTester, name });
                     handleSetTab('tester');
@@ -1054,7 +1051,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
               <ClientFlowManager
                 isDarkMode={isDarkMode}
                 onBackToHome={() => handleSetTab('home')}
-                initialView={initialSubTab === 'dashboard' ? 'dashboard' : initialSubTab === 'wizard' ? 'wizard' : undefined}
+                initialView={initialSubTab === 'dashboard' ? 'dashboard' : ['wizard', 'new-app'].includes(initialSubTab) ? 'wizard' : undefined}
                 onCheckoutTier={apiCheckoutOnboardingTier}
                 projects={apps}
                 isLoading={dashboardLoading}

@@ -266,7 +266,7 @@ export default function Step3PricingTier({
           Start Testing
         </button>}
       </div>
-      {skipPayment && <p className="text-center text-sm text-slate-500">Local testing: payment is skipped. No charge or payment confirmation will be created.</p>}
+      {skipPayment && <p className="text-center text-sm text-slate-500">Payment is temporarily disabled. Continue to create your project without a charge.</p>}
       {paymentError && <p className="text-center text-sm font-semibold text-red-500">{paymentError}</p>}
     </div>
   );

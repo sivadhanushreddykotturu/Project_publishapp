@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import ClientWizardLayout from './ClientWizardLayout';
 import ClientAppDashboard from './ClientAppDashboard';
 import Step1ServiceSelect, { ServiceType } from './Step1ServiceSelect';
@@ -67,10 +67,6 @@ export default function ClientFlowManager({
       if (window.location.pathname.includes('/client/new-app') || window.location.pathname.includes('/client/wizard')) {
         return 'wizard';
       }
-      // If returning client has already published an app, auto-redirect to dashboard!
-      if (localStorage.getItem('launchops_client_has_published') === 'true') {
-        return 'dashboard';
-      }
     }
     return initialView;
   });
@@ -92,6 +88,15 @@ export default function ClientFlowManager({
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [supportMessage, setSupportMessage] = useState('');
   const [supportSent, setSupportSent] = useState(false);
+
+  useEffect(() => {
+    if (isLoading || initialView === 'wizard' || projects.length === 0) return;
+    setViewMode('dashboard');
+    localStorage.setItem('launchops_client_has_published', 'true');
+    if (!window.location.pathname.includes('/client/dashboard')) {
+      window.history.replaceState(null, '', '/client/dashboard');
+    }
+  }, [initialView, isLoading, projects.length]);
 
   // Step 1: Service selection completion
   const handleStep1Next = () => {
