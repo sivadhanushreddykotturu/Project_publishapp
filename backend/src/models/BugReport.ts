@@ -18,6 +18,7 @@ export interface IBugReport extends Document {
   duplicateOf?: Types.ObjectId;
   status: BugStatus;
   publishedAt?: Date;
+  adminNotes?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +40,7 @@ const bugReportSchema = new Schema<IBugReport>(
     duplicateOf: { type: Schema.Types.ObjectId, ref: "BugReport" },
     status: { type: String, enum: BUG_STATUSES, default: "open", index: true },
     publishedAt: { type: Date },
+    adminNotes: { type: String, trim: true },
   },
   { timestamps: true }
 );

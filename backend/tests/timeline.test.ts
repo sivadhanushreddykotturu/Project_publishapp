@@ -14,6 +14,7 @@ import {
   markTestersInvited,
   applyForProduction,
   confirmProductionApproved,
+  getVerifiedTesterEmails,
 } from "../src/services/playIntegration.service";
 import { runInstallPacingSweep } from "../src/jobs/installPacingCron";
 
@@ -70,6 +71,20 @@ afterEach(async () => {
 });
 
 describe("email review milestone", () => {
+  it("returns the verified Google Play email submitted by the tester", async () => {
+    const project = await makeProject();
+    const admin = await makeAdmin();
+    const uniqueSuffix = new Types.ObjectId().toString();
+    const user = await User.create({ clerkUserId: `clerk_${uniqueSuffix}`, role: "tester", name: "T", email: `${uniqueSuffix}@account.test` });
+    const tester = await Tester.create({ userId: user._id });
+    const assignment = await Assignment.create({ projectId: project._id, testerId: tester._id, status: "active", currentStep: 1, assignedAt: new Date(), lastActivityAt: new Date() });
+
+    await submitProof({ assignmentId: assignment._id, step: 1, fileUrl: "r2://proofs/v.png", googlePlayEmail: "play.tester@gmail.com" });
+    await verifyProof({ assignmentId: assignment._id, step: 1, approve: true, adminId: admin._id });
+
+    await expect(getVerifiedTesterEmails(project._id)).resolves.toEqual(["play.tester@gmail.com"]);
+  });
+
   it("requires verification to be fully cleared before it can be submitted for review", async () => {
     const project = await makeProject();
     const admin = await makeAdmin();

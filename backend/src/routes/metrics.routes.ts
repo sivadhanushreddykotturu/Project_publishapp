@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getMetricsSummary } from "../controllers/metrics.controller";
+import { getAdminDashboard, getMetricsSummary } from "../controllers/metrics.controller";
 import { requireAuth, requireRole } from "../middleware/auth";
 
 const router = Router();
@@ -36,5 +36,6 @@ const router = Router();
  *                         concurrentProjectsPerAdminTarget: { type: integer }
  */
 router.get("/summary", requireAuth(), requireRole("admin"), getMetricsSummary);
+router.get("/admin-dashboard", requireAuth(), requireRole("admin"), getAdminDashboard);
 
 export default router;

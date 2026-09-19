@@ -13,11 +13,16 @@ import { dispatchNotification } from "./notification.service";
  * guarded findOneAndUpdate, so concurrent joins can never exceed requiredTesters.
  * Testers who miss the cutoff are queued in arrival order (queuePosition).
  */
-export async function joinProject(projectId: Types.ObjectId, testerId: Types.ObjectId) {
+export async function joinProject(
+  projectId: Types.ObjectId,
+  testerId: Types.ObjectId,
+  options: { reactivateRemoved?: boolean } = {}
+) {
   const existing = await Assignment.findOne({ projectId, testerId });
   // Joining is idempotent: repeated clicks, retries, or a refreshed notification
   // return the tester's existing enrollment instead of surfacing a misleading 409.
-  if (existing) return existing;
+  const shouldReactivate = existing?.status === "removed" && options.reactivateRemoved;
+  if (existing && !shouldReactivate) return existing;
 
   const project = await Project.findById(projectId);
   if (!project) throw ApiError.notFound("Project not found");
@@ -39,14 +44,40 @@ export async function joinProject(projectId: Types.ObjectId, testerId: Types.Obj
   );
 
   if (claimed) {
-    const assignment = await Assignment.create({
-      projectId,
-      testerId,
-      status: "active",
-      currentStep: 1,
-      assignedAt: new Date(),
-      lastActivityAt: new Date(),
-    });
+    const assignedAt = new Date();
+    const assignment = shouldReactivate
+      ? await Assignment.findOneAndUpdate(
+          { _id: existing!._id, status: "removed" },
+          {
+            $set: {
+              status: "active",
+              currentStep: 1,
+              proofs: [],
+              inactivityFlag: false,
+              assignedAt,
+              lastActivityAt: assignedAt,
+            },
+            $unset: { queuePosition: 1, replacedBy: 1, scheduledInstallDate: 1, installPacingNotifiedAt: 1 },
+          },
+          { new: true }
+        )
+      : await Assignment.create({
+          projectId,
+          testerId,
+          status: "active",
+          currentStep: 1,
+          assignedAt,
+          lastActivityAt: assignedAt,
+        });
+
+    // Another concurrent admin request may have reactivated the same historical
+    // assignment after we claimed a project slot. Release our duplicate claim.
+    if (!assignment) {
+      await Project.findByIdAndUpdate(projectId, { $inc: { activeTesterCount: -1 } });
+      const concurrentlyReactivated = await Assignment.findById(existing!._id);
+      if (!concurrentlyReactivated) throw ApiError.notFound("Assignment not found after concurrent allocation");
+      return concurrentlyReactivated;
+    }
 
     if (claimed.activeTesterCount >= claimed.requiredTesters && claimed.joinState !== "full") {
       claimed.joinState = "full";
@@ -59,8 +90,8 @@ export async function joinProject(projectId: Types.ObjectId, testerId: Types.Obj
       recipientUserId: tester.userId,
       type: "testing_link",
       channel: "email",
-      relatedId: assignment._id.toString(),
-      payload: { projectId: projectId.toString(), status: "active" },
+      relatedId: shouldReactivate ? `${assignment._id.toString()}:${assignedAt.toISOString()}` : assignment._id.toString(),
+      payload: { projectId: projectId.toString(), status: "active", reallocated: Boolean(shouldReactivate) },
     });
     return assignment;
   }

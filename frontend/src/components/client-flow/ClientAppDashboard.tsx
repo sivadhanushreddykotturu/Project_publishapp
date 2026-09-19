@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { TestApp } from '../../types';
-import type { BackendAssignment, BackendNotification, BackendProjectFile, LaunchOpsUser } from '../../lib/launchops-api';
+import type { BackendAssignment, BackendNotification, BackendProjectFile, BackendSupportTicket, LaunchOpsUser } from '../../lib/launchops-api';
 
 export interface ClientAppItem {
   id: string;
@@ -96,7 +96,13 @@ interface ClientAppDashboardProps {
   notifications: BackendNotification[];
   onLoadProjectDetails: (projectId: string) => Promise<{ assignments: BackendAssignment[]; files: BackendProjectFile[] }>;
   onDownloadProjectFile: (key: string) => Promise<void>;
+  onUploadProjectFile: (projectId: string, file: File) => Promise<BackendProjectFile>;
+  onSubmitTestingLink: (projectId: string, optInUrl: string) => Promise<void>;
+  onConfirmEmailsAdded: (projectId: string) => Promise<void>;
+  onGetVerifiedTesterEmails: (projectId: string) => Promise<{ emails: string[]; count: number }>;
   onSendSupport: (input: { subject: string; message: string; cc: string[] }, projectId?: string) => Promise<void>;
+  supportTickets: BackendSupportTicket[];
+  onReplyToSupport: (ticketId: string, body: string) => Promise<void>;
   newRegisteredApp?: {
     appName: string;
     category?: string;
@@ -120,7 +126,13 @@ export default function ClientAppDashboard({
   notifications,
   onLoadProjectDetails,
   onDownloadProjectFile,
-  onSendSupport
+  onUploadProjectFile,
+  onSubmitTestingLink,
+  onConfirmEmailsAdded,
+  onGetVerifiedTesterEmails,
+  onSendSupport,
+  supportTickets,
+  onReplyToSupport
 }: ClientAppDashboardProps) {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(initialDarkMode);
   const [activeNav, setActiveNav] = useState<'dashboard' | 'testing' | 'services' | 'support'>('testing');
@@ -138,6 +150,14 @@ export default function ClientAppDashboard({
   const [projectAssignments, setProjectAssignments] = useState<BackendAssignment[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<BackendProjectFile[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<BackendNotification | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [testingLink, setTestingLink] = useState('');
+  const [testingLinkSaving, setTestingLinkSaving] = useState(false);
+  const [testingLinkMessage, setTestingLinkMessage] = useState('');
+  const [verifiedEmails, setVerifiedEmails] = useState<string[]>([]);
+  const [emailWorkflowBusy, setEmailWorkflowBusy] = useState(false);
+  const [emailWorkflowMessage, setEmailWorkflowMessage] = useState('');
+  const [supportReplies, setSupportReplies] = useState<Record<string, string>>({});
 
   const apps: ClientAppItem[] = projects
     .filter((project) => activeFilterTab !== 'active' || project.status === 'Testing')
@@ -179,18 +199,35 @@ export default function ClientAppDashboard({
 
   useEffect(() => {
     if (!selectedApp) return;
+    const project = projects.find((item) => item.id === selectedApp.id);
+    setTestingLink(project?.optInUrl ?? '');
+    setTestingLinkMessage('');
     setDetailLoading(true);
     setDetailError('');
-    void onLoadProjectDetails(selectedApp.id)
-      .then((result) => { setProjectAssignments(result.assignments); setUploadedFiles(result.files); })
+    void Promise.all([onLoadProjectDetails(selectedApp.id), onGetVerifiedTesterEmails(selectedApp.id)])
+      .then(([result, emailResult]) => { setProjectAssignments(result.assignments); setUploadedFiles(result.files); setVerifiedEmails(emailResult.emails); })
       .catch((err) => setDetailError(err instanceof Error ? err.message : 'Could not load project details.'))
       .finally(() => setDetailLoading(false));
   }, [selectedApp?.id]);
 
   const emailTimeline = notifications.filter((notification) =>
     notification.channel === 'email' &&
-    (!notification.payload.projectId || notification.payload.projectId === selectedApp?.id)
+    (notification.payload.projectId === selectedApp?.id || notification.relatedId === selectedApp?.id)
   );
+  const selectedProjectModel = projects.find((project) => project.id === selectedApp?.id);
+  const verificationStep = selectedProjectModel?.workflowSteps?.find((step) => step.type === 'verification');
+  const emailReviewStep = selectedProjectModel?.workflowSteps?.find((step) => step.type === 'google_email_review');
+  const workflowStage = selectedProjectModel?.status === 'Completed'
+    ? 'Completed'
+    : selectedProjectModel?.optInUrl
+      ? '14-day testing in progress'
+      : emailReviewStep?.state === 'verified'
+        ? 'Google review approved — testing link ready'
+        : emailReviewStep?.state === 'submitted'
+          ? 'Google email review pending'
+          : verificationStep?.state === 'verified'
+            ? 'Verified emails ready to add'
+            : 'Collecting verified tester emails';
 
   const emailTitle = (type: string) => type
     .split('_')
@@ -722,7 +759,58 @@ export default function ClientAppDashboard({
                   </div>
                 </div>
 
-                {/* BOTTOM ROW: All Testing Files */}
+                {/* Google Play manual workflow */}
+                <div className={`rounded-3xl border p-8 shadow-sm ${
+                  isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200/90'
+                }`}>
+                  <div className="mb-5 flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#4F37FE]/10 text-[#4F37FE]"><Share2 className="h-5 w-5" /></div>
+                    <div>
+                      <h3 className="text-[20px] font-black text-slate-900 dark:text-white">Google Play testing workflow</h3>
+                      <p className="mt-0.5 text-[12px] font-medium text-slate-400">Current stage: <span className="font-bold text-[#4F37FE]">{workflowStage}</span></p>
+                    </div>
+                  </div>
+                  <div className="mb-6 grid grid-cols-2 gap-2 md:grid-cols-5">
+                    {['Collect emails', 'Add to Play Console', 'Google review', 'Share testing link', '14-day testing'].map((label, index) => {
+                      const activeIndex = selectedProjectModel?.optInUrl ? 4 : emailReviewStep?.state === 'verified' ? 3 : emailReviewStep?.state === 'submitted' ? 2 : verificationStep?.state === 'verified' ? 1 : 0;
+                      return <div key={label} className={`rounded-xl px-3 py-2 text-center text-[10px] font-bold ${index <= activeIndex ? 'bg-[#4F37FE]/10 text-[#4F37FE]' : 'bg-slate-500/10 text-slate-400'}`}>{index + 1}. {label}</div>;
+                    })}
+                  </div>
+
+                  <div className={`mb-6 rounded-2xl border p-5 ${isDarkMode ? 'border-white/10 bg-[#181926]' : 'border-slate-200 bg-slate-50'}`}>
+                    <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+                      <div><p className="text-sm font-bold">Verified tester emails ({verifiedEmails.length}/{selectedProjectModel?.testersRequired ?? 0})</p><p className="mt-1 text-xs text-slate-400">Copy these addresses into the Google Play closed-testing email list.</p></div>
+                      <button type="button" disabled={!verifiedEmails.length} onClick={async () => { await navigator.clipboard.writeText(verifiedEmails.join(', ')); setEmailWorkflowMessage(`${verifiedEmails.length} emails copied.`); }} className="rounded-xl bg-[#4F37FE] px-5 py-2.5 text-xs font-bold text-white disabled:opacity-40">Copy comma-separated</button>
+                    </div>
+                    <div className="mt-3 max-h-32 overflow-y-auto whitespace-pre-wrap rounded-xl bg-black/5 p-3 font-mono text-xs dark:bg-black/20">{verifiedEmails.length ? verifiedEmails.join(',\n') : 'No verified emails yet.'}</div>
+                    <button type="button" disabled={emailWorkflowBusy || !verifiedEmails.length || emailReviewStep?.state === 'submitted' || emailReviewStep?.state === 'verified'} onClick={async () => { if (!selectedApp) return; setEmailWorkflowBusy(true); setEmailWorkflowMessage(''); try { await onConfirmEmailsAdded(selectedApp.id); setEmailWorkflowMessage('Confirmed. The admin has been notified and Google email review is pending.'); } catch (confirmError) { setEmailWorkflowMessage(confirmError instanceof Error ? confirmError.message : 'Could not confirm the email list.'); } finally { setEmailWorkflowBusy(false); } }} className="mt-4 rounded-xl border border-[#4F37FE] bg-transparent px-5 py-2.5 text-xs font-bold text-[#4F37FE] disabled:opacity-40">{emailReviewStep?.state === 'submitted' ? 'Google Review Pending' : emailReviewStep?.state === 'verified' ? 'Email Review Approved' : emailWorkflowBusy ? 'Confirming...' : 'I Added These Emails to Play Console'}</button>
+                    {emailWorkflowMessage && <p className="mt-3 text-xs font-semibold text-slate-500">{emailWorkflowMessage}</p>}
+                  </div>
+
+                  <p className="mb-3 text-xs font-semibold text-slate-500">After Google approves the email list, paste the closed-testing opt-in URL below.</p>
+                  <form className="flex flex-col gap-3 md:flex-row" onSubmit={async (event) => {
+                    event.preventDefault();
+                    if (!selectedApp || !testingLink.trim()) return;
+                    setTestingLinkSaving(true);
+                    setTestingLinkMessage('');
+                    try {
+                      await onSubmitTestingLink(selectedApp.id, testingLink.trim());
+                      const eligibleCount = projectAssignments.filter((assignment) => assignment.status === 'active' && assignment.currentStep >= 3).length;
+                      setTestingLinkMessage(`Testing link saved and sent to ${eligibleCount} eligible enrolled tester${eligibleCount === 1 ? '' : 's'}.`);
+                    } catch (submitError) {
+                      setTestingLinkMessage(submitError instanceof Error ? submitError.message : 'Could not save the testing link.');
+                    } finally {
+                      setTestingLinkSaving(false);
+                    }
+                  }}>
+                    <input type="url" required value={testingLink} onChange={(event) => setTestingLink(event.target.value)} placeholder="https://play.google.com/apps/testing/com.example.app" className={`min-w-0 flex-1 rounded-2xl border px-4 py-3 text-sm outline-none focus:border-[#4F37FE] ${isDarkMode ? 'border-white/10 bg-[#181926] text-white' : 'border-slate-200 bg-white text-slate-900'}`} />
+                    <button disabled={testingLinkSaving || !testingLink.trim() || emailReviewStep?.state !== 'verified'} className="rounded-2xl bg-[#4F37FE] px-6 py-3 text-sm font-bold text-white disabled:opacity-50">{testingLinkSaving ? 'Sharing...' : selectedProjectModel?.optInUrl ? 'Update & Resend' : 'Save & Notify Testers'}</button>
+                  </form>
+                  {emailReviewStep?.state !== 'verified' && <p className="mt-3 text-xs text-amber-600">This action unlocks when the admin confirms Google approved the tester email list.</p>}
+                  {testingLinkMessage && <p className={`mt-3 text-xs font-semibold ${testingLinkMessage.startsWith('Testing link saved') ? 'text-emerald-600' : 'text-red-500'}`}>{testingLinkMessage}</p>}
+                </div>
+
+                {/* BOTTOM ROW: optional project files */}
                 <div className={`rounded-3xl border p-8 shadow-sm ${
                   isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200/90'
                 }`}>
@@ -731,10 +819,11 @@ export default function ClientAppDashboard({
                       <FileText className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-[20px] font-black text-slate-900 dark:text-white">All Testing Files</h3>
-                      <p className="text-[12px] font-medium text-slate-400 mt-0.5">Files shared for this testing project</p>
+                      <h3 className="text-[20px] font-black text-slate-900 dark:text-white">Project Files <span className="text-sm font-semibold text-slate-400">(Optional)</span></h3>
+                      <p className="text-[12px] font-medium text-slate-400 mt-0.5">Share supporting instructions, credentials, screenshots, or app builds only when needed.</p>
                     </div>
                   </div>
+                  {selectedApp && <label className="mb-5 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-[#4F37FE] px-5 py-3 text-sm font-bold text-white"><Plus className="h-4 w-4" />{uploadingFile ? 'Uploading...' : 'Add Optional File'}<input type="file" className="hidden" disabled={uploadingFile} onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; setUploadingFile(true); try { const saved = await onUploadProjectFile(selectedApp.id, file); setUploadedFiles((items) => [saved, ...items]); } finally { setUploadingFile(false); event.target.value = ''; } }} /></label>}
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {uploadedFiles.map((file, idx) => (
                       <div key={idx} className="flex items-center gap-3.5 p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/10">
@@ -822,7 +911,7 @@ export default function ClientAppDashboard({
       {/* Floating Support Modal */}
       {isSupportOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className={`rounded-3xl border max-w-lg w-full p-7 space-y-5 shadow-2xl ${
+          <div className={`max-h-[90vh] overflow-y-auto rounded-3xl border max-w-2xl w-full p-7 space-y-5 shadow-2xl ${
             isDarkMode ? 'bg-[#0F1017] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900'
           }`}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/10">
@@ -903,6 +992,10 @@ export default function ClientAppDashboard({
                 </button>
               </div>
             )}
+            <div className="space-y-3 border-t border-slate-500/15 pt-4">
+              <h4 className="text-sm font-black">My support conversations</h4>
+              {supportTickets.length === 0 ? <p className="text-xs text-slate-500">No support conversations yet.</p> : supportTickets.map((ticket) => <article key={ticket._id} className="rounded-2xl border border-slate-500/15 p-4"><div className="flex justify-between gap-3"><strong className="text-sm">{ticket.subject}</strong><span className="text-[9px] font-black uppercase text-[#4F37FE]">{ticket.status.replace('_', ' ')}</span></div><div className="mt-3 space-y-2">{ticket.messages.map((message, index) => { const author = typeof message.authorId === 'object' ? message.authorId : null; const isAdmin = author?.role === 'admin'; return <div key={index} className={`rounded-xl p-3 text-xs ${isAdmin ? 'ml-8 bg-[#4F37FE]/10 text-[#4F37FE]' : 'mr-8 bg-slate-500/10'}`}><p className="mb-1 text-[9px] font-black uppercase opacity-60">{isAdmin ? 'Admin response' : 'You'}</p>{message.body}</div>; })}</div><form className="mt-3 flex gap-2" onSubmit={async (event) => { event.preventDefault(); const body = supportReplies[ticket._id]?.trim(); if (!body) return; await onReplyToSupport(ticket._id, body); setSupportReplies((items) => ({ ...items, [ticket._id]: '' })); }}><input value={supportReplies[ticket._id] ?? ''} onChange={(event) => setSupportReplies((items) => ({ ...items, [ticket._id]: event.target.value }))} placeholder="Reply" className={`min-w-0 flex-1 rounded-xl border px-3 py-2 text-xs ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-slate-200'}`} /><button className="rounded-xl border-0 bg-[#4F37FE] px-4 text-xs font-bold text-white">Send</button></form></article>)}
+            </div>
           </div>
         </div>
       )}

@@ -8,8 +8,9 @@ export interface TestApp {
   launchDate: string;
   category: string;
   progress: number;
+  testerPayout?: number;
   testingWindowEnded?: boolean;
-  devices: string[];
+    devices: string[];
   
   // Simulation & Workflow Extensions
   packageTier?: 'testers_only' | 'managed_testing' | 'launch_ready' | 'custom';
@@ -24,6 +25,7 @@ export interface TestApp {
   joinState?: 'open' | 'full' | 'closed';
   whatsappGroupLink?: string;
   optInUrl?: string;
+  workflowSteps?: Array<{ order: number; type: string; state: string; deadline?: string }>;
   playIntegration?: {
     serviceAccountSet: boolean;
     packageName: string;
@@ -88,11 +90,13 @@ export interface Notification {
 }
 
 export interface Tester {
-  id: string;
-  name: string;
+    id: string;
+    name: string;
+    email?: string;
   avatar: string;
   country: string;
-  devices: string[];
+    devices: string[];
+    deviceDetails?: Array<{ model: string; androidVersion: string; fingerprint: string }>;
   bugsFoundCount: number;
   rating: number;
   specialty: string;
@@ -121,6 +125,8 @@ export interface TesterAssignment {
   step4CheckInsCompleted: number; // Derived count of submitted Step 4 proofs
   step4LastCheckIn?: string; // Date string
   step4Proof?: string; // Step 4: Testing-period completion proof
+  pendingProofSteps?: number[];
+  rejectedProofSteps?: number[];
   inactivityFlag: boolean;
   joinedAt: string;
 }

@@ -178,7 +178,7 @@ router.get("/:id/queue", requireAuth(), requireRole("admin"), getProjectQueue);
  *                     emails: { type: array, items: { type: string, format: email } }
  *                     count: { type: integer }
  */
-router.get("/:id/verified-tester-emails", requireAuth(), requireRole("admin"), getVerifiedEmails);
+router.get("/:id/verified-tester-emails", requireAuth(), requireRole("client", "admin"), getVerifiedEmails);
 
 /**
  * @openapi
@@ -267,7 +267,7 @@ router.post("/:id/verification/review", requireAuth(), requireRole("admin"), rev
  *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Project' } } }
  *       400: { description: Verification step is not yet fully verified }
  */
-router.post("/:id/submit-email-review", requireAuth(), requireRole("admin"), submitProjectEmailsForReview);
+router.post("/:id/submit-email-review", requireAuth(), requireRole("client", "admin"), submitProjectEmailsForReview);
 
 /**
  * @openapi
@@ -315,7 +315,7 @@ router.post("/:id/confirm-email-review", requireAuth(), requireRole("admin"), co
  *             schema: { type: object, properties: { data: { $ref: '#/components/schemas/Project' } } }
  *       400: { description: Email review has not been confirmed yet }
  */
-router.post("/:id/testers-invited", requireAuth(), requireRole("admin"), markProjectTestersInvited);
+router.post("/:id/testers-invited", requireAuth(), requireRole("client", "admin"), markProjectTestersInvited);
 
 /**
  * @openapi

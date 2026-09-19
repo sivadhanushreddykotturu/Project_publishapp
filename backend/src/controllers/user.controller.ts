@@ -76,3 +76,17 @@ export const getMe = asyncHandler(async (req: Request, res: Response) => {
 
   res.status(200).json({ data: { user: req.dbUser, profile } });
 });
+
+const updateMeSchema = z.object({
+  name: z.string().trim().min(1).max(100).optional(),
+  phone: z.string().trim().max(30).optional(),
+});
+
+export const updateMe = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.dbUser) throw ApiError.unauthorized();
+  const body = updateMeSchema.parse(req.body);
+  if (body.name !== undefined) req.dbUser.name = body.name;
+  if (body.phone !== undefined) req.dbUser.phone = body.phone || undefined;
+  await req.dbUser.save();
+  res.status(200).json({ data: { user: req.dbUser, profile: null } });
+});

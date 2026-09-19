@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { syncUser, getMe } from "../controllers/user.controller";
+import { syncUser, getMe, updateMe } from "../controllers/user.controller";
 import { requireAuth } from "../middleware/auth";
 
 const router = Router();
@@ -61,5 +61,6 @@ router.post("/sync", syncUser);
  *       401: { description: Not authenticated }
  */
 router.get("/me", requireAuth(), getMe);
+router.patch("/me", requireAuth(), updateMe);
 
 export default router;

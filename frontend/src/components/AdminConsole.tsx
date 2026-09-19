@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { 
   Shield, Check, X, AlertTriangle, Plus, Smartphone, Bug, 
   Clock, DollarSign, Users, Award, CornerDownRight, ListFilter, Trash2, ArrowRight, ExternalLink, LogOut, 
-  ChevronDown, ChevronUp, UserPlus, Calendar, Bell, Settings, BarChart2, Activity, FileText, AlertCircle, Sparkles, Landmark, RefreshCw
+  ChevronDown, ChevronUp, UserPlus, Calendar, Bell, Settings, BarChart2, Activity, FileText, AlertCircle, Sparkles, Landmark, RefreshCw, Search
 } from 'lucide-react';
 import { TestApp, BugReport, TesterAssignment, Tester, WithdrawalRequest } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { BackendNotification, BackendProjectFile } from '../lib/launchops-api';
+import type { AdminDashboardSummary, BackendNotification, BackendProjectFile, BackendSupportTicket, LaunchOpsUser } from '../lib/launchops-api';
 
 interface AdminConsoleProps {
   isDarkMode: boolean;
@@ -16,6 +16,10 @@ interface AdminConsoleProps {
   testers: Tester[];
   withdrawals: WithdrawalRequest[];
   notifications: BackendNotification[];
+  supportTickets: BackendSupportTicket[];
+  currentUser: LaunchOpsUser | null;
+  dashboardSummary: AdminDashboardSummary | null;
+  onUpdateProfile: (input: { name?: string; phone?: string }) => Promise<void>;
   onReadNotification: (notificationId: string) => void;
   onApproveVerification: (projectId: string, customPrice?: number) => void;
   onRejectVerification: (projectId: string) => void;
@@ -23,15 +27,18 @@ interface AdminConsoleProps {
   onReplaceTester: (assignmentId: string) => void;
   onMergeBugs: (canonicalId: string, duplicateId: string) => void;
   onPublishBug: (bugId: string, adminNotes?: string) => void;
-  onCompleteWithdrawal: (withdrawalId: string, transactionId: string) => void;
-  onRejectWithdrawal: (withdrawalId: string, reason: string) => void;
+  onCompleteWithdrawal: (withdrawalId: string, transactionId: string) => Promise<void>;
+  onRejectWithdrawal: (withdrawalId: string, reason: string) => Promise<void>;
   onLogout: () => void;
-  onAddTesterToProject: (projectId: string, testerId: string) => void;
+  onAddTesterToProject: (projectId: string, testerId: string) => Promise<void>;
   onRemoveTesterFromProject: (projectId: string, testerId: string) => void;
   onApproveTesterStep1: (projectId: string, testerId: string) => void;
+  onVerifyTesterProof: (assignmentId: string, step: number, approve: boolean, reason?: string) => Promise<void>;
   onListProjectFiles: (projectId: string) => Promise<BackendProjectFile[]>;
   onDownloadProjectFile: (key: string) => Promise<void>;
   onClearProjectFiles: (projectId: string) => Promise<number>;
+  onReplyToSupport: (ticketId: string, body: string) => Promise<void>;
+  onUpdateSupportStatus: (ticketId: string, status: BackendSupportTicket['status']) => Promise<void>;
   initialTab?: string;
   onTabChange?: (tab: string) => void;
 }
@@ -44,6 +51,10 @@ export default function AdminConsole({
   testers,
   withdrawals,
   notifications,
+  supportTickets,
+  currentUser,
+  dashboardSummary,
+  onUpdateProfile,
   onReadNotification,
   onApproveVerification,
   onRejectVerification,
@@ -57,15 +68,20 @@ export default function AdminConsole({
   onAddTesterToProject,
   onRemoveTesterFromProject,
   onApproveTesterStep1,
+  onVerifyTesterProof,
   onListProjectFiles,
   onDownloadProjectFile,
   onClearProjectFiles,
+  onReplyToSupport,
+  onUpdateSupportStatus,
   initialTab,
   onTabChange
 }: AdminConsoleProps) {
+  const [supportReplies, setSupportReplies] = useState<Record<string, string>>({});
+  const [sendingSupportReply, setSendingSupportReply] = useState<string | null>(null);
   // Tabs map directly to sidebar menu options
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'testers' | 'verifications' | 'bugs' | 'cashouts'>(() => {
-    if (initialTab && ['dashboard', 'projects', 'testers', 'verifications', 'bugs', 'cashouts'].includes(initialTab)) {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'testers' | 'verifications' | 'bugs' | 'support' | 'cashouts'>(() => {
+    if (initialTab && ['dashboard', 'projects', 'testers', 'verifications', 'bugs', 'support', 'cashouts'].includes(initialTab)) {
       return initialTab as any;
     }
     return 'dashboard';
@@ -81,15 +97,29 @@ export default function AdminConsole({
   const [selectedUtrWithdrawalId, setSelectedUtrWithdrawalId] = useState<string | null>(null);
   const [utrVal, setUtrVal] = useState('');
   const [payoutValidationErr, setPayoutValidationErr] = useState('');
+  const [rejectingWithdrawalId, setRejectingWithdrawalId] = useState<string | null>(null);
+  const [withdrawalRejectReason, setWithdrawalRejectReason] = useState('');
+  const [processingWithdrawalId, setProcessingWithdrawalId] = useState<string | null>(null);
   
   // Selection states for project assignments
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
   const [addingTesterProjectId, setAddingTesterProjectId] = useState<string | null>(null);
   const [selectedTesterToAssign, setSelectedTesterToAssign] = useState<string>('');
+  const [assigningTester, setAssigningTester] = useState(false);
+  const [assignmentError, setAssignmentError] = useState('');
   const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
   const [projectFiles, setProjectFiles] = useState<Record<string, BackendProjectFile[]>>({});
   const [fileActionError, setFileActionError] = useState('');
   const [clearingFilesProjectId, setClearingFilesProjectId] = useState<string | null>(null);
+  const [testerSearch, setTesterSearch] = useState('');
+  const [testerCampaignFilter, setTesterCampaignFilter] = useState('all');
+  const [testerSpecialtyFilter, setTesterSpecialtyFilter] = useState('all');
+  const [bugProjectFilter, setBugProjectFilter] = useState('all');
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileName, setProfileName] = useState(currentUser?.name ?? '');
+  const [profilePhone, setProfilePhone] = useState(currentUser?.phone ?? '');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState('');
 
   const toggleProject = async (projectId: string) => {
     if (expandedProjectId === projectId) { setExpandedProjectId(null); return; }
@@ -104,19 +134,24 @@ export default function AdminConsole({
   };
 
   useEffect(() => {
-    if (initialTab && ['dashboard', 'projects', 'testers', 'verifications', 'bugs', 'cashouts'].includes(initialTab)) {
+    if (initialTab && ['dashboard', 'projects', 'testers', 'verifications', 'bugs', 'support', 'cashouts'].includes(initialTab)) {
       setActiveTab(initialTab as any);
     }
   }, [initialTab]);
 
-  const handleTabSelect = (tab: 'dashboard' | 'projects' | 'testers' | 'verifications' | 'bugs' | 'cashouts') => {
+  useEffect(() => {
+    setProfileName(currentUser?.name ?? '');
+    setProfilePhone(currentUser?.phone ?? '');
+  }, [currentUser]);
+
+  const handleTabSelect = (tab: 'dashboard' | 'projects' | 'testers' | 'verifications' | 'bugs' | 'support' | 'cashouts') => {
     setActiveTab(tab);
     if (onTabChange) {
       onTabChange(tab);
     }
   };
 
-  const handleCompletePayoutSubmit = (e: React.FormEvent, withdrawalId: string) => {
+  const handleCompletePayoutSubmit = async (e: React.FormEvent, withdrawalId: string) => {
     e.preventDefault();
     setPayoutValidationErr('');
     if (!utrVal.trim()) {
@@ -127,9 +162,36 @@ export default function AdminConsole({
       setPayoutValidationErr('Please enter a valid bank reference number.');
       return;
     }
-    onCompleteWithdrawal(withdrawalId, utrVal);
-    setSelectedUtrWithdrawalId(null);
-    setUtrVal('');
+    setProcessingWithdrawalId(withdrawalId);
+    try {
+      await onCompleteWithdrawal(withdrawalId, utrVal.trim());
+      setSelectedUtrWithdrawalId(null);
+      setUtrVal('');
+    } catch (error) {
+      setPayoutValidationErr(error instanceof Error ? error.message : 'Could not complete this payout.');
+    } finally {
+      setProcessingWithdrawalId(null);
+    }
+  };
+
+  const handleRejectPayoutSubmit = async (e: React.FormEvent, withdrawalId: string) => {
+    e.preventDefault();
+    const reason = withdrawalRejectReason.trim();
+    if (!reason) {
+      setPayoutValidationErr('A rejection reason is required.');
+      return;
+    }
+    setProcessingWithdrawalId(withdrawalId);
+    setPayoutValidationErr('');
+    try {
+      await onRejectWithdrawal(withdrawalId, reason);
+      setRejectingWithdrawalId(null);
+      setWithdrawalRejectReason('');
+    } catch (error) {
+      setPayoutValidationErr(error instanceof Error ? error.message : 'Could not reject this request.');
+    } finally {
+      setProcessingWithdrawalId(null);
+    }
   };
 
   const activeProjects = projects.filter((project) => project.status === 'Testing');
@@ -139,12 +201,12 @@ export default function AdminConsole({
   const completedPayoutTotal = withdrawals.filter((withdrawal) => withdrawal.status === 'completed').reduce((sum, withdrawal) => sum + withdrawal.amount, 0);
   const successRate = assignments.length ? Math.round((completedAssignments.length / assignments.length) * 100) : 0;
   const dashboardStats = [
-    { title: 'Active Projects', value: activeProjects.length.toString(), desc: `${projects.length} total projects` },
-    { title: 'Total Testers', value: testers.length.toString(), desc: `${testers.filter((tester) => tester.status === 'Online').length} active` },
-    { title: 'Tests In Progress', value: activeAssignments.length.toString(), desc: `${assignments.length} assignments` },
-    { title: 'Bugs Reported', value: bugs.length.toString(), desc: `${bugs.filter((bug) => bug.isPublished).length} published` },
-    { title: 'Total Payouts', value: `₹${completedPayoutTotal.toFixed(2)}`, desc: `${withdrawals.filter((withdrawal) => withdrawal.status === 'pending').length} pending` },
-    { title: 'Success Rate', value: `${successRate}%`, desc: `${completedAssignments.length} completed` },
+    { title: 'Active Projects', value: String(dashboardSummary?.projects.active ?? activeProjects.length), desc: `${dashboardSummary?.projects.total ?? projects.length} total projects` },
+    { title: 'Total Testers', value: String(dashboardSummary?.testers.total ?? testers.length), desc: `${dashboardSummary?.testers.active ?? testers.filter((tester) => tester.status === 'Online').length} active` },
+    { title: 'Tests In Progress', value: String(dashboardSummary?.assignments.active ?? activeAssignments.length), desc: `${dashboardSummary?.assignments.total ?? assignments.length} assignments` },
+    { title: 'Bugs Reported', value: String(dashboardSummary?.bugs.total ?? bugs.length), desc: `${dashboardSummary?.bugs.published ?? bugs.filter((bug) => bug.isPublished).length} published` },
+    { title: 'Total Payouts', value: `₹${((dashboardSummary?.payouts.paidTotal ?? completedPayoutTotal * 100) / 100).toFixed(2)}`, desc: `${dashboardSummary?.payouts.pending ?? withdrawals.filter((withdrawal) => withdrawal.status === 'pending').length} pending` },
+    { title: 'Success Rate', value: `${dashboardSummary?.successRate ?? successRate}%`, desc: `${dashboardSummary?.assignments.completed ?? completedAssignments.length} completed` },
   ];
   const dashboardAlerts = [
     ...assignments.filter((assignment) => assignment.inactivityFlag).map((assignment) => ({ title: 'Tester inactivity flagged', app: assignment.appName, type: 'error' as const })),
@@ -152,6 +214,28 @@ export default function AdminConsole({
     ...pendingVerifications.map((project) => ({ title: 'Client verification awaiting review', app: project.name, type: 'info' as const })),
   ];
   const todayLabel = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date());
+  const testerSpecialties = [...new Set(testers.map((tester) => tester.specialty))].sort();
+  const testerCampaigns = [...new Map(
+    activeAssignments.map((assignment) => [assignment.projectId, assignment.appName])
+  ).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  const normalizedTesterSearch = testerSearch.trim().toLowerCase();
+  const filteredTesters = testers.filter((tester) => {
+    const matchesSearch = !normalizedTesterSearch || [tester.name, ...tester.devices]
+      .some((value) => value.toLowerCase().includes(normalizedTesterSearch));
+    const matchesSpecialty = testerSpecialtyFilter === 'all' || tester.specialty === testerSpecialtyFilter;
+    const testerActiveAssignments = activeAssignments.filter((assignment) => assignment.testerId === tester.id);
+    const matchesCampaign = testerCampaignFilter === 'all'
+      || (testerCampaignFilter === 'none' && testerActiveAssignments.length === 0)
+      || testerActiveAssignments.some((assignment) => assignment.projectId === testerCampaignFilter);
+    return matchesSearch && matchesSpecialty && matchesCampaign;
+  });
+  const testerFiltersActive = Boolean(normalizedTesterSearch) || testerCampaignFilter !== 'all' || testerSpecialtyFilter !== 'all';
+  const projectsWithBugReports = projects.filter((project) => bugs.some((bug) => bug.appId === project.id));
+  const filteredBugs = bugProjectFilter === 'all' ? bugs : bugs.filter((bug) => bug.appId === bugProjectFilter);
+  const adminInitials = (currentUser?.name || 'Admin').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+  const totalTesterCount = dashboardSummary?.testers.total ?? testers.length;
+  const activeTesterCount = dashboardSummary?.testers.active ?? testers.filter((tester) => tester.status === 'Online').length;
+  const activeTesterPercent = totalTesterCount ? Math.round((activeTesterCount / totalTesterCount) * 100) : 0;
 
   return (
     <div className={`h-screen overflow-hidden flex ${isDarkMode ? 'bg-[#09090B] text-slate-105' : 'bg-slate-50 text-slate-900'}`}>
@@ -178,6 +262,7 @@ export default function AdminConsole({
               { id: 'projects', label: 'Projects', icon: <Smartphone className="w-4 h-4" /> },
               { id: 'testers', label: 'Testers', icon: <Users className="w-4 h-4" /> },
               { id: 'bugs', label: 'Bug Reports', icon: <Bug className="w-4 h-4" /> },
+              { id: 'support', label: 'Support Inbox', icon: <FileText className="w-4 h-4" /> },
               { id: 'cashouts', label: 'Payouts & Wallets', icon: <Landmark className="w-4 h-4" /> }
             ].map((link) => {
               const isActive = activeTab === link.id;
@@ -203,18 +288,18 @@ export default function AdminConsole({
 
         {/* Profile and Logout Footer */}
         <div className={`pt-6 border-t ${isDarkMode ? 'border-zinc-800' : 'border-slate-100'}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="relative flex items-center justify-between">
+            <button type="button" onClick={() => setProfileOpen((open) => !open)} className="flex items-center gap-3 border-0 bg-transparent p-0 text-left cursor-pointer">
               <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center font-black text-indigo-600 font-display">
-                AD
+                {adminInitials}
               </div>
               <div className="hidden sm:block text-left text-xs leading-none">
-                <span className={`font-bold block ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>LaunchOps Admin</span>
+                <span className={`font-bold block ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{currentUser?.name ?? 'Admin'}</span>
                 <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-1 mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Super Admin
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {currentUser?.role ?? 'admin'}
                 </span>
               </div>
-            </div>
+            </button>
             <button 
               onClick={onLogout}
               className={`p-2 rounded-xl border-none cursor-pointer bg-transparent transition-colors ${
@@ -224,6 +309,22 @@ export default function AdminConsole({
             >
               <LogOut className="w-4 h-4" />
             </button>
+            {profileOpen && (
+              <form onSubmit={async (event) => {
+                event.preventDefault(); setProfileSaving(true); setProfileError('');
+                try { await onUpdateProfile({ name: profileName, phone: profilePhone }); setProfileOpen(false); }
+                catch (error) { setProfileError(error instanceof Error ? error.message : 'Could not update profile.'); }
+                finally { setProfileSaving(false); }
+              }} className={`absolute bottom-12 left-0 z-50 w-72 space-y-3 rounded-2xl border p-4 shadow-xl ${isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-slate-200'}`}>
+                <p className="text-[10px] font-black uppercase text-slate-500">Admin profile</p>
+                <input value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Name" className={`w-full rounded-lg border px-3 py-2 text-xs ${isDarkMode ? 'bg-black border-zinc-700 text-white' : 'border-slate-200'}`} />
+                <input value={currentUser?.email ?? ''} readOnly className={`w-full rounded-lg border px-3 py-2 text-xs opacity-70 ${isDarkMode ? 'bg-black border-zinc-700 text-white' : 'border-slate-200'}`} />
+                <input value={profilePhone} onChange={(event) => setProfilePhone(event.target.value)} placeholder="Phone" className={`w-full rounded-lg border px-3 py-2 text-xs ${isDarkMode ? 'bg-black border-zinc-700 text-white' : 'border-slate-200'}`} />
+                <p className="text-[10px] text-slate-500">Status: {currentUser?.status ?? 'active'} · Role: {currentUser?.role ?? 'admin'}</p>
+                {profileError && <p className="text-[10px] font-bold text-red-500">{profileError}</p>}
+                <button disabled={profileSaving} className="w-full rounded-lg border-0 bg-indigo-600 px-3 py-2 text-xs font-black text-white disabled:opacity-50">{profileSaving ? 'Saving...' : 'Save profile'}</button>
+              </form>
+            )}
           </div>
         </div>
       </aside>
@@ -239,7 +340,7 @@ export default function AdminConsole({
             <h1 className={`text-xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
               Admin Control Center
             </h1>
-            <p className="text-[10px] text-slate-500 mt-0.5">Here's what's happening on UXOS today.</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Here's what's happening on LaunchOps today.</p>
           </div>
 
           <div className="flex items-center gap-4">
@@ -256,7 +357,7 @@ export default function AdminConsole({
               {notifications.some((notification) => !notification.readAt) && <span className="absolute top-1 right-1 w-2 h-2 bg-indigo-500 rounded-full" />}
             </button>
             {notificationDropdownOpen && <div className={`absolute right-0 top-12 w-80 max-h-96 overflow-y-auto rounded-xl border p-2 shadow-xl ${isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-slate-200'}`}>
-              {notifications.length === 0 ? <p className="p-3 text-xs text-slate-500">No notifications.</p> : notifications.map((notification) => <button key={notification._id} onClick={() => { onReadNotification(notification._id); if (notification.type === 'project_request') handleTabSelect('projects'); setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs border mb-1 transition-colors ${notification.readAt ? (isDarkMode ? 'bg-zinc-900/70 border-zinc-800 text-slate-500' : 'bg-slate-100 border-slate-200 text-slate-500') : (isDarkMode ? 'bg-indigo-500/15 border-indigo-500/30 text-white' : 'bg-indigo-50 border-indigo-200 text-slate-900')}`}><span className="flex items-center justify-between gap-2 font-bold"><span>{notification.type === 'project_request' ? 'New published project' : notification.type.replace(/_/g, ' ')}</span><span className={`text-[8px] uppercase px-1.5 py-0.5 rounded-full ${notification.readAt ? 'bg-slate-500/10 text-slate-500' : 'bg-indigo-600 text-white'}`}>{notification.readAt ? 'Read' : 'New'}</span></span><span className="text-slate-500 block mt-1">{String(notification.payload.appName ?? '')}</span></button>) }
+              {notifications.filter((notification) => !notification.readAt).length === 0 ? <p className="p-3 text-xs text-slate-500">You're all caught up.</p> : notifications.filter((notification) => !notification.readAt).map((notification) => <button key={notification._id} onClick={() => { onReadNotification(notification._id); if (notification.type === 'project_request') handleTabSelect('projects'); else if (notification.type === 'support_request') handleTabSelect('support'); setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs border mb-1 transition-colors ${isDarkMode ? 'bg-indigo-500/15 border-indigo-500/30 text-white' : 'bg-indigo-50 border-indigo-200 text-slate-900'}`}><span className="flex items-center justify-between gap-2 font-bold"><span>{notification.type === 'project_request' ? 'New published project' : notification.type.replace(/_/g, ' ')}</span><span className="text-[8px] uppercase px-1.5 py-0.5 rounded-full bg-indigo-600 text-white">New</span></span><span className="text-slate-500 block mt-1">{String(notification.payload.appName ?? '')}</span></button>) }
             </div>}
             </div>
 
@@ -419,9 +520,9 @@ export default function AdminConsole({
                       <div className="relative w-44 h-44 flex items-center justify-center">
                         {/* Tester distribution ring */}
                         <div className="absolute inset-0 rounded-full border-[14px] border-slate-500/5" />
-                        <div className="absolute inset-0 rounded-full border-[14px] border-indigo-600 border-t-purple-500 border-r-amber-500 border-b-transparent transform rotate-45" />
+                        <div className="absolute inset-0 rounded-full" style={{ background: `conic-gradient(#4f46e5 0 ${activeTesterPercent}%, #e2e8f0 ${activeTesterPercent}% 100%)`, mask: 'radial-gradient(farthest-side, transparent calc(100% - 14px), #000 0)', WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 14px), #000 0)' }} />
                         <div className="text-center z-10">
-                          <span className={`text-3xl font-black block tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{testers.length}</span>
+                          <span className={`text-3xl font-black block tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{totalTesterCount}</span>
                           <span className="text-[10px] text-slate-400 uppercase font-extrabold tracking-wider mt-1 block">Total Testers</span>
                         </div>
                       </div>
@@ -431,22 +532,22 @@ export default function AdminConsole({
                       <div className="flex items-center gap-2 border-b pb-2 border-slate-500/5">
                         <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0" />
                         <span className="text-slate-500">Active</span>
-                        <span className="font-mono font-black ml-auto">{testers.filter((tester) => tester.status === 'Online').length}</span>
+                        <span className="font-mono font-black ml-auto">{dashboardSummary?.testers.active ?? activeTesterCount}</span>
                       </div>
                       <div className="flex items-center gap-2 border-b pb-2 border-slate-500/5">
                         <span className="w-2.5 h-2.5 rounded-full bg-purple-500 shrink-0" />
                         <span className="text-slate-500">In Progress</span>
-                        <span className="font-mono font-black ml-auto">{new Set(activeAssignments.map((assignment) => assignment.testerId)).size}</span>
+                        <span className="font-mono font-black ml-auto">{dashboardSummary?.assignments.active ?? activeAssignments.length}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
                         <span className="text-slate-500">Waiting</span>
-                        <span className="font-mono font-black ml-auto">{assignments.filter((assignment) => assignment.status === 'queued').length}</span>
+                        <span className="font-mono font-black ml-auto">{dashboardSummary?.assignments.queued ?? assignments.filter((assignment) => assignment.status === 'queued').length}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-slate-405 shrink-0" />
                         <span className="text-slate-500">Inactive</span>
-                        <span className="font-mono font-black ml-auto">{testers.filter((tester) => tester.status !== 'Online').length}</span>
+                        <span className="font-mono font-black ml-auto">{dashboardSummary?.testers.inactive ?? testers.filter((tester) => tester.status !== 'Online').length}</span>
                       </div>
                     </div>
                   </div>
@@ -545,7 +646,7 @@ export default function AdminConsole({
                               onClick={() => {
                                 const currentStep = Math.round((proj.progress || 0) / 16.6);
                                 const nextStep = Math.min(currentStep + 1, 6);
-                                onAdvanceMilestone(proj.id, nextStep, { optInUrl: 'https://play.google.com/apps/testing/' + (proj.playIntegration?.packageName || 'com.launchops.app') });
+                                onAdvanceMilestone(proj.id, nextStep, { optInUrl: proj.optInUrl });
                               }}
                               className="px-5 py-2.5 text-white text-xs font-black rounded-xl border-0 cursor-pointer shadow-md hover:opacity-90 transition-all"
                               style={{ backgroundColor: '#4F46E5' }}
@@ -576,6 +677,7 @@ export default function AdminConsole({
                               >
                                 <option value="">-- Choose Candidate --</option>
                                 {testers
+                                  .filter(t => t.status === 'Online')
                                   .filter(t => !activeAss.some(a => a.testerId === t.id))
                                   .map(t => (
                                     <option key={t.id} value={t.id}>{t.name} ({t.devices.join(', ')})</option>
@@ -583,17 +685,26 @@ export default function AdminConsole({
                               </select>
                             </div>
                             <div className="flex gap-2 shrink-0">
-                              <button
-                                onClick={() => {
-                                  if (selectedTesterToAssign) {
-                                    onAddTesterToProject(proj.id, selectedTesterToAssign);
+                            <button
+                              disabled={!selectedTesterToAssign || assigningTester}
+                              onClick={async () => {
+                                if (selectedTesterToAssign && !assigningTester) {
+                                  setAssigningTester(true);
+                                  setAssignmentError('');
+                                  try {
+                                    await onAddTesterToProject(proj.id, selectedTesterToAssign);
                                     setSelectedTesterToAssign('');
                                     setAddingTesterProjectId(null);
+                                  } catch (error) {
+                                    setAssignmentError(error instanceof Error ? error.message : 'Could not allocate this tester.');
+                                  } finally {
+                                    setAssigningTester(false);
                                   }
-                                }}
-                                className="px-4 py-2 text-xs font-black text-white bg-green-600 hover:bg-green-550 border-0 rounded-xl cursor-pointer"
+                                }
+                              }}
+                                className="px-4 py-2 text-xs font-black text-white bg-green-600 hover:bg-green-550 border-0 rounded-xl cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                               >
-                                Confirm Allocation
+                                {assigningTester ? 'Allocating...' : 'Confirm Allocation'}
                               </button>
                               <button
                                 onClick={() => {
@@ -605,6 +716,7 @@ export default function AdminConsole({
                                 Cancel
                               </button>
                             </div>
+                            {assignmentError && <p className="text-xs font-semibold text-red-600 md:basis-full">{assignmentError}</p>}
                           </div>
                         )}
 
@@ -654,6 +766,7 @@ export default function AdminConsole({
                                             Verify Step 1
                                           </button>
                                         )}
+                                        {ass.pendingProofSteps?.filter((step) => step !== 1 && (step !== 4 || ass.step4CheckInsCompleted >= 14)).map((step) => <div key={step} className="flex items-center gap-1"><button onClick={(event) => { event.stopPropagation(); void onVerifyTesterProof(ass.id, step, true); }} className="rounded-lg border-0 bg-emerald-600 px-2.5 py-1.5 text-[9px] font-extrabold uppercase text-white">Approve Step {step}</button><button onClick={(event) => { event.stopPropagation(); const reason = window.prompt(`Reason for rejecting Step ${step}`); if (reason) void onVerifyTesterProof(ass.id, step, false, reason); }} className="rounded-lg border-0 bg-red-600 px-2 py-1.5 text-[9px] font-extrabold uppercase text-white">Reject</button></div>)}
 
                                         {ass.inactivityFlag && (
                                           <button
@@ -733,13 +846,77 @@ export default function AdminConsole({
           {/* TAB 3: TESTER LIST */}
           {activeTab === 'testers' && (
             <div className="space-y-6">
-              <div>
-                <h2 className={`text-xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Registered QA Specialists</h2>
-                <p className="text-[11px] text-slate-500 mt-1">Review profiles, target testing devices, and verified overall bug count.</p>
+              <div className="flex flex-col gap-4">
+                <div>
+                  <h2 className={`text-xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Registered QA Specialists</h2>
+                  <p className="text-[11px] text-slate-500 mt-1">Review profiles, target testing devices, and verified overall bug count.</p>
+                </div>
+
+                <div className={`grid grid-cols-1 gap-3 rounded-2xl border p-4 md:grid-cols-3 ${
+                  isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200'
+                }`}>
+                  <label className="relative block">
+                    <span className="sr-only">Search testers by name or device</span>
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="search"
+                      value={testerSearch}
+                      onChange={(event) => setTesterSearch(event.target.value)}
+                      placeholder="Search name or device"
+                      className={`w-full rounded-xl border py-2.5 pl-9 pr-3 text-xs outline-none focus:border-indigo-500 ${
+                        isDarkMode ? 'bg-[#09090B] border-zinc-700 text-white' : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                    />
+                  </label>
+                  <label>
+                    <span className="sr-only">Filter by active campaign</span>
+                    <select
+                      value={testerCampaignFilter}
+                      onChange={(event) => setTesterCampaignFilter(event.target.value)}
+                      className={`w-full rounded-xl border px-3 py-2.5 text-xs outline-none focus:border-indigo-500 ${
+                        isDarkMode ? 'bg-[#09090B] border-zinc-700 text-white' : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                    >
+                      <option value="all">All active campaigns</option>
+                      <option value="none">No active campaigns</option>
+                      {testerCampaigns.map(([projectId, appName]) => <option key={projectId} value={projectId}>{appName}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    <span className="sr-only">Filter by specialty</span>
+                    <select
+                      value={testerSpecialtyFilter}
+                      onChange={(event) => setTesterSpecialtyFilter(event.target.value)}
+                      className={`w-full rounded-xl border px-3 py-2.5 text-xs outline-none focus:border-indigo-500 ${
+                        isDarkMode ? 'bg-[#09090B] border-zinc-700 text-white' : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                    >
+                      <option value="all">All specialties</option>
+                      {testerSpecialties.map((specialty) => <option key={specialty} value={specialty}>{specialty}</option>)}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                  <span>Showing {filteredTesters.length} of {testers.length} testers</span>
+                  {testerFiltersActive && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTesterSearch('');
+                        setTesterCampaignFilter('all');
+                        setTesterSpecialtyFilter('all');
+                      }}
+                      className="border-0 bg-transparent text-indigo-500 cursor-pointer font-bold hover:underline"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {testers.map((t) => (
+                {filteredTesters.map((t) => (
                   <div 
                     key={t.id}
                     className={`border rounded-2xl p-6 ${
@@ -763,7 +940,7 @@ export default function AdminConsole({
                         <div className="space-y-1.5 pl-1.5 border-l border-indigo-500/20">
                           <p className="flex justify-between">
                             <span className="text-slate-400">Email:</span>
-                            <span className="font-mono text-[10px]">{t.name.toLowerCase().replace(/\s+/g, '')}@launchops.com</span>
+                            <span className="font-mono text-[10px]">{t.email || 'Not available'}</span>
                           </p>
                           <p className="flex justify-between">
                             <span className="text-slate-400">Mobile:</span>
@@ -829,6 +1006,13 @@ export default function AdminConsole({
                     </div>
                   </div>
                 ))}
+                {filteredTesters.length === 0 && (
+                  <div className={`col-span-full rounded-2xl border p-10 text-center text-xs font-semibold text-slate-500 ${
+                    isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200'
+                  }`}>
+                    No testers match these filters.
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -861,7 +1045,7 @@ export default function AdminConsole({
                         <div className="space-y-3">
                           <h3 className={`text-base font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{p.name}</h3>
                           <div className="text-xs space-y-1 font-semibold text-slate-500">
-                            <p>Package ID: <span className="font-mono text-slate-400">{p.playIntegration?.packageName || 'com.launchops.app'}</span></p>
+                            <p>Package ID: <span className="font-mono text-slate-400">{p.playIntegration?.packageName || 'Not configured'}</span></p>
                             <p>Selected Package Plan: <span className="capitalize text-indigo-500">{p.packageTier?.replace('_', ' ')}</span></p>
                             {p.whatsappGroupLink && (
                               <p className="flex items-center gap-2">
@@ -900,9 +1084,31 @@ export default function AdminConsole({
           {/* TAB 5: BUG REPORTS CURATION */}
           {activeTab === 'bugs' && (
             <div className="space-y-6">
-              <div>
-                <h2 className={`text-xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Verified Bug Curation Room</h2>
-                <p className="text-[11px] text-slate-500 mt-1">Audit raw logs submitted by testers, filter, and publish canonical issues to client rooms.</p>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className={`text-xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Verified Bug Curation Room</h2>
+                  <p className="text-[11px] text-slate-500 mt-1">Audit raw logs submitted by testers, filter, and publish canonical issues to client rooms.</p>
+                </div>
+                <label className="w-full sm:w-64">
+                  <span className="mb-1.5 block text-[9px] font-black uppercase text-slate-500 font-mono">Project</span>
+                  <select
+                    value={bugProjectFilter}
+                    onChange={(event) => {
+                      setBugProjectFilter(event.target.value);
+                      setSelectedBugId(null);
+                    }}
+                    className={`w-full rounded-xl border px-3 py-2.5 text-xs outline-none focus:border-indigo-500 ${
+                      isDarkMode ? 'bg-[#09090B] border-zinc-700 text-white' : 'bg-white border-slate-200 text-slate-800'
+                    }`}
+                  >
+                    <option value="all">All projects ({bugs.length})</option>
+                    {projectsWithBugReports.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name} ({bugs.filter((bug) => bug.appId === project.id).length})
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
 
               {bugs.length === 0 ? (
@@ -911,12 +1117,18 @@ export default function AdminConsole({
                 }`}>
                   No bug reports logged.
                 </div>
+              ) : filteredBugs.length === 0 ? (
+                <div className={`p-10 border rounded-2xl text-center text-slate-500 text-xs font-semibold ${
+                  isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200'
+                }`}>
+                  No bug reports are logged for this project.
+                </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                   
                   {/* Raw incoming bug list */}
                   <div className="lg:col-span-7 space-y-4">
-                    {bugs.map((b) => (
+                    {filteredBugs.map((b) => (
                       <div 
                         key={b.id}
                         onClick={() => setSelectedBugId(b.id)}
@@ -945,7 +1157,7 @@ export default function AdminConsole({
                   <div className="lg:col-span-5">
                     {selectedBugId ? (
                       (() => {
-                        const bug = bugs.find(b => b.id === selectedBugId);
+                        const bug = filteredBugs.find(b => b.id === selectedBugId);
                         if (!bug) return null;
                         return (
                           <div className={`p-6 border rounded-2xl space-y-5 sticky top-28 ${
@@ -1004,7 +1216,63 @@ export default function AdminConsole({
             </div>
           )}
 
-          {/* TAB 6: PAYOUTS & WALLETS */}
+          {activeTab === 'support' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className={`text-xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Support Inbox</h2>
+                <p className="mt-1 text-[11px] text-slate-500">Client and tester support requests received by the backend.</p>
+              </div>
+              {supportTickets.length === 0 ? (
+                <div className={`rounded-2xl border p-10 text-center text-xs font-semibold text-slate-500 ${isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200'}`}>No support requests received.</div>
+              ) : (
+                <div className="space-y-4">
+                  {supportTickets.map((ticket) => {
+                    const sender = typeof ticket.raisedBy === 'object' ? ticket.raisedBy : null;
+                    const projectName = typeof ticket.projectId === 'object' ? ticket.projectId.appDetails?.appName : undefined;
+                    return (
+                      <article key={ticket._id} className={`rounded-2xl border p-5 ${isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200'}`}>
+                        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                          <div>
+                            <div className="mb-2 flex items-center gap-2">
+                              <span className="rounded-lg bg-indigo-500/10 px-2 py-1 text-[9px] font-black uppercase text-indigo-500">{sender?.role ?? 'user'}</span>
+                              <select value={ticket.status} onChange={(event) => { void onUpdateSupportStatus(ticket._id, event.target.value as BackendSupportTicket['status']); }} className={`rounded-lg border px-2 py-1 text-[9px] font-black uppercase ${isDarkMode ? 'border-zinc-700 bg-zinc-900 text-slate-300' : 'border-slate-200 bg-white text-slate-600'}`}><option value="open">Open</option><option value="in_progress">In progress</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select>
+                            </div>
+                            <h3 className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{ticket.subject}</h3>
+                            <p className="mt-1 text-[11px] text-slate-500">{sender?.name ?? 'Unknown sender'} · {sender?.email ?? 'Email unavailable'}{projectName ? ` · ${projectName}` : ''}</p>
+                          </div>
+                          <time className="text-[10px] text-slate-500">{new Date(ticket.createdAt).toLocaleString()}</time>
+                        </div>
+                        <div className="mt-4 space-y-2 border-t border-slate-500/10 pt-4">
+                          {ticket.messages.map((message, index) => {
+                            const author = typeof message.authorId === 'object' ? message.authorId : null;
+                            return <div key={`${ticket._id}-${index}`} className={`rounded-xl p-3 text-xs ${author?.role === 'admin' ? 'ml-8 bg-indigo-500/10 text-indigo-600' : isDarkMode ? 'mr-8 bg-black/30 text-slate-300' : 'mr-8 bg-slate-50 text-slate-700'}`}>
+                              <p className="mb-1 text-[9px] font-black uppercase opacity-70">{author?.role === 'admin' ? 'Admin response' : `${author?.role ?? 'User'} message`}</p>
+                              <p>{message.body}</p>
+                            </div>;
+                          })}
+                          <form className="flex gap-2 pt-2" onSubmit={async (event) => {
+                            event.preventDefault();
+                            const body = supportReplies[ticket._id]?.trim();
+                            if (!body) return;
+                            setSendingSupportReply(ticket._id);
+                            try {
+                              await onReplyToSupport(ticket._id, body);
+                              setSupportReplies((current) => ({ ...current, [ticket._id]: '' }));
+                            } finally { setSendingSupportReply(null); }
+                          }}>
+                            <input value={supportReplies[ticket._id] ?? ''} onChange={(event) => setSupportReplies((current) => ({ ...current, [ticket._id]: event.target.value }))} placeholder="Reply to this user" className={`min-w-0 flex-1 rounded-xl border px-3 py-2 text-xs ${isDarkMode ? 'border-zinc-700 bg-zinc-950 text-white' : 'border-slate-200 bg-white'}`} />
+                            <button disabled={sendingSupportReply === ticket._id} className="rounded-xl border-0 bg-indigo-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{sendingSupportReply === ticket._id ? 'Sending...' : 'Reply'}</button>
+                          </form>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 7: PAYOUTS & WALLETS */}
           {activeTab === 'cashouts' && (
             <div className="space-y-6">
               <div>
@@ -1043,7 +1311,7 @@ export default function AdminConsole({
                               </span>
                             </div>
                             <div className="text-xs space-y-1 font-semibold text-slate-500">
-                              <p>UPI ID: <span className="font-mono text-slate-400">{w.upiId}</span></p>
+                              <p>UPI ID: <span className="font-mono text-slate-400">{w.upiId || 'Not registered'}</span></p>
                               <p>Tester: <span className="text-slate-400">{tester?.name || 'Unknown'}</span></p>
                               <p className="text-[9.5px] font-mono">Date Requested: {w.createdAt}</p>
                             </div>
@@ -1071,15 +1339,53 @@ export default function AdminConsole({
                                 <div className="flex gap-2">
                                   <button
                                     type="submit"
-                                    className="px-4 py-2 text-xs font-black text-white bg-green-600 hover:bg-green-550 border-0 rounded-xl cursor-pointer"
+                                    disabled={processingWithdrawalId === w.id}
+                                    className="px-4 py-2 text-xs font-black text-white bg-green-600 hover:bg-green-550 border-0 rounded-xl cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                                   >
-                                    Confirm Transfer
+                                    {processingWithdrawalId === w.id ? 'Saving...' : 'Confirm Transfer'}
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => {
                                       setSelectedUtrWithdrawalId(null);
                                       setUtrVal('');
+                                      setPayoutValidationErr('');
+                                    }}
+                                    className="px-4 py-2 text-xs font-black text-slate-400 border border-slate-500/20 rounded-xl cursor-pointer hover:bg-slate-500/5 bg-transparent"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </form>
+                            ) : rejectingWithdrawalId === w.id ? (
+                              <form onSubmit={(event) => { void handleRejectPayoutSubmit(event, w.id); }} className="space-y-3">
+                                <div>
+                                  <label className="text-[9px] font-black uppercase text-slate-500 block mb-1.5 font-mono">Rejection reason</label>
+                                  <textarea
+                                    required
+                                    rows={3}
+                                    value={withdrawalRejectReason}
+                                    onChange={(event) => setWithdrawalRejectReason(event.target.value)}
+                                    placeholder="Explain why this cashout cannot be processed"
+                                    className={`w-full md:w-72 px-3 py-2 rounded-xl border text-xs focus:outline-none focus:border-indigo-500 ${
+                                      isDarkMode ? 'bg-black border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
+                                    }`}
+                                  />
+                                  {payoutValidationErr && <p className="mt-1.5 text-[10px] font-bold text-red-500">{payoutValidationErr}</p>}
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    type="submit"
+                                    disabled={processingWithdrawalId === w.id}
+                                    className="px-4 py-2 text-xs font-black text-white bg-red-600 border-0 rounded-xl cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {processingWithdrawalId === w.id ? 'Rejecting...' : 'Confirm Rejection'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setRejectingWithdrawalId(null);
+                                      setWithdrawalRejectReason('');
                                       setPayoutValidationErr('');
                                     }}
                                     className="px-4 py-2 text-xs font-black text-slate-400 border border-slate-500/20 rounded-xl cursor-pointer hover:bg-slate-500/5 bg-transparent"
@@ -1099,7 +1405,11 @@ export default function AdminConsole({
                                 </button>
                                 
                                 <button
-                                  onClick={() => onRejectWithdrawal(w.id, 'Incorrect UPI address or account flag.')}
+                                  onClick={() => {
+                                    setRejectingWithdrawalId(w.id);
+                                    setWithdrawalRejectReason('');
+                                    setPayoutValidationErr('');
+                                  }}
                                   className="w-full px-5 py-2.5 text-xs text-red-500 border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 rounded-xl cursor-pointer"
                                 >
                                   Reject Request
@@ -1127,7 +1437,7 @@ export default function AdminConsole({
             </div>
             <div>
               <span className="text-[10px] text-slate-405 block font-mono">Auto Replacements</span>
-              <span className={`font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>5 Today</span>
+              <span className={`font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{dashboardSummary?.replacementsToday ?? 0} Today</span>
             </div>
           </div>
 
@@ -1136,8 +1446,8 @@ export default function AdminConsole({
               <AlertCircle className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-[10px] text-slate-405 block font-mono">Inactive (48h+)</span>
-              <span className={`font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>7 Testers</span>
+              <span className="text-[10px] text-slate-405 block font-mono">Inactive ({dashboardSummary?.inactivityThresholdHours ?? 48}h+)</span>
+              <span className={`font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{dashboardSummary?.testers.inactive ?? 0} Testers</span>
             </div>
           </div>
 
@@ -1147,7 +1457,7 @@ export default function AdminConsole({
             </div>
             <div>
               <span className="text-[10px] text-slate-405 block font-mono">Bugs Resolved</span>
-              <span className={`font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>28 Today</span>
+              <span className={`font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{dashboardSummary?.bugs.resolvedToday ?? 0} Today</span>
             </div>
           </div>
 
@@ -1157,7 +1467,7 @@ export default function AdminConsole({
             </div>
             <div>
               <span className="text-[10px] text-slate-405 block font-mono">Play Store Sync</span>
-              <span className="font-black text-green-500">All Good</span>
+              <span className={`font-black ${dashboardSummary?.playStoreSync.status === 'degraded' ? 'text-red-500' : dashboardSummary?.playStoreSync.status === 'operational' ? 'text-green-500' : 'text-amber-500'}`}>{dashboardSummary?.playStoreSync.status === 'degraded' ? `${dashboardSummary.playStoreSync.errors} Errors` : dashboardSummary?.playStoreSync.status === 'operational' ? 'Operational' : 'Not Configured'}</span>
             </div>
           </div>
 
@@ -1167,7 +1477,7 @@ export default function AdminConsole({
             </div>
             <div>
               <span className="text-[10px] text-slate-405 block font-mono">System Status</span>
-              <span className="font-black text-green-500">Operational</span>
+              <span className="font-black text-green-500">{dashboardSummary?.system.status ?? 'Unavailable'}</span>
             </div>
           </div>
         </footer>

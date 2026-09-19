@@ -4,6 +4,7 @@ import { ASSIGNMENT_STATUSES, AssignmentStatus, VERIFICATION_SOURCES, Verificati
 export interface IProof {
   step: number;
   fileUrl: string;
+  googlePlayEmail?: string;
   fileHash?: string;
   verifiedBy?: Types.ObjectId;
   verificationSource?: VerificationSource;
@@ -37,6 +38,7 @@ const proofSchema = new Schema<IProof>(
   {
     step: { type: Number, required: true },
     fileUrl: { type: String, required: true },
+    googlePlayEmail: { type: String, trim: true, lowercase: true },
     fileHash: { type: String },
     verifiedBy: { type: Schema.Types.ObjectId, ref: "User" },
     verificationSource: { type: String, enum: VERIFICATION_SOURCES },

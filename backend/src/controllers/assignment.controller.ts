@@ -35,6 +35,7 @@ const submitProofSchema = z.object({
   step: z.number().int().min(1).max(5),
   fileUrl: z.string().min(1),
   fileHash: z.string().optional(),
+  googlePlayEmail: z.string().email().optional(),
 });
 
 export const submitAssignmentProof = asyncHandler(async (req: Request, res: Response) => {

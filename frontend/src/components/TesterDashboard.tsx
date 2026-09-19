@@ -7,8 +7,8 @@ import {
 } from 'lucide-react';
 import { Tester, TestApp, TesterAssignment, BugReport, Transaction, WithdrawalRequest } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
-import TesterExperienceManager from './tester/TesterExperienceManager';
-import type { BackendNotification } from '../lib/launchops-api';
+import type { BackendNotification, BackendSupportTicket } from '../lib/launchops-api';
+import { API_BASE_URL } from '../lib/api';
 
 interface TesterDashboardProps {
   isDarkMode: boolean;
@@ -20,14 +20,18 @@ interface TesterDashboardProps {
   transactions: Transaction[];
   withdrawals: WithdrawalRequest[];
   notifications: BackendNotification[];
+  supportTickets: BackendSupportTicket[];
   onReadNotification: (notificationId: string) => void;
   onUpdateTesterProfile: (updatedTester: Partial<Tester>) => void;
   onJoinProject: (projectId: string) => Promise<void>;
-  onSubmitStep1Email: (assignmentId: string, email: string, screenshotUrl?: string) => void;
+  onSubmitStep1Email: (assignmentId: string, email: string, screenshotUrl?: string) => void | Promise<void>;
   onClickStep3Link: (assignmentId: string, screenshotUrl?: string) => void;
   onLogStep4CheckIn: (assignmentId: string) => void;
+  onUploadProof: (file: File) => Promise<string>;
   onSubmitBugReport: (bugReport: Omit<BugReport, 'id' | 'createdAt' | 'testerName' | 'testerAvatar' | 'screenshot'> & { screenshot?: string }) => void | Promise<void>;
   onRequestWithdrawal: (amount: number, upiId: string) => { success: boolean; error?: string } | Promise<{ success: boolean; error?: string }>;
+  onSendSupport: (input: { subject: string; message: string; projectId?: string }) => Promise<void>;
+  onReplyToSupport: (ticketId: string, body: string) => Promise<void>;
   onLogout: () => void;
   initialTab?: string;
   onTabChange?: (tab: string) => void;
@@ -43,28 +47,25 @@ export default function TesterDashboard({
   transactions,
   withdrawals,
   notifications,
+  supportTickets,
   onReadNotification,
   onUpdateTesterProfile,
   onJoinProject,
   onSubmitStep1Email,
   onClickStep3Link,
   onLogStep4CheckIn,
+  onUploadProof,
   onSubmitBugReport,
   onRequestWithdrawal,
+  onSendSupport,
+  onReplyToSupport,
   onLogout,
   initialTab,
   onTabChange
 }: TesterDashboardProps) {
-  return (
-    <TesterExperienceManager
-      isDarkMode={isDarkMode}
-      onToggleDarkMode={onToggleDarkMode || (() => {})}
-      onLogout={onLogout}
-    />
-  );
-  // Tabs: 'dashboard' (Active), 'explore' (Projects), 'wallet', 'bugs' (Support/Bugs), 'profile'
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'explore' | 'wallet' | 'bugs' | 'profile'>(() => {
-    if (initialTab && ['dashboard', 'explore', 'wallet', 'bugs', 'profile'].includes(initialTab)) {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'explore' | 'wallet' | 'support' | 'profile'>(() => {
+    if (initialTab === 'projects' || initialTab?.startsWith('projects/')) return 'explore';
+    if (initialTab && ['dashboard', 'explore', 'wallet', 'support', 'profile'].includes(initialTab)) {
       return initialTab as any;
     }
     return 'dashboard';
@@ -73,6 +74,12 @@ export default function TesterDashboard({
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
   const [joiningProjectIds, setJoiningProjectIds] = useState<string[]>([]);
+  const [detailsProjectId, setDetailsProjectId] = useState<string | null>(null);
+  const [supportReplies, setSupportReplies] = useState<Record<string, string>>({});
+  const [replyingTicketId, setReplyingTicketId] = useState<string | null>(null);
+  const [submittingProjectEmail, setSubmittingProjectEmail] = useState(false);
+  const [projectEmailError, setProjectEmailError] = useState('');
+  const [uploadingProof, setUploadingProof] = useState(false);
 
   const handleJoin = async (projectId: string) => {
     if (joiningProjectIds.includes(projectId)) return;
@@ -86,8 +93,11 @@ export default function TesterDashboard({
 
   const openCurrentProjectStep = (assignmentId: string) => {
     setSelectedAssignmentId(assignmentId);
-    handleTabSelect('dashboard');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const assignment = assignments.find((item) => item.id === assignmentId);
+    if (assignment) {
+      setDetailsProjectId(assignment.projectId);
+      onTabChange?.(`projects/${assignment.projectId}`);
+    }
   };
   
   // Simulation & Modal States
@@ -107,6 +117,11 @@ export default function TesterDashboard({
   const [bugSeverity, setBugSeverity] = useState<'Critical' | 'High' | 'Medium' | 'Low'>('Medium');
   const [bugReproductionSteps, setBugReproductionSteps] = useState<string[]>(['']);
   const [bugSuccess, setBugSuccess] = useState<boolean>(false);
+  const [supportSubject, setSupportSubject] = useState('');
+  const [supportMessage, setSupportMessage] = useState('');
+  const [supportProjectId, setSupportProjectId] = useState('');
+  const [supportError, setSupportError] = useState('');
+  const [supportSending, setSupportSending] = useState(false);
 
   // Inline Step 4 Bug Form States
   const [inlineBugTitle, setInlineBugTitle] = useState<string>('');
@@ -116,9 +131,10 @@ export default function TesterDashboard({
 
   // Profile Edit States
   const [profileUpi, setProfileUpi] = useState(activeTester.upiId || '');
-  const [profileCountry, setProfileCountry] = useState(activeTester.country || 'India');
-  const [profileSpecialty, setProfileSpecialty] = useState(activeTester.specialty || 'General Testing');
-  const [profileDevices, setProfileDevices] = useState<string[]>(activeTester.devices || []);
+  const [profileExperience, setProfileExperience] = useState(activeTester.experience || 'beginner');
+  const [profileCountry, setProfileCountry] = useState(activeTester.country || '');
+  const [profileSpecialty, setProfileSpecialty] = useState(activeTester.specialty || '');
+  const [profileDeviceInput, setProfileDeviceInput] = useState((activeTester.devices || []).join(', '));
   const [profileSuccess, setProfileSuccess] = useState(false);
 
   // Sync activeTester UPI when props update
@@ -126,22 +142,34 @@ export default function TesterDashboard({
     if (activeTester) {
       setWithdrawalUpi(activeTester.upiId || '');
       setProfileUpi(activeTester.upiId || '');
-      setProfileCountry(activeTester.country || 'India');
-      setProfileSpecialty(activeTester.specialty || 'General Testing');
-      setProfileDevices(activeTester.devices || []);
+      setProfileExperience(activeTester.experience || 'beginner');
+      setProfileCountry(activeTester.country === 'Not provided' ? '' : activeTester.country || '');
+      setProfileSpecialty(activeTester.specialty || '');
+      setProfileDeviceInput((activeTester.devices || []).join(', '));
     }
   }, [activeTester]);
 
   useEffect(() => {
-    if (initialTab && ['dashboard', 'explore', 'wallet', 'bugs', 'profile'].includes(initialTab)) {
+    if (initialTab?.startsWith('projects/')) {
+      setActiveTab('explore');
+      setDetailsProjectId(initialTab.slice('projects/'.length));
+      return;
+    }
+    if (initialTab === 'projects') {
+      setActiveTab('explore');
+      setDetailsProjectId(null);
+      return;
+    }
+    if (initialTab && ['dashboard', 'explore', 'wallet', 'support', 'profile'].includes(initialTab)) {
       setActiveTab(initialTab as any);
+      if (initialTab !== 'explore') setDetailsProjectId(null);
     }
   }, [initialTab]);
 
-  const handleTabSelect = (tab: 'dashboard' | 'explore' | 'wallet' | 'bugs' | 'profile') => {
+  const handleTabSelect = (tab: 'dashboard' | 'explore' | 'wallet' | 'support' | 'profile') => {
     setActiveTab(tab);
     if (onTabChange) {
-      onTabChange(tab);
+      onTabChange(tab === 'explore' ? 'projects' : tab);
     }
   };
 
@@ -158,7 +186,13 @@ export default function TesterDashboard({
 
   const selectedAssignment = activeAssignments.find(a => a.id === selectedAssignmentId);
   const selectedProject = selectedAssignment ? projects.find(p => p.id === selectedAssignment.projectId) : null;
+  const detailsProject = detailsProjectId ? projects.find((project) => project.id === detailsProjectId) : null;
+  const detailsAssignment = detailsProjectId ? assignments.find((assignment) => assignment.projectId === detailsProjectId && assignment.testerId === activeTester.id) : undefined;
+  const detailsBugs = detailsProjectId ? bugs.filter((bug) => bug.appId === detailsProjectId && bug.testerName === activeTester.name) : [];
+  useEffect(() => { if (detailsProjectId) setBugAppId(detailsProjectId); }, [detailsProjectId]);
   const pendingWithdrawals = withdrawals.filter(w => w.testerId === activeTester.id && w.status === 'pending');
+  const pendingWithdrawalTotal = pendingWithdrawals.reduce((sum, withdrawal) => sum + withdrawal.amount, 0);
+  const withdrawableBalance = Math.max(0, activeTester.walletBalance - pendingWithdrawalTotal);
   const nextPayoutDate = pendingWithdrawals[0]?.expectedCompletionAt ?? 'No pending payout';
   const pendingVerificationCount = assignments.filter(a =>
     a.testerId === activeTester.id &&
@@ -201,16 +235,6 @@ export default function TesterDashboard({
       time: bug.createdAt,
     })),
   ].slice(0, 4);
-
-  // Derive Reward based on package tier
-  const getRewardAmount = (tier?: string) => {
-    switch (tier) {
-      case 'launch_ready': return 2500;
-      case 'managed_testing': return 1200;
-      case 'custom': return 1800;
-      default: return 400; // testers_only
-    }
-  };
 
   const handleWithdrawalSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -270,8 +294,8 @@ export default function TesterDashboard({
       title: bugTitle,
       severity: bugSeverity,
       status: 'Open',
-      device: activeTester.devices[0] || 'Google Pixel 8 Pro',
-      osVersion: 'Android 14 (API 34)',
+      device: activeTester.devices[0] || '',
+      osVersion: '',
       reproductionSteps: stepsFiltered
     });
 
@@ -293,9 +317,10 @@ export default function TesterDashboard({
 
     await onUpdateTesterProfile({
       upiId: profileUpi,
+      experience: profileExperience,
       country: profileCountry,
       specialty: profileSpecialty,
-      devices: profileDevices
+      devices: profileDeviceInput.split(',').map((device) => device.trim()).filter(Boolean)
     });
 
     setProfileSuccess(true);
@@ -345,7 +370,7 @@ export default function TesterDashboard({
     { id: 'dashboard', label: 'Dashboard', icon: <Compass className="w-5 h-5" /> },
     { id: 'explore', label: 'Projects', icon: <FolderCheck className="w-5 h-5" /> },
     { id: 'wallet', label: 'Wallet', icon: <Wallet className="w-5 h-5" /> },
-    { id: 'bugs', label: 'Support', icon: <MessageSquare className="w-5 h-5" /> },
+    { id: 'support', label: 'Support', icon: <MessageSquare className="w-5 h-5" /> },
     { id: 'profile', label: 'Profile Settings', icon: <User className="w-5 h-5" /> },
   ];
 
@@ -377,7 +402,7 @@ export default function TesterDashboard({
                 <button
                   key={link.id}
                   onClick={() => {
-                    setActiveTab(link.id as any);
+                    handleTabSelect(link.id as any);
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all border border-transparent cursor-pointer bg-transparent text-left ${
                     isActive
@@ -408,7 +433,7 @@ export default function TesterDashboard({
             You will receive new opportunities here.
           </p>
           <button 
-            onClick={() => setActiveTab('explore')}
+            onClick={() => handleTabSelect('explore')}
             className={`w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider border transition-all cursor-pointer bg-transparent ${
               isDarkMode
                 ? 'border-zinc-700 hover:border-zinc-600 text-white hover:bg-zinc-800/30'
@@ -444,9 +469,9 @@ export default function TesterDashboard({
             </button>
             {notificationDropdownOpen && (
               <div className={`absolute right-0 top-12 w-80 max-h-96 overflow-y-auto rounded-xl border p-2 shadow-xl z-50 ${isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-slate-200'}`}>
-                {notifications.length === 0 ? <p className="p-3 text-xs text-slate-500">No notifications.</p> : notifications.map((notification) => (
-                  <button key={notification._id} onClick={() => { onReadNotification(notification._id); if (notification.type === 'project_opportunity') handleTabSelect('explore'); setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs border mb-1 transition-colors ${notification.readAt ? (isDarkMode ? 'bg-zinc-900/70 border-zinc-800 text-slate-500' : 'bg-slate-100 border-slate-200 text-slate-500') : (isDarkMode ? 'bg-indigo-500/15 border-indigo-500/30 text-white' : 'bg-indigo-50 border-indigo-200 text-slate-900')}`}>
-                    <span className="flex items-center justify-between gap-2 font-bold"><span>{notification.type === 'project_opportunity' ? 'New testing opportunity' : notification.type.replace(/_/g, ' ')}</span><span className={`text-[8px] uppercase px-1.5 py-0.5 rounded-full ${notification.readAt ? 'bg-slate-500/10 text-slate-500' : 'bg-indigo-600 text-white'}`}>{notification.readAt ? 'Read' : 'New'}</span></span>
+                {notifications.filter((notification) => !notification.readAt).length === 0 ? <p className="p-3 text-xs text-slate-500">You're all caught up.</p> : notifications.filter((notification) => !notification.readAt).map((notification) => (
+                  <button key={notification._id} onClick={() => { onReadNotification(notification._id); if (notification.type === 'project_opportunity') handleTabSelect('explore'); else if (notification.type === 'support_reply') handleTabSelect('support'); else if (notification.payload.projectId && ['testing_link', 'step_reminder', 'step_verified', 'step_rejected', 'install_scheduled'].includes(notification.type)) { const projectId = String(notification.payload.projectId); setActiveTab('explore'); setDetailsProjectId(projectId); onTabChange?.(`projects/${projectId}`); } setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs border mb-1 transition-colors ${isDarkMode ? 'bg-indigo-500/15 border-indigo-500/30 text-white' : 'bg-indigo-50 border-indigo-200 text-slate-900'}`}>
+                    <span className="flex items-center justify-between gap-2 font-bold"><span>{notification.type === 'project_opportunity' ? 'New testing opportunity' : notification.type.replace(/_/g, ' ')}</span><span className="text-[8px] uppercase px-1.5 py-0.5 rounded-full bg-indigo-600 text-white">New</span></span>
                     <span className="text-slate-500 block mt-1">{String(notification.payload.appName ?? '')}</span>
                     {notification.payload.requiredDeviceModels?.length ? <span className="text-indigo-500 block mt-1">Device: {notification.payload.requiredDeviceModels.join(', ')}</span> : null}
                   </button>
@@ -479,13 +504,13 @@ export default function TesterDashboard({
                 isDarkMode ? 'bg-zinc-900 border-zinc-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
               }`}>
                 <button
-                  onClick={() => { setActiveTab('profile'); setUserDropdownOpen(false); }}
+                  onClick={() => { handleTabSelect('profile'); setUserDropdownOpen(false); }}
                   className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-500/10 cursor-pointer border-0 bg-transparent"
                 >
                   My Profile Settings
                 </button>
                 <button
-                  onClick={() => { setActiveTab('wallet'); setUserDropdownOpen(false); }}
+                  onClick={() => { handleTabSelect('wallet'); setUserDropdownOpen(false); }}
                   className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold hover:bg-slate-500/10 cursor-pointer border-0 bg-transparent"
                 >
                   Wallet Ledger
@@ -526,7 +551,7 @@ export default function TesterDashboard({
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Wallet Balance</span>
                       <h3 className={`text-2xl font-black mt-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>₹{activeTester.walletBalance.toFixed(2)}</h3>
-                      <span className="text-[10px] text-slate-500 mt-1 block">Withdrawable Balance: ₹{activeTester.walletBalance.toFixed(2)}</span>
+                      <span className="text-[10px] text-slate-500 mt-1 block">Withdrawable Balance: ₹{withdrawableBalance.toFixed(2)}</span>
                     </div>
                   </div>
                   <button 
@@ -674,14 +699,31 @@ export default function TesterDashboard({
                 {/* LEFT MAIN SPLIT COLUMN */}
                 <div className="lg:col-span-7 space-y-8">
                   
-                  {/* 1. Current Project */}
-                  <div className={`border rounded-2xl p-6 ${
+                  <div className={`border rounded-2xl p-6 ${isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200 shadow-xs'}`}>
+                    <div className="flex items-center justify-between border-b pb-4 mb-3">
+                      <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>My Project Status</h3>
+                      <button onClick={() => handleTabSelect('explore')} className="text-xs font-bold text-indigo-600 bg-transparent border-none cursor-pointer">View projects</button>
+                    </div>
+                    {assignments.filter((assignment) => assignment.testerId === activeTester.id).length === 0 ? <p className="py-8 text-center text-xs text-slate-500">You are not enrolled in a project yet.</p> : (
+                      <div className="divide-y divide-slate-500/10">
+                        {assignments.filter((assignment) => assignment.testerId === activeTester.id).map((assignment) => (
+                          <button key={assignment.id} onClick={() => { setSelectedAssignmentId(assignment.id); setDetailsProjectId(assignment.projectId); onTabChange?.(`projects/${assignment.projectId}`); }} className="flex w-full items-center justify-between gap-4 bg-transparent py-4 text-left border-0 cursor-pointer">
+                            <div><p className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{assignment.appName}</p><p className="mt-1 text-[10px] text-slate-500">{assignment.status === 'queued' ? `Waitlist position ${assignment.queuePosition ?? '-'}` : assignment.status === 'completed' ? 'Testing completed' : `Current step: ${getStepDetails(assignment.currentStep).title}`}</p></div>
+                            <span className={`rounded-full px-3 py-1 text-[9px] font-black uppercase ${assignment.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500' : assignment.status === 'queued' ? 'bg-amber-500/10 text-amber-500' : 'bg-indigo-500/10 text-indigo-500'}`}>{assignment.status}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Legacy task workspace is now represented in the project details dialog. */}
+                  <div className={`hidden border rounded-2xl p-6 ${
                     isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200 shadow-xs'
                   }`}>
                     <div className="flex items-center justify-between border-b pb-4 mb-5">
                       <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Current Project</h3>
                       <button 
-                        onClick={() => setActiveTab('explore')}
+                        onClick={() => handleTabSelect('explore')}
                         className="text-xs font-bold text-indigo-600 hover:underline bg-transparent border-none cursor-pointer p-0"
                       >
                         View All
@@ -718,7 +760,7 @@ export default function TesterDashboard({
                           <div>
                             <span className="text-[9px] uppercase tracking-wider text-slate-500 block">Reward</span>
                             <span className={`text-sm font-black mt-1 block ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                              ₹{getRewardAmount(selectedProject.packageTier)}
+                              ₹{(selectedProject.testerPayout ?? 0).toFixed(2)}
                             </span>
                           </div>
                           <div>
@@ -1059,8 +1101,8 @@ export default function TesterDashboard({
                                           appName: selectedProject.name,
                                           title: inlineBugTitle,
                                           severity: inlineBugSeverity,
-                                          device: activeTester.devices[0] || 'Google Pixel 8',
-                                          osVersion: 'Android 14',
+                                          device: activeTester.devices[0] || '',
+                                          osVersion: '',
                                           reproductionSteps: [inlineBugSteps],
                                           screenshot: step4BugScreenshotFile || undefined,
                                           status: 'Open'
@@ -1164,7 +1206,7 @@ export default function TesterDashboard({
                     <div className="flex items-center justify-between border-b pb-4 mb-5">
                       <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Available Opportunities</h3>
                       <button 
-                        onClick={() => setActiveTab('explore')}
+                        onClick={() => handleTabSelect('explore')}
                         className="text-xs font-bold text-indigo-600 hover:underline bg-transparent border-none cursor-pointer p-0"
                       >
                         View All
@@ -1184,7 +1226,7 @@ export default function TesterDashboard({
                                   {p.name}
                                 </h4>
                                 <div className="flex items-center gap-2 text-slate-500 mt-1 font-semibold">
-                                  <span>₹{getRewardAmount(p.packageTier)}</span>
+                                  <span>₹{(p.testerPayout ?? 0).toFixed(2)}</span>
                                   <span>•</span>
                                   <span>{p.category}</span>
                                   <span>•</span>
@@ -1226,7 +1268,7 @@ export default function TesterDashboard({
                     <div className="flex items-center justify-between border-b pb-4 mb-5">
                       <h3 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Wallet Summary</h3>
                       <button 
-                        onClick={() => setActiveTab('wallet')}
+                        onClick={() => handleTabSelect('wallet')}
                         className="text-xs font-bold text-indigo-600 hover:underline bg-transparent border-none cursor-pointer p-0"
                       >
                         View All
@@ -1240,16 +1282,16 @@ export default function TesterDashboard({
                       </div>
                       <div className="flex justify-between border-b pb-3 border-slate-100 dark:border-zinc-800/50">
                         <span className="text-slate-500">Withdrawable Balance</span>
-                        <span className={isDarkMode ? 'text-white' : 'text-slate-800'}>₹{activeTester.walletBalance.toFixed(2)}</span>
+                        <span className={isDarkMode ? 'text-white' : 'text-slate-800'}>₹{withdrawableBalance.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between pb-1">
-                        <span className="text-slate-500">Pending Earnings</span>
-                        <span className={isDarkMode ? 'text-white' : 'text-slate-800'}>₹0.00</span>
+                        <span className="text-slate-500">Pending Withdrawals</span>
+                        <span className={isDarkMode ? 'text-white' : 'text-slate-800'}>₹{pendingWithdrawalTotal.toFixed(2)}</span>
                       </div>
                     </div>
 
                     <button 
-                      onClick={() => setActiveTab('wallet')}
+                      onClick={() => handleTabSelect('wallet')}
                       className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-wider py-3.5 rounded-xl cursor-pointer border-0 shadow-lg shadow-indigo-500/10 text-center block"
                     >
                       Withdraw Funds
@@ -1285,14 +1327,14 @@ export default function TesterDashboard({
                             <span className="text-[10px] text-slate-500 block mt-0.5">{p.version} · {p.category}</span>
                           </div>
                           <span className="px-3 py-1 rounded-xl text-xs font-black text-indigo-500 bg-indigo-500/10 border border-indigo-500/20">
-                            ₹{getRewardAmount(p.packageTier)}
+                            ₹{(p.testerPayout ?? 0).toFixed(2)}
                           </span>
                         </div>
 
                         <div className="space-y-2">
                           <div className="flex justify-between text-xs text-slate-500">
                             <span>Requirements:</span>
-                            <span className="font-semibold">Android 7.0+</span>
+                            <span className="font-semibold">{p.devices.length > 0 ? p.devices.join(', ') : 'No device restriction'}</span>
                           </div>
                           <div className="flex justify-between text-xs text-slate-500">
                             <span>Status:</span>
@@ -1367,6 +1409,7 @@ export default function TesterDashboard({
                         </div>
                       </div>
 
+                      <button type="button" onClick={() => { setDetailsProjectId(p.id); if (assignment) setSelectedAssignmentId(assignment.id); onTabChange?.(`projects/${p.id}`); }} className="mb-2 w-full rounded-xl border border-slate-500/20 bg-transparent py-2.5 text-xs font-bold text-indigo-500 cursor-pointer">View Project Details</button>
                       {isJoined ? (
                         assignment.status === 'queued' ? (
                           <span className="w-full py-2.5 rounded-xl font-bold text-xs border border-amber-500/20 bg-amber-500/5 text-amber-500 text-center">
@@ -1426,7 +1469,7 @@ export default function TesterDashboard({
                           <div className="space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
                             <div className="flex justify-between">
                               <span>Reward Earned:</span>
-                              <span className="font-bold text-indigo-500">₹{getRewardAmount(p?.packageTier)}</span>
+                              <span className="font-bold text-indigo-500">₹{(p?.testerPayout ?? 0).toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between">
                               <span>Closed Testing Runs:</span>
@@ -1609,8 +1652,8 @@ export default function TesterDashboard({
             </div>
           )}
 
-          {/* TAB 4: BUGS / NOTIFICATIONS */}
-          {activeTab === 'bugs' && (
+          {/* Bug reporting now lives inside each project details dialog. */}
+          {false && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               {/* Report Bug */}
               <div className="lg:col-span-5">
@@ -1797,6 +1840,35 @@ export default function TesterDashboard({
             </div>
           )}
 
+          {activeTab === 'support' && (
+            <div className={`mt-8 rounded-2xl border p-6 ${isDarkMode ? 'bg-[#18181B] border-zinc-800' : 'bg-white border-slate-200'}`}>
+              <h3 className={`mb-1 text-base font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Messages to Admin</h3>
+              <p className="mb-4 text-xs text-slate-500">Create a support request and continue the conversation with the admin team here.</p>
+              <form onSubmit={async (event) => {
+                event.preventDefault(); setSupportError(''); setSupportSending(true);
+                try { await onSendSupport({ subject: supportSubject, message: supportMessage, projectId: supportProjectId || undefined }); setSupportSubject(''); setSupportMessage(''); setSupportProjectId(''); }
+                catch (error) { setSupportError(error instanceof Error ? error.message : 'Could not create support ticket.'); }
+                finally { setSupportSending(false); }
+              }} className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <input required value={supportSubject} onChange={(e) => setSupportSubject(e.target.value)} placeholder="Subject" className={`rounded-xl border px-4 py-2.5 text-xs ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'border-slate-200'}`} />
+                <select value={supportProjectId} onChange={(e) => setSupportProjectId(e.target.value)} className={`rounded-xl border px-4 py-2.5 text-xs ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'border-slate-200'}`}><option value="">General support</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select>
+                <textarea required value={supportMessage} onChange={(e) => setSupportMessage(e.target.value)} placeholder="Describe what you need help with" rows={3} className={`rounded-xl border px-4 py-2.5 text-xs md:col-span-2 ${isDarkMode ? 'bg-zinc-950 border-zinc-800 text-white' : 'border-slate-200'}`} />
+                {supportError && <p className="text-xs font-bold text-red-500 md:col-span-2">{supportError}</p>}
+                <button disabled={supportSending} className="rounded-xl border-0 bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{supportSending ? 'Sending...' : 'Create Ticket'}</button>
+              </form>
+              <div className="mt-6 space-y-2">
+                {supportTickets.length === 0 ? <p className="text-xs text-slate-500">No support conversations yet.</p> : supportTickets.map((ticket) => <article key={ticket._id} className={`rounded-xl border p-4 text-xs ${isDarkMode ? 'border-zinc-800' : 'border-slate-200'}`}>
+                  <div className="flex items-start justify-between gap-4"><div><strong className={isDarkMode ? 'text-white' : 'text-slate-900'}>{ticket.subject}</strong><p className="mt-1 text-[10px] text-slate-500">Opened {new Date(ticket.createdAt).toLocaleString()}</p></div><span className="uppercase text-indigo-500">{ticket.status.replace('_', ' ')}</span></div>
+                  <div className="mt-4 space-y-2">{ticket.messages.map((message, index) => { const author = typeof message.authorId === 'object' ? message.authorId : null; const isAdmin = author?.role === 'admin'; return <div key={index} className={`rounded-xl p-3 ${isAdmin ? 'ml-8 bg-indigo-500/10 text-indigo-600' : isDarkMode ? 'mr-8 bg-zinc-900 text-slate-300' : 'mr-8 bg-slate-50 text-slate-700'}`}><p className="mb-1 text-[9px] font-black uppercase opacity-70">{isAdmin ? 'Admin response' : 'You'}</p><p>{message.body}</p></div>; })}</div>
+                  <form className="mt-3 flex gap-2" onSubmit={async (event) => { event.preventDefault(); const body = supportReplies[ticket._id]?.trim(); if (!body) return; setReplyingTicketId(ticket._id); try { await onReplyToSupport(ticket._id, body); setSupportReplies((current) => ({ ...current, [ticket._id]: '' })); } finally { setReplyingTicketId(null); } }}>
+                    <input value={supportReplies[ticket._id] ?? ''} onChange={(event) => setSupportReplies((current) => ({ ...current, [ticket._id]: event.target.value }))} placeholder="Reply in this conversation" className={`min-w-0 flex-1 rounded-xl border px-3 py-2 ${isDarkMode ? 'border-zinc-800 bg-zinc-950 text-white' : 'border-slate-200'}`} />
+                    <button disabled={replyingTicketId === ticket._id} className="rounded-xl border-0 bg-indigo-600 px-4 py-2 font-bold text-white disabled:opacity-50">{replyingTicketId === ticket._id ? 'Sending...' : 'Send'}</button>
+                  </form>
+                </article>)}
+              </div>
+            </div>
+          )}
+
           {/* TAB 5: PROFILE */}
           {activeTab === 'profile' && (
             <div className="p-6 max-w-2xl mx-auto">
@@ -1844,40 +1916,15 @@ export default function TesterDashboard({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                      Country Location
-                    </label>
-                    <input
-                      type="text"
-                      value={profileCountry}
-                      onChange={(e) => setProfileCountry(e.target.value)}
-                      className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500/50 ${
-                        isDarkMode 
-                          ? 'bg-zinc-950/60 border-zinc-800 text-white' 
-                          : 'bg-white border-slate-200 text-slate-900'
-                      }`}
-                    />
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Account Email</label>
+                    <input type="email" value={activeTester.email || ''} readOnly className="w-full border rounded-xl px-4 py-2.5 text-xs bg-slate-500/5 border-white/5 opacity-70 text-slate-400" />
                   </div>
-
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                      QA Testing Specialty
-                    </label>
-                    <select
-                      value={profileSpecialty}
-                      onChange={(e) => setProfileSpecialty(e.target.value)}
-                      className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500/50 ${
-                        isDarkMode 
-                          ? 'bg-zinc-955/60 border-zinc-800 text-white' 
-                          : 'bg-white border-slate-200 text-slate-900'
-                      }`}
-                    >
-                      <option value="General Testing">General Exploratory Testing</option>
-                      <option value="BLE Integrations & Network Sync">BLE Integrations & Network Sync</option>
-                      <option value="Performance Profiling & Memory Leak Diagnostics">Performance Profiling & Memory Leak Diagnostics</option>
-                      <option value="Security, Cryptography & Biometrics">Security, Cryptography & Biometrics</option>
-                      <option value="Foldables & Dynamic Aspect Ratios">Foldables & Dynamic Aspect Ratios</option>
-                      <option value="Localization, Fonts & Accent Overflows">Localization, Fonts & Accent Overflows</option>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Experience Level</label>
+                    <select value={profileExperience} onChange={(e) => setProfileExperience(e.target.value)} className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500/50 ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+                      <option value="beginner">Beginner</option>
+                      <option value="intermediate">Intermediate</option>
+                      <option value="expert">Expert</option>
                     </select>
                   </div>
                 </div>
@@ -1886,33 +1933,17 @@ export default function TesterDashboard({
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-2 font-mono">
                     My Device Lab Inventory
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      'Google Pixel 8 Pro', 'Samsung Galaxy S24 Ultra', 'OnePlus 12', 
-                      'Galaxy Z Fold 5', 'Pixel 7a', 'Samsung Galaxy A54'
-                    ].map((device) => {
-                      const isChecked = profileDevices.includes(device);
-                      return (
-                        <div
-                          key={device}
-                          onClick={() => {
-                            if (isChecked) {
-                              setProfileDevices(profileDevices.filter(d => d !== device));
-                            } else {
-                              setProfileDevices([...profileDevices, device]);
-                            }
-                          }}
-                          className={`border p-3 rounded-xl cursor-pointer flex items-center justify-between text-xs font-semibold select-none ${
-                            isChecked
-                              ? 'bg-indigo-600/10 border-indigo-500 text-indigo-500'
-                              : isDarkMode ? 'bg-zinc-900 border-zinc-800 hover:border-zinc-700' : 'bg-slate-50 border-slate-200 hover:border-slate-350'
-                          }`}
-                        >
-                          <span>{device}</span>
-                          {isChecked ? <CheckCircle className="w-4 h-4 text-indigo-500 shrink-0" /> : <Clock className="w-4 h-4 opacity-15 shrink-0" />}
-                        </div>
-                      );
-                    })}
+                  <textarea value={profileDeviceInput} onChange={(e) => setProfileDeviceInput(e.target.value)} rows={3} placeholder="Enter registered device models, separated by commas" className={`w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-indigo-500/50 ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`} />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Country</label>
+                    <input value={profileCountry} onChange={(e) => setProfileCountry(e.target.value)} placeholder="Country" className={`w-full border rounded-xl px-4 py-2.5 text-xs ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Testing Specialty</label>
+                    <input value={profileSpecialty} onChange={(e) => setProfileSpecialty(e.target.value)} placeholder="e.g. Performance testing" className={`w-full border rounded-xl px-4 py-2.5 text-xs ${isDarkMode ? 'bg-zinc-950/60 border-zinc-800 text-white' : 'bg-white border-slate-200 text-slate-900'}`} />
                   </div>
                 </div>
 
@@ -1928,13 +1959,44 @@ export default function TesterDashboard({
         </div>
       </div>
 
+      {detailsProject && (
+        <div className={`fixed inset-y-0 left-0 right-0 z-[40] overflow-y-auto p-4 md:left-[260px] md:p-8 ${isDarkMode ? 'bg-[#09090B]' : 'bg-slate-50'}`}>
+          <div className={`mx-auto min-h-full w-full max-w-6xl rounded-2xl border p-6 ${isDarkMode ? 'border-zinc-800 bg-[#18181B]' : 'border-slate-200 bg-white'}`}>
+            <div className="flex items-start justify-between gap-4 border-b border-slate-500/15 pb-4">
+              <div><p className="text-[10px] font-black uppercase text-indigo-500">Project details</p><h2 className={`mt-1 text-xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{detailsProject.name}</h2><p className="mt-1 text-xs text-slate-500">{detailsProject.projectName || detailsProject.packageName || detailsProject.category}</p></div>
+              <button onClick={() => { setDetailsProjectId(null); handleTabSelect('explore'); }} className="rounded-xl border border-slate-500/20 bg-transparent px-3 py-2 text-xs font-bold text-slate-500 cursor-pointer">← Back to Projects</button>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+              {[['Enrollment', detailsAssignment?.status ?? detailsProject.joinState ?? 'open'], ['Progress', detailsAssignment ? `Step ${detailsAssignment.currentStep} of 6` : `${detailsProject.progress}%`], ['Tester slots', `${detailsProject.testersCount}/${detailsProject.testersRequired ?? 0}`], ['Reward', `₹${(detailsProject.testerPayout ?? 0).toFixed(2)}`], ['Category', detailsProject.category], ['Version', detailsProject.version || 'Not provided'], ['Launch date', detailsProject.launchDate], ['Waitlist', `${detailsProject.waitlistCount ?? 0}/3`]].map(([label, value]) => <div key={label} className={`rounded-xl border p-3 ${isDarkMode ? 'border-zinc-800 bg-zinc-950/40' : 'border-slate-200 bg-slate-50'}`}><p className="text-[9px] font-black uppercase text-slate-500">{label}</p><p className={`mt-1 text-xs font-bold capitalize ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{value}</p></div>)}
+            </div>
+            <div className="mt-5 grid gap-5 lg:grid-cols-2">
+              <section className={`rounded-2xl border p-5 ${isDarkMode ? 'border-zinc-800' : 'border-slate-200'}`}>
+                <h3 className={`text-sm font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Current project</h3>
+                {detailsAssignment ? <><p className="mt-2 text-xs font-bold text-indigo-500">{detailsAssignment.status === 'queued' ? `Waitlisted at position ${detailsAssignment.queuePosition ?? '-'}` : getStepDetails(detailsAssignment.currentStep).title}</p><p className="mt-2 text-xs leading-5 text-slate-500">{detailsAssignment.status === 'active' ? getStepDetails(detailsAssignment.currentStep).description : detailsAssignment.status === 'completed' ? 'This testing campaign is complete.' : 'You will be notified when a tester slot becomes available.'}</p><div className="mt-4 grid grid-cols-6 gap-2">{[1,2,3,4,5,6].map((step) => <div key={step} className={`rounded-lg py-2 text-center text-[10px] font-black ${step < detailsAssignment.currentStep ? 'bg-emerald-500/10 text-emerald-500' : step === detailsAssignment.currentStep ? 'bg-indigo-600 text-white' : 'bg-slate-500/10 text-slate-500'}`}>{step}</div>)}</div>
+                {detailsAssignment.status === 'active' && detailsAssignment.currentStep === 1 && <form className="mt-5 space-y-3 border-t border-slate-500/15 pt-4" onSubmit={async (event) => { event.preventDefault(); setProjectEmailError(''); const email = googlePlayEmail.trim(); if (!/^\S+@\S+\.\S+$/.test(email)) { setProjectEmailError('Enter a valid Google Play email address.'); return; } setSubmittingProjectEmail(true); try { await Promise.resolve(onSubmitStep1Email(detailsAssignment.id, email)); setGooglePlayEmail(''); } catch (error) { setProjectEmailError(error instanceof Error ? error.message : 'Could not submit email address.'); } finally { setSubmittingProjectEmail(false); } }}><label className="block text-[10px] font-black uppercase text-slate-500">Google Play email address</label><input type="email" required value={googlePlayEmail} onChange={(event) => setGooglePlayEmail(event.target.value)} placeholder="name@gmail.com" className={`w-full rounded-xl border px-3 py-2.5 text-xs ${isDarkMode ? 'border-zinc-800 bg-zinc-950 text-white' : 'border-slate-200 bg-white'}`} />{projectEmailError && <p className="text-xs font-bold text-red-500">{projectEmailError}</p>}<button disabled={submittingProjectEmail} className="w-full rounded-xl border-0 bg-indigo-600 py-2.5 text-xs font-bold text-white disabled:opacity-50">{submittingProjectEmail ? 'Submitting...' : 'Submit Email for Verification'}</button></form>}
+                {detailsAssignment.status === 'active' && detailsAssignment.currentStep === 3 && <form className="mt-5 space-y-3 border-t border-slate-500/15 pt-4" onSubmit={async (event) => { event.preventDefault(); if (!step3ScreenshotFile.trim()) return; setSubmittingProjectEmail(true); try { await Promise.resolve(onClickStep3Link(detailsAssignment.id, step3ScreenshotFile.trim())); setStep3ScreenshotFile(''); } finally { setSubmittingProjectEmail(false); } }}><a href={detailsProject.optInUrl || '#'} target="_blank" rel="noreferrer" className="block rounded-xl bg-indigo-500/10 px-4 py-3 text-center text-xs font-bold text-indigo-500">Open Play Store testing invitation</a><label className="block text-[10px] font-black uppercase text-slate-500">Installation proof</label><label className="block cursor-pointer rounded-xl border border-dashed border-indigo-500/40 p-4 text-center text-xs font-bold text-indigo-500">{uploadingProof ? 'Uploading screenshot...' : step3ScreenshotFile ? 'Screenshot uploaded' : 'Choose screenshot'}<input type="file" accept="image/*" className="hidden" disabled={uploadingProof} onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; setUploadingProof(true); try { setStep3ScreenshotFile(await onUploadProof(file)); } finally { setUploadingProof(false); } }} /></label><button disabled={submittingProjectEmail || uploadingProof || !step3ScreenshotFile} className="w-full rounded-xl border-0 bg-indigo-600 py-2.5 text-xs font-bold text-white disabled:opacity-50">Submit Installation Proof</button></form>}
+                {detailsAssignment.status === 'active' && detailsAssignment.currentStep === 4 && <div className="mt-5 space-y-3 border-t border-slate-500/15 pt-4"><div className="flex items-center justify-between text-xs"><span className="font-bold">Daily testing check-ins</span><span className="text-indigo-500">{detailsAssignment.step4CheckInsCompleted}/14 days</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-500/10"><div className="h-full bg-indigo-600" style={{ width: `${Math.min(100, (detailsAssignment.step4CheckInsCompleted / 14) * 100)}%` }} /></div><button disabled={detailsAssignment.step4CheckInsCompleted >= 14} onClick={() => onLogStep4CheckIn(detailsAssignment.id)} className="w-full rounded-xl border-0 bg-indigo-600 py-2.5 text-xs font-bold text-white disabled:opacity-50">{detailsAssignment.step4CheckInsCompleted >= 14 ? 'Testing period submitted' : `Log Day ${detailsAssignment.step4CheckInsCompleted + 1} Check-in`}</button><p className="text-[10px] text-slate-500">Check in once per testing day. The backend records each submission for admin verification.</p></div>}
+                {detailsAssignment.currentStep > 3 && detailsProject.optInUrl && <a href={`${API_BASE_URL}/t/${detailsAssignment.id}`} target="_blank" rel="noreferrer" className="mt-4 block rounded-xl bg-indigo-500/10 px-4 py-3 text-center text-xs font-bold text-indigo-500">Open Google Play testing link</a>}
+                </> : <p className="mt-3 text-xs text-slate-500">You have not enrolled in this project.</p>}
+                <div className="mt-4 space-y-2 text-xs text-slate-500">{detailsProject.instructions && <p><strong>Instructions:</strong> {detailsProject.instructions}</p>}{detailsProject.releaseNotes && <p><strong>Release notes:</strong> {detailsProject.releaseNotes}</p>}{detailsProject.devices.length > 0 && <p><strong>Required devices:</strong> {detailsProject.devices.join(', ')}</p>}</div>
+              </section>
+              <section className={`rounded-2xl border p-5 ${isDarkMode ? 'border-zinc-800' : 'border-slate-200'}`}>
+                <h3 className={`text-sm font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Bug reports for this project</h3>
+                <div className="mt-3 space-y-2">{detailsBugs.length === 0 ? <p className="text-xs text-slate-500">No bug reports submitted for this project.</p> : detailsBugs.map((bug) => <div key={bug.id} className="rounded-xl bg-slate-500/5 p-3"><div className="flex justify-between gap-3"><strong className="text-xs">{bug.title}</strong><span className="text-[9px] font-black uppercase text-indigo-500">{bug.status}</span></div><p className="mt-1 text-[10px] text-slate-500">{bug.severity} · {bug.createdAt}</p></div>)}</div>
+                {detailsAssignment?.status === 'active' && <form onSubmit={handleBugSubmit} className="mt-4 space-y-2 border-t border-slate-500/15 pt-4"><p className="text-[10px] font-black uppercase text-slate-500">Report a bug</p><input required value={bugTitle} onChange={(event) => setBugTitle(event.target.value)} placeholder="Bug summary" className={`w-full rounded-xl border px-3 py-2 text-xs ${isDarkMode ? 'border-zinc-800 bg-zinc-950 text-white' : 'border-slate-200'}`} /><select value={bugSeverity} onChange={(event) => setBugSeverity(event.target.value as typeof bugSeverity)} className={`w-full rounded-xl border px-3 py-2 text-xs ${isDarkMode ? 'border-zinc-800 bg-zinc-950 text-white' : 'border-slate-200'}`}><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select><textarea required value={bugReproductionSteps[0] ?? ''} onChange={(event) => setBugReproductionSteps([event.target.value])} placeholder="Reproduction steps" rows={3} className={`w-full rounded-xl border px-3 py-2 text-xs ${isDarkMode ? 'border-zinc-800 bg-zinc-950 text-white' : 'border-slate-200'}`} /><button className="w-full rounded-xl border-0 bg-purple-600 py-2.5 text-xs font-bold text-white">Submit Bug Report</button>{bugSuccess && <p className="text-xs font-bold text-emerald-500">Bug report submitted.</p>}</form>}
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ================= MOBILE BOTTOM NAV ================= */}
       <div className={`md:hidden fixed bottom-0 left-0 right-0 h-16 border-t flex items-center justify-around z-50 ${
         isDarkMode ? 'bg-[#09090B] border-zinc-800' : 'bg-white border-slate-200'
       }`}>
         {[
           { id: 'dashboard', label: 'Home', icon: <Home className="w-5 h-5" /> },
-          { id: 'tasks', label: 'Tests', icon: <CheckSquare className="w-5 h-5" /> },
+          { id: 'explore', label: 'Projects', icon: <CheckSquare className="w-5 h-5" /> },
           { id: 'wallet', label: 'Wallet', icon: <Wallet className="w-5 h-5" /> },
           { id: 'profile', label: 'Profile', icon: <User className="w-5 h-5" /> }
         ].map(link => (

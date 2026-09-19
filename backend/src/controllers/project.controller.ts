@@ -204,7 +204,7 @@ export const assignTesterToProject = asyncHandler(async (req: Request, res: Resp
   const { testerId } = adminAssignTesterSchema.parse(req.body);
   const tester = await Tester.findById(testerId);
   if (!tester) throw ApiError.notFound("Tester not found");
-  const assignment = await joinProject(new Types.ObjectId(req.params.id), tester._id);
+  const assignment = await joinProject(new Types.ObjectId(req.params.id), tester._id, { reactivateRemoved: true });
   res.status(201).json({ data: assignment });
 });
 
@@ -256,12 +256,14 @@ export const reviewProjectVerification = asyncHandler(async (req: Request, res: 
 });
 
 export const getVerifiedEmails = asyncHandler(async (req: Request, res: Response) => {
+  await loadVisibleProject(req);
   const emails = await getVerifiedTesterEmails(new Types.ObjectId(req.params.id));
   res.status(200).json({ data: { emails, count: emails.length } });
 });
 
 /** Admin confirms verified tester emails were copied into Play Console and submitted for review. */
 export const submitProjectEmailsForReview = asyncHandler(async (req: Request, res: Response) => {
+  await loadVisibleProject(req);
   const project = await submitEmailsForReview(new Types.ObjectId(req.params.id), req.dbUser!._id);
   res.status(200).json({ data: project });
 });
@@ -272,10 +274,16 @@ export const confirmProjectEmailReview = asyncHandler(async (req: Request, res: 
   res.status(200).json({ data: project });
 });
 
-const markInvitedSchema = z.object({ optInUrl: z.string().url() });
+const markInvitedSchema = z.object({
+  optInUrl: z.string().url().refine((value) => {
+    const url = new URL(value);
+    return url.hostname === "play.google.com" && url.pathname.startsWith("/apps/testing/");
+  }, "Enter a Google Play closed-testing URL (https://play.google.com/apps/testing/...)")
+});
 
 export const markProjectTestersInvited = asyncHandler(async (req: Request, res: Response) => {
   const { optInUrl } = markInvitedSchema.parse(req.body);
+  await loadVisibleProject(req);
   const project = await markTestersInvited({
     projectId: new Types.ObjectId(req.params.id),
     optInUrl,

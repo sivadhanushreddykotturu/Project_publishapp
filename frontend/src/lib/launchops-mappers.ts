@@ -58,6 +58,7 @@ export function mapProject(project: BackendProject): TestApp {
     launchDate: formatDate(project.createdAt, "Not scheduled"),
     category: (project.serviceType || "play_store_closed_testing").replace(/_/g, " "),
     progress: projectProgress(project),
+    testerPayout: paiseToRupees(project.steps?.reduce((sum, step) => sum + Number(step.config?.payoutAmount ?? 0), 0) ?? 0),
     testingWindowEnded: ["closed", "completed", "cancelled"].includes(project.status),
     devices: project.requiredDeviceModels ?? [],
     packageTier: project.package,
@@ -77,6 +78,7 @@ export function mapProject(project: BackendProject): TestApp {
     waitlistCount: project.waitlistCount,
     joinState: project.joinState,
     optInUrl: project.playIntegration?.optInUrl,
+    workflowSteps: project.steps?.map((step) => ({ order: step.order, type: step.type, state: step.state, deadline: step.deadline })),
     playIntegration: {
       serviceAccountSet: Boolean(project.playIntegration?.serviceAccountLinked),
       packageName: project.playIntegration?.packageName ?? project.appDetails.packageName ?? "",
@@ -91,12 +93,14 @@ export function mapTesterProfile(profile: BackendTesterProfile, user: LaunchOpsU
   return {
     id: profile._id,
     name: user.name,
+    email: user.email,
     avatar: `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(user.name || user.email)}`,
-    country: "India",
+    country: profile.country ?? "Not provided",
     devices,
+    deviceDetails: profile.devices,
     bugsFoundCount: 0,
     rating: profile.ratingAvg || 0,
-    specialty: `${profile.experienceLevel[0].toUpperCase()}${profile.experienceLevel.slice(1)} tester`,
+    specialty: profile.specialty ?? `${profile.experienceLevel[0].toUpperCase()}${profile.experienceLevel.slice(1)} tester`,
     status: profile.status === "active" ? "Online" : "Idle",
     upiId: profile.upi?.vpa ?? "",
     qrCodeUrl: profile.upi?.qrImageUrl,
@@ -114,6 +118,7 @@ export function mapAssignment(assignment: BackendAssignment, user?: LaunchOpsUse
   const backendStep = Math.min(STEP_MAX, Math.max(STEP_MIN, assignment.currentStep));
   const displayStep = backendStep === 1 && step1Proof?.status === "pending" ? 2 : backendStep;
   const currentStep = displayStep as TesterAssignment["currentStep"];
+  const populatedTesterUser = typeof assignment.testerId === "object" ? assignment.testerId.userId : undefined;
 
   return {
     id: assignment._id,
@@ -123,12 +128,14 @@ export function mapAssignment(assignment: BackendAssignment, user?: LaunchOpsUse
     status: assignment.status === "removed" ? "completed" : assignment.status,
     queuePosition: assignment.queuePosition,
     currentStep,
-    testerEmail: user?.email,
+    testerEmail: step1Proof?.googlePlayEmail ?? user?.email ?? populatedTesterUser?.email,
     step1Screenshot: step1Proof?.fileUrl,
     step3Clicked: Boolean(step3Proof),
     step3Screenshot: step3Proof?.fileUrl,
     step4CheckInsCompleted: proofs.filter((proof) => proof.step === 4).length,
     step4Proof: step4Proof?.fileUrl,
+    pendingProofSteps: [...new Set(proofs.filter((proof) => proof.status === 'pending').map((proof) => proof.step))],
+    rejectedProofSteps: [...new Set(proofs.filter((proof) => proof.status === 'rejected').map((proof) => proof.step))],
     inactivityFlag: assignment.inactivityFlag,
     joinedAt: formatDate(assignment.assignedAt ?? assignment.createdAt, "Joined"),
   };
@@ -156,7 +163,7 @@ export function mapWithdrawal(item: BackendWalletTransaction, testerId: string):
     id: item._id,
     testerId,
     amount: paiseToRupees(item.amount),
-    upiId: "",
+    upiId: typeof item.testerId === "object" ? item.testerId.upi?.vpa ?? "" : "",
     status,
     transactionId: item.transactionId,
     rejectionReason: item.status === "rejected" ? item.note : undefined,
@@ -194,6 +201,7 @@ export function mapBugReport(report: BackendBugReport, tester: Tester): BugRepor
     reproductionSteps: report.stepsToReproduce,
     createdAt: formatDate(report.createdAt, "Recent"),
     isPublished: report.status === "published",
+    adminNotes: report.adminNotes,
     screenshot: report.attachments[0],
   };
 }

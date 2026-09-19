@@ -118,15 +118,15 @@ export const mergeBugReports = asyncHandler(async (req: Request, res: Response) 
   res.status(200).json({ data: { canonicalId, mergedCount: duplicateIds.length } });
 });
 
-const publishSchema = z.object({ ids: z.array(z.string().min(1)).min(1) });
+const publishSchema = z.object({ ids: z.array(z.string().min(1)).min(1), adminNotes: z.string().trim().optional() });
 
 /** Admin publishes the clean, de-duplicated set to the client dashboard (PRD §5.2). */
 export const publishBugReports = asyncHandler(async (req: Request, res: Response) => {
-  const { ids } = publishSchema.parse(req.body);
+  const { ids, adminNotes } = publishSchema.parse(req.body);
 
   const result = await BugReport.updateMany(
     { _id: { $in: ids }, status: { $ne: "duplicate" } },
-    { $set: { status: "published", publishedAt: new Date() } }
+    { $set: { status: "published", publishedAt: new Date(), ...(adminNotes ? { adminNotes } : {}) } }
   );
 
   await recordAudit({

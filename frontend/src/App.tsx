@@ -23,16 +23,16 @@ import AdminConsole from './components/AdminConsole';
 import { MapPin, Users, Heart, ShieldCheck, Sparkles, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  advanceProjectMilestone, assignTesterToProject, checkoutInvoice, completeAdminWithdrawal, createClientProject,
-  getCurrentLaunchOpsUser, getMyTesterProfile, getMyWallet, joinTesterProject,
+  advanceProjectMilestone, assignTesterToProject, checkoutInvoice, checkoutOnboardingTier, verifyOnboardingPayment, completeAdminWithdrawal, createClientProject,
+  getCurrentLaunchOpsUser, getMyTesterProfile, getMyWallet, joinTesterProject, getAdminDashboard, updateCurrentLaunchOpsUser,
   listAdminTesters, listAdminWithdrawals, listInvoices, listMyAssignments, listMyBugReports,
-  listMyNotifications, markNotificationRead,
+  listMyNotifications, markNotificationRead, listMySupportTickets, replyToSupportTicket, updateSupportTicketStatus,
   listProjectAssignments, listProjectBugReports, listProjects, listTesterOpportunities,
-  listClientProjectAssignments, listProjectFiles, clearAdminProjectFiles, requestTestingFileUpload, registerProjectFile, getProjectFileDownload, createSupportTicket,
+  listClientProjectAssignments, listProjectFiles, clearAdminProjectFiles, requestTestingFileUpload, uploadTesterProofFile, registerProjectFile, getProjectFileDownload, createSupportTicket, getVerifiedProjectTesterEmails,
   mergeBugReports, publishBugReport, rejectAdminWithdrawal, replaceAssignment,
   requestWalletWithdrawal, reviewProjectVerification, submitAssignmentProof,
   submitClientVerification, submitProjectBugReport, updateMyTesterProfile, verifyAssignment,
-  type BackendInvoice, type BackendNotification, type BackendTesterProfile, type BackendProjectFile, type LaunchOpsUser,
+  type BackendInvoice, type BackendNotification, type BackendTesterProfile, type BackendProjectFile, type LaunchOpsUser, type AdminDashboardSummary, type BackendSupportTicket,
 } from './lib/launchops-api';
 import {
   mapAssignment, mapBugReport, mapProject, mapTesterProfile, mapWallet, mapWithdrawal,
@@ -102,7 +102,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
         } else if (['home', 'auth', 'tester', 'client', 'admin', 'solutions', 'resources', 'pricing', 'company'].includes(mainTab)) {
           setCurrentTab(mainTab);
           if (parts[1]) {
-            setInitialSubTab(parts[1]);
+            setInitialSubTab(mainTab === 'tester' ? parts.slice(1).join('/') : parts[1]);
           }
         }
       } else {
@@ -124,7 +124,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
         } else if (['home', 'auth', 'tester', 'client', 'admin', 'solutions', 'resources', 'pricing', 'company'].includes(p)) {
           setCurrentTab(p);
           if (subparts[1]) {
-            setInitialSubTab(subparts[1]);
+            setInitialSubTab(p === 'tester' ? subparts.slice(1).join('/') : subparts[1]);
           } else {
             setInitialSubTab('');
           }
@@ -190,6 +190,8 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   const [assignments, setAssignments] = useState<TesterAssignment[]>([]);
 
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+  const [adminDashboard, setAdminDashboard] = useState<AdminDashboardSummary | null>(null);
+  const [supportTickets, setSupportTickets] = useState<BackendSupportTicket[]>([]);
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
 
@@ -204,9 +206,9 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
 
   const refreshTesterData = async () => {
     const token = await getTokenOrThrow();
-    const [me, profileResponse, opportunities, assignmentResponse, walletResponse, bugResponse, notificationResponse] = await Promise.all([
+    const [me, profileResponse, opportunities, assignmentResponse, walletResponse, bugResponse, notificationResponse, supportResponse] = await Promise.all([
       getCurrentLaunchOpsUser(token), getMyTesterProfile(token), listTesterOpportunities(token),
-      listMyAssignments(token), getMyWallet(token), listMyBugReports(token), listMyNotifications(token),
+      listMyAssignments(token), getMyWallet(token), listMyBugReports(token), listMyNotifications(token), listMySupportTickets(token),
     ]);
     const tester = mapTesterProfile(profileResponse.data, me.data.user);
     const wallet = mapWallet(walletResponse.data, tester.id);
@@ -223,12 +225,13 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     setTransactions(wallet.transactions);
     setBugs(bugResponse.data.map((report) => mapBugReport(report, tester)));
     setNotifications(notificationResponse.data);
+    setSupportTickets(supportResponse.data);
   };
 
   const refreshClientData = async () => {
     const token = await getTokenOrThrow();
-    const [me, projectResponse, invoiceResponse, notificationResponse] = await Promise.all([
-      getCurrentLaunchOpsUser(token), listProjects(token), listInvoices(token), listMyNotifications(token),
+    const [me, projectResponse, invoiceResponse, notificationResponse, supportResponse] = await Promise.all([
+      getCurrentLaunchOpsUser(token), listProjects(token), listInvoices(token), listMyNotifications(token), listMySupportTickets(token),
     ]);
     setCurrentUser(me.data.user);
     const projectBugs = await Promise.all(projectResponse.data.map((project) => listProjectBugReports(project._id, token)));
@@ -245,12 +248,13 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     setInvoices(invoiceResponse.data);
     setBugs(allBugs);
     setNotifications(notificationResponse.data);
+    setSupportTickets(supportResponse.data);
   };
 
   const refreshAdminData = async () => {
     const token = await getTokenOrThrow();
-    const [projectResponse, testerResponse, withdrawalResponse, notificationResponse] = await Promise.all([
-      listProjects(token), listAdminTesters(token), listAdminWithdrawals(token), listMyNotifications(token),
+    const [projectResponse, testerResponse, withdrawalResponse, notificationResponse, dashboardResponse, supportResponse] = await Promise.all([
+      listProjects(token), listAdminTesters(token), listAdminWithdrawals(token), listMyNotifications(token), getAdminDashboard(token), listMySupportTickets(token),
     ]);
     const testers = testerResponse.data.map((profile) => mapTesterProfile(profile as BackendTesterProfile, profile.userId));
     const [queueResponses, bugResponses] = await Promise.all([
@@ -258,9 +262,13 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
       Promise.all(projectResponse.data.map((project) => listProjectBugReports(project._id, token))),
     ]);
     const mappedAssignments = queueResponses.flatMap((response) => response.data.map((assignment) => mapAssignment(assignment)));
-    const mappedBugs = bugResponses.flatMap((response) => response.data.map((report) => {
+    const mappedBugs = bugResponses.flatMap((response, projectIndex) => response.data.map((report) => {
       const testerId = typeof report.testerId === 'string' ? report.testerId : '';
-      return mapBugReport(report, testers.find((tester) => tester.id === testerId) ?? { ...emptyTester, name: 'Tester' });
+      return {
+        ...mapBugReport(report, testers.find((tester) => tester.id === testerId) ?? { ...emptyTester, name: 'Tester' }),
+        appId: projectResponse.data[projectIndex]._id,
+        appName: projectResponse.data[projectIndex].appDetails.appName,
+      };
     }));
     setApps(projectResponse.data.map((project) => ({ ...mapProject(project), bugsFound: mappedBugs.filter((bug) => bug.appId === project._id).length })));
     setAdminTesters(testers);
@@ -268,6 +276,8 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     setBugs(mappedBugs);
     setWithdrawals(withdrawalResponse.data.map((item) => mapWithdrawal(item, typeof item.testerId === 'string' ? item.testerId : item.testerId._id)));
     setNotifications(notificationResponse.data);
+    setAdminDashboard(dashboardResponse.data);
+    setSupportTickets(supportResponse.data);
   };
 
   const refreshCurrentDashboard = async () => {
@@ -725,8 +735,13 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     const token = await getTokenOrThrow();
     const models = updated.devices ?? activeTester.devices;
     await updateMyTesterProfile({
-      devices: (models.length ? models : ['Android device']).map((model, index) => ({ model, androidVersion: 'Android 14', fingerprint: `${activeTester.id || 'tester'}-${index}-${model.replace(/\W+/g, '-').toLowerCase()}` })),
+      devices: models.map((model, index) => {
+        const existing = activeTester.deviceDetails?.find((device) => device.model === model);
+        return existing ?? { model, androidVersion: 'Unknown', fingerprint: `${activeTester.id || 'tester'}-${index}-${model.replace(/\W+/g, '-').toLowerCase()}` };
+      }),
       experienceLevel: (updated.experience ?? activeTester.experience ?? 'beginner') as 'beginner' | 'intermediate' | 'expert',
+      country: updated.country ?? activeTester.country,
+      specialty: updated.specialty ?? activeTester.specialty,
       upi: { vpa: updated.upiId ?? activeTester.upiId },
     }, token);
     await refreshTesterData();
@@ -750,12 +765,13 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
       setDashboardError(error instanceof Error ? error.message : 'Unable to mark notification as read.');
     }
   };
-  const apiSubmitStep1 = async (assignmentId: string, email: string, screenshotUrl?: string) => { await submitAssignmentProof(assignmentId, { step: 1, fileUrl: screenshotUrl || email }, await getTokenOrThrow()); await refreshTesterData(); };
+  const apiSubmitStep1 = async (assignmentId: string, email: string, screenshotUrl?: string) => { await submitAssignmentProof(assignmentId, { step: 1, fileUrl: screenshotUrl || email, googlePlayEmail: email }, await getTokenOrThrow()); await refreshTesterData(); };
   const apiSubmitStep3 = async (assignmentId: string, screenshotUrl?: string) => {
     if (!screenshotUrl) { window.open(`${API_BASE_URL}/t/${assignmentId}`, '_blank', 'noopener,noreferrer'); return; }
     await submitAssignmentProof(assignmentId, { step: 3, fileUrl: screenshotUrl }, await getTokenOrThrow()); await refreshTesterData();
   };
   const apiSubmitStep4 = async (assignmentId: string) => { await submitAssignmentProof(assignmentId, { step: 4, fileUrl: `check-in:${new Date().toISOString()}` }, await getTokenOrThrow()); await refreshTesterData(); };
+  const apiUploadTesterProof = async (file: File) => uploadTesterProofFile(file, await getTokenOrThrow());
   const apiSubmitBug = async (bug: Omit<BugReport, 'id' | 'createdAt' | 'testerName' | 'testerAvatar' | 'screenshot'> & { screenshot?: string }) => {
     await submitProjectBugReport(bug.appId, { title: bug.title, description: bug.title, category: 'functional', severity: bug.severity.toLowerCase() as 'low' | 'medium' | 'high' | 'critical', device: bug.device, appVersion: bug.osVersion, expectedResult: 'Expected behavior without this issue', actualResult: bug.title, stepsToReproduce: bug.reproductionSteps, attachments: bug.screenshot ? [bug.screenshot] : [] }, await getTokenOrThrow());
     await refreshTesterData();
@@ -769,7 +785,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   };
 
   const apiCreateProject = async (project: Omit<TestApp, 'id' | 'testersCount' | 'bugsFound' | 'progress' | 'status'>) => {
-    await createClientProject({
+    const response = await createClientProject({
       package: project.packageTier ?? 'managed_testing',
       serviceType: project.serviceType ?? 'play_store_closed_testing',
       serviceOption: project.serviceOption ?? project.packageTier ?? 'testers_only',
@@ -778,6 +794,11 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
       appDetails: { appName: project.name, packageName: project.packageName || project.playIntegration?.packageName || project.version, description: project.instructions, playStoreUrl: project.apkUrl },
     }, await getTokenOrThrow());
     await refreshClientData();
+    return mapProject(response.data.project);
+  };
+  const apiGetVerifiedTesterEmails = async (projectId: string) => {
+    const response = await getVerifiedProjectTesterEmails(projectId, await getTokenOrThrow());
+    return response.data;
   };
   const apiSubmitVerification = async (projectId: string, proofUrl: string) => { await submitClientVerification(projectId, proofUrl, await getTokenOrThrow()); await refreshClientData(); };
   const apiPayInvoice = async (projectId: string) => {
@@ -800,10 +821,50 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
       document.head.appendChild(script);
     });
   };
+  const apiSendTesterSupport = async (input: { subject: string; message: string; projectId?: string }) => {
+    await createSupportTicket(input, await getTokenOrThrow());
+    await refreshTesterData();
+  };
+  const apiReplyToSupport = async (ticketId: string, body: string) => {
+    await replyToSupportTicket(ticketId, body, await getTokenOrThrow());
+    if (currentTab === 'admin') await refreshAdminData();
+    else if (currentTab === 'client') await refreshClientData();
+    else await refreshTesterData();
+  };
+  const apiUpdateSupportStatus = async (ticketId: string, status: BackendSupportTicket['status']) => {
+    await updateSupportTicketStatus(ticketId, status, await getTokenOrThrow());
+    await refreshAdminData();
+  };
 
   const apiCheckoutOnboardingTier = async (tierIndex: number): Promise<boolean> => {
-    // Temporary local-development bypass until Razorpay credentials are enabled.
-    return tierIndex >= 0 && tierIndex < 3;
+    const token = await getTokenOrThrow();
+    const checkout = await checkoutOnboardingTier(tierIndex, token);
+    return new Promise<boolean>((resolve, reject) => {
+      const startCheckout = () => {
+        const Razorpay = (window as typeof window & { Razorpay?: new (options: unknown) => { open: () => void } }).Razorpay;
+        if (!Razorpay) { reject(new Error('Razorpay checkout failed to load.')); return; }
+        new Razorpay({
+          key: checkout.data.keyId,
+          order_id: checkout.data.order.id,
+          amount: checkout.data.order.amount,
+          currency: checkout.data.order.currency,
+          name: 'LaunchOps',
+          handler: async (payment: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+            try { const result = await verifyOnboardingPayment(payment, token); resolve(result.data.verified); }
+            catch (error) { reject(error); }
+          },
+          modal: { ondismiss: () => resolve(false) },
+        }).open();
+      };
+      const existing = document.querySelector<HTMLScriptElement>('script[data-razorpay-checkout]');
+      if (existing) { startCheckout(); return; }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.dataset.razorpayCheckout = 'true';
+      script.onload = startCheckout;
+      script.onerror = () => reject(new Error('Could not load Razorpay checkout.'));
+      document.head.appendChild(script);
+    });
   };
 
   const apiLoadClientProjectDetails = async (projectId: string) => {
@@ -830,6 +891,15 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     window.open(response.data.downloadUrl, '_blank', 'noopener,noreferrer');
   };
 
+  const apiSubmitClientTestingLink = async (projectId: string, optInUrl: string) => {
+    await advanceProjectMilestone(projectId, 4, await getTokenOrThrow(), optInUrl);
+    await refreshClientData();
+  };
+  const apiConfirmClientEmailsAdded = async (projectId: string) => {
+    await advanceProjectMilestone(projectId, 2, await getTokenOrThrow());
+    await refreshClientData();
+  };
+
   const apiSendClientSupport = async (input: { subject: string; message: string; cc: string[] }, projectId?: string) => {
     await createSupportTicket({ ...input, projectId }, await getTokenOrThrow());
     await refreshClientData();
@@ -841,10 +911,15 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   const apiAdvanceMilestone = async (projectId: string, step: number, payload?: { optInUrl?: string }) => { await advanceProjectMilestone(projectId, step, await getTokenOrThrow(), payload?.optInUrl); await refreshAdminData(); };
   const apiReplaceTester = async (assignmentId: string) => { await replaceAssignment(assignmentId, await getTokenOrThrow()); await refreshAdminData(); };
   const apiApproveStep1 = async (projectId: string, testerId: string) => { const assignment = assignments.find((item) => item.projectId === projectId && item.testerId === testerId); if (!assignment) throw new Error('Assignment not found'); await verifyAssignment(assignment.id, 1, true, await getTokenOrThrow()); await refreshAdminData(); };
+  const apiVerifyTesterProof = async (assignmentId: string, step: number, approve: boolean, reason?: string) => { await verifyAssignment(assignmentId, step, approve, await getTokenOrThrow(), reason); await refreshAdminData(); };
   const apiAddTester = async (projectId: string, testerId: string) => { await assignTesterToProject(projectId, testerId, await getTokenOrThrow()); await refreshAdminData(); };
   const apiRemoveTester = async (projectId: string, testerId: string) => { const assignment = assignments.find((item) => item.projectId === projectId && item.testerId === testerId); if (!assignment) throw new Error('Assignment not found'); await replaceAssignment(assignment.id, await getTokenOrThrow()); await refreshAdminData(); };
   const apiMergeBugs = async (canonicalId: string, duplicateId: string) => { await mergeBugReports(canonicalId, duplicateId, await getTokenOrThrow()); await refreshAdminData(); };
-  const apiPublishBug = async (bugId: string) => { await publishBugReport(bugId, await getTokenOrThrow()); await refreshAdminData(); };
+  const apiPublishBug = async (bugId: string, adminNotes?: string) => { await publishBugReport(bugId, await getTokenOrThrow(), adminNotes); await refreshAdminData(); };
+  const apiUpdateAdminProfile = async (input: { name?: string; phone?: string }) => {
+    const response = await updateCurrentLaunchOpsUser(input, await getTokenOrThrow());
+    setCurrentUser(response.data.user);
+  };
   const apiCompleteWithdrawal = async (id: string, transactionId: string) => { await completeAdminWithdrawal(id, transactionId, await getTokenOrThrow()); await refreshAdminData(); };
   const apiRejectWithdrawal = async (id: string, reason: string) => { await rejectAdminWithdrawal(id, reason, await getTokenOrThrow()); await refreshAdminData(); };
 
@@ -949,14 +1024,18 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 transactions={transactions}
                 withdrawals={withdrawals}
                 notifications={notifications}
+                supportTickets={supportTickets}
                 onReadNotification={apiMarkNotificationRead}
                 onUpdateTesterProfile={apiUpdateTesterProfile}
                 onJoinProject={apiJoinProject}
                 onSubmitStep1Email={apiSubmitStep1}
                 onClickStep3Link={apiSubmitStep3}
                 onLogStep4CheckIn={apiSubmitStep4}
+                onUploadProof={apiUploadTesterProof}
                 onSubmitBugReport={apiSubmitBug}
                 onRequestWithdrawal={apiRequestWithdrawal}
+                onSendSupport={apiSendTesterSupport}
+                onReplyToSupport={apiReplyToSupport}
                 onLogout={() => { void handleLogout(); }}
                 initialTab={initialSubTab}
                 onTabChange={(tab) => handleSetTab('tester', tab)}
@@ -981,11 +1060,17 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 isLoading={dashboardLoading}
                 error={dashboardError}
                 onCreateProject={apiCreateProject}
+                onGetVerifiedTesterEmails={apiGetVerifiedTesterEmails}
                 currentUser={currentUser}
                 notifications={notifications}
                 onLoadProjectDetails={apiLoadClientProjectDetails}
                 onDownloadProjectFile={apiDownloadClientProjectFile}
+                onUploadProjectFile={apiUploadClientProjectFile}
+                onSubmitTestingLink={apiSubmitClientTestingLink}
+                onConfirmEmailsAdded={apiConfirmClientEmailsAdded}
                 onSendSupport={apiSendClientSupport}
+                supportTickets={supportTickets}
+                onReplyToSupport={apiReplyToSupport}
               />
             </motion.div>
           )}
@@ -1008,22 +1093,29 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 testers={adminTesters}
                 withdrawals={withdrawals}
                 notifications={notifications}
+                supportTickets={supportTickets}
+                currentUser={currentUser}
+                dashboardSummary={adminDashboard}
+                onUpdateProfile={apiUpdateAdminProfile}
                 onReadNotification={apiMarkNotificationRead}
                 onApproveVerification={(id, amount) => { void apiReviewVerification(id, true, amount); }}
                 onRejectVerification={(id) => { void apiReviewVerification(id, false); }}
                 onAdvanceMilestone={(id, step, payload) => { void apiAdvanceMilestone(id, step, payload); }}
                 onReplaceTester={(id) => { void apiReplaceTester(id); }}
                 onMergeBugs={(canonical, duplicate) => { void apiMergeBugs(canonical, duplicate); }}
-                onPublishBug={(id) => { void apiPublishBug(id); }}
-                onCompleteWithdrawal={(id, txn) => { void apiCompleteWithdrawal(id, txn); }}
-                onRejectWithdrawal={(id, reason) => { void apiRejectWithdrawal(id, reason); }}
+                onPublishBug={apiPublishBug}
+                onCompleteWithdrawal={apiCompleteWithdrawal}
+                onRejectWithdrawal={apiRejectWithdrawal}
                 onLogout={() => { void handleLogout(); }}
-                onAddTesterToProject={(projectId, testerId) => { void apiAddTester(projectId, testerId); }}
+                onAddTesterToProject={apiAddTester}
                 onRemoveTesterFromProject={(projectId, testerId) => { void apiRemoveTester(projectId, testerId); }}
                 onApproveTesterStep1={(projectId, testerId) => { void apiApproveStep1(projectId, testerId); }}
+                onVerifyTesterProof={apiVerifyTesterProof}
                 onListProjectFiles={apiListAdminProjectFiles}
                 onDownloadProjectFile={apiDownloadClientProjectFile}
                 onClearProjectFiles={apiClearAdminProjectFiles}
+                onReplyToSupport={apiReplyToSupport}
+                onUpdateSupportStatus={apiUpdateSupportStatus}
                 initialTab={initialSubTab}
                 onTabChange={(tab) => handleSetTab('admin', tab)}
               />}

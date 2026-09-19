@@ -14,7 +14,7 @@ export interface AppDetailsFormData {
 interface Step4AppDetailsProps {
   isDarkMode: boolean;
   initialData?: Partial<AppDetailsFormData>;
-  onNext: (data: AppDetailsFormData) => void;
+  onNext: (data: AppDetailsFormData) => void | Promise<void>;
   onBack: () => void;
 }
 
@@ -28,19 +28,30 @@ export default function Step4AppDetails({
   const [webLink, setWebLink] = useState(initialData?.webLink || '');
   const [appLink, setAppLink] = useState(initialData?.appLink || '');
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!appName.trim()) {
       alert("Please enter your app name.");
       return;
     }
-    onNext({
-      appName: appName.trim(),
-      webLink: webLink.trim(),
-      appLink: appLink.trim(),
-      packageName: initialData?.packageName,
-    });
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setSubmitError('');
+    try {
+      await onNext({
+        appName: appName.trim(),
+        webLink: webLink.trim(),
+        appLink: appLink.trim(),
+        packageName: initialData?.packageName,
+      });
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Could not create the project. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -165,11 +176,13 @@ export default function Step4AppDetails({
 
         <button
           onClick={handleSubmit}
-          className="px-16 py-3.5 bg-[#4F37FE] hover:bg-[#432EE0] text-white text-[15px] font-bold rounded-2xl shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer"
+          disabled={isSubmitting}
+          className="px-16 py-3.5 bg-[#4F37FE] hover:bg-[#432EE0] disabled:opacity-60 text-white text-[15px] font-bold rounded-2xl shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer"
         >
-          Next
+          {isSubmitting ? 'Creating Project...' : 'Next'}
         </button>
       </div>
+      {submitError && <p className="text-center text-sm font-semibold text-red-500">{submitError}</p>}
 
       {/* Video Modal */}
       {showVideoModal && (

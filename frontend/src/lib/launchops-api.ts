@@ -43,6 +43,8 @@ export type BackendTesterProfile = {
   userId: string | LaunchOpsUser;
   devices: BackendTesterDevice[];
   experienceLevel: "beginner" | "intermediate" | "expert";
+  country?: string;
+  specialty?: string;
   upi?: {
     vpa?: string;
     qrImageUrl?: string;
@@ -129,6 +131,7 @@ export type BackendAssignment = {
   proofs?: Array<{
     step: number;
     fileUrl: string;
+    googlePlayEmail?: string;
     status: "pending" | "verified" | "rejected";
     submittedAt: string;
   }>;
@@ -140,7 +143,7 @@ export type BackendAssignment = {
 
 export type BackendWalletTransaction = {
   _id: string;
-  testerId: string | { _id: string; userId?: LaunchOpsUser };
+  testerId: string | { _id: string; userId?: LaunchOpsUser; upi?: { vpa?: string; qrImageUrl?: string } };
   projectId?: string;
   type: "earning" | "withdrawal";
   amount: number;
@@ -174,6 +177,7 @@ export type BackendBugReport = {
   stepsToReproduce: string[];
   attachments: string[];
   status: "open" | "duplicate" | "merged" | "published";
+  adminNotes?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -182,6 +186,7 @@ export type BackendNotification = {
   _id: string;
   type: "project_request" | "project_opportunity" | string;
   channel: "email" | "push" | "sms" | "whatsapp";
+  relatedId?: string;
   payload: { projectId?: string; appName?: string; joinPath?: string; requiredDeviceModels?: string[]; [key: string]: unknown };
   status: "queued" | "sent" | "failed";
   sentAt?: string;
@@ -190,9 +195,35 @@ export type BackendNotification = {
   createdAt: string;
 };
 
+export type BackendSupportTicket = {
+  _id: string;
+  raisedBy?: string | Pick<LaunchOpsUser, "_id" | "name" | "email" | "role">;
+  projectId?: string | { _id: string; appDetails?: { appName?: string } };
+  subject: string;
+  status: "open" | "in_progress" | "resolved" | "closed";
+  messages: Array<{ authorId: string | Pick<LaunchOpsUser, "_id" | "name" | "email" | "role">; body: string; createdAt: string }>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminDashboardSummary = {
+  projects: { total: number; active: number };
+  testers: { total: number; active: number; inactive: number };
+  assignments: { total: number; active: number; queued: number; completed: number };
+  bugs: { total: number; published: number; resolvedToday: number };
+  payouts: { paidTotal: number; pending: number };
+  replacementsToday: number;
+  successRate: number;
+  playStoreSync: { status: "operational" | "degraded" | "not_configured"; errors: number; configuredProjects: number };
+  system: { status: "operational"; serverTime: string; uptimeSeconds: number };
+  inactivityThresholdHours: number;
+};
+
 export type UpsertTesterProfileInput = {
   devices: BackendTesterDevice[];
   experienceLevel?: BackendTesterProfile["experienceLevel"];
+  country?: string;
+  specialty?: string;
   upi: {
     vpa: string;
     qrImageUrl?: string;
@@ -203,6 +234,7 @@ export type SubmitAssignmentProofInput = {
   step: number;
   fileUrl: string;
   fileHash?: string;
+  googlePlayEmail?: string;
 };
 
 export type SubmitBugReportInput = {
@@ -353,6 +385,14 @@ export function checkoutInvoice(invoiceId: string, token: string) {
   });
 }
 
+export function updateCurrentLaunchOpsUser(input: { name?: string; phone?: string }, token: string) {
+  return apiRequest<ApiEnvelope<CurrentUserResponse>>("/api/v1/users/me", { method: "PATCH", token, body: input });
+}
+
+export function getAdminDashboard(token: string) {
+  return apiRequest<ApiEnvelope<AdminDashboardSummary>>("/api/v1/metrics/admin-dashboard", { token });
+}
+
 export function checkoutOnboardingTier(tierIndex: number, token: string) {
   return apiRequest<ApiEnvelope<{ order: { id: string; amount: number; currency: string }; keyId: string }>>("/api/v1/invoices/onboarding-checkout", {
     method: "POST", token, body: { tierIndex },
@@ -381,6 +421,10 @@ export function listProjectAssignments(projectId: string, token: string) {
   return apiRequest<ApiEnvelope<BackendAssignment[]>>(`/api/v1/projects/${projectId}/queue?all=true`, { token });
 }
 
+export function getVerifiedProjectTesterEmails(projectId: string, token: string) {
+  return apiRequest<ApiEnvelope<{ emails: string[]; count: number }>>(`/api/v1/projects/${projectId}/verified-tester-emails`, { token });
+}
+
 export function listClientProjectAssignments(projectId: string, token: string) {
   return apiRequest<ApiEnvelope<BackendAssignment[]>>(`/api/v1/projects/${projectId}/client-assignments`, { token });
 }
@@ -399,6 +443,15 @@ export function requestTestingFileUpload(filename: string, contentType: string, 
   });
 }
 
+export function uploadTesterProofFile(file: File, token: string) {
+  const contentType = file.type || "application/octet-stream";
+  return requestTestingFileUpload(file.name, contentType, token).then(async (presigned) => {
+    const upload = await fetch(presigned.data.uploadUrl, { method: "PUT", headers: { "Content-Type": contentType }, body: file });
+    if (!upload.ok) throw new Error("Proof upload failed.");
+    return presigned.data.key;
+  });
+}
+
 export function registerProjectFile(projectId: string, file: Omit<BackendProjectFile, "uploadedAt">, token: string) {
   return apiRequest<ApiEnvelope<BackendProjectFile>>(`/api/v1/projects/${projectId}/files`, { method: "POST", token, body: file });
 }
@@ -408,7 +461,23 @@ export function getProjectFileDownload(key: string, token: string) {
 }
 
 export function createSupportTicket(input: { subject: string; message: string; projectId?: string; cc?: string[] }, token: string) {
-  return apiRequest<ApiEnvelope<unknown>>("/api/v1/support-tickets", { method: "POST", token, body: input });
+  return apiRequest<ApiEnvelope<BackendSupportTicket>>("/api/v1/support-tickets", { method: "POST", token, body: input });
+}
+
+export function listMySupportTickets(token: string) {
+  return apiRequest<ApiEnvelope<BackendSupportTicket[]>>("/api/v1/support-tickets?limit=100", { token });
+}
+
+export function replyToSupportTicket(ticketId: string, body: string, token: string) {
+  return apiRequest<ApiEnvelope<BackendSupportTicket>>(`/api/v1/support-tickets/${ticketId}/messages`, {
+    method: "POST", token, body: { body },
+  });
+}
+
+export function updateSupportTicketStatus(ticketId: string, status: BackendSupportTicket["status"], token: string) {
+  return apiRequest<ApiEnvelope<BackendSupportTicket>>(`/api/v1/support-tickets/${ticketId}/status`, {
+    method: "PATCH", token, body: { status },
+  });
 }
 
 export function assignTesterToProject(projectId: string, testerId: string, token: string) {
@@ -443,8 +512,8 @@ export function mergeBugReports(canonicalId: string, duplicateId: string, token:
   });
 }
 
-export function publishBugReport(id: string, token: string) {
-  return apiRequest<ApiEnvelope<unknown>>("/api/v1/bug-reports/publish", { method: "POST", token, body: { ids: [id] } });
+export function publishBugReport(id: string, token: string, adminNotes?: string) {
+  return apiRequest<ApiEnvelope<unknown>>("/api/v1/bug-reports/publish", { method: "POST", token, body: { ids: [id], adminNotes } });
 }
 
 export function completeAdminWithdrawal(id: string, transactionId: string, token: string) {

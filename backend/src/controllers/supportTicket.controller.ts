@@ -10,6 +10,7 @@ import { resendClient } from "../config/resend";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { Notification } from "../models/Notification";
+import { User } from "../models/User";
 
 const createSchema = z.object({
   subject: z.string().min(1),
@@ -83,6 +84,15 @@ export const createSupportTicket = asyncHandler(async (req: Request, res: Respon
     sentAt,
   });
 
+  const admins = await User.find({ role: "admin", status: "active" }).select("_id");
+  await Promise.all(admins.map((admin) => dispatchNotification({
+    recipientUserId: admin._id,
+    type: "support_request",
+    channel: "email",
+    relatedId: ticket._id.toString(),
+    payload: { ticketId: ticket._id.toString(), subject: body.subject, requesterRole: req.dbUser!.role },
+  })));
+
   res.status(201).json({ data: ticket });
 });
 
@@ -93,7 +103,11 @@ export const listSupportTickets = asyncHandler(async (req: Request, res: Respons
   if (req.query.status) filter.status = req.query.status;
 
   const [items, total] = await Promise.all([
-    SupportTicket.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    SupportTicket.find(filter)
+      .populate("raisedBy", "name email role")
+      .populate("projectId", "appDetails.appName")
+      .populate("messages.authorId", "name email role")
+      .sort({ createdAt: -1 }).skip(skip).limit(limit),
     SupportTicket.countDocuments(filter),
   ]);
   res.status(200).json({ data: items, meta: buildPageMeta(page, limit, total) });
@@ -108,6 +122,7 @@ async function loadVisibleTicket(req: Request) {
 
 export const getSupportTicketById = asyncHandler(async (req: Request, res: Response) => {
   const ticket = await loadVisibleTicket(req);
+  await ticket.populate("messages.authorId", "name email role");
   res.status(200).json({ data: ticket });
 });
 
@@ -126,10 +141,11 @@ export const addSupportTicketMessage = asyncHandler(async (req: Request, res: Re
       type: "support_reply",
       channel: "email",
       relatedId: ticket._id.toString(),
-      payload: { subject: ticket.subject },
+      payload: { subject: ticket.subject, projectId: ticket.projectId?.toString() },
     });
   }
   await ticket.save();
+  await ticket.populate("messages.authorId", "name email role");
   res.status(200).json({ data: ticket });
 });
 

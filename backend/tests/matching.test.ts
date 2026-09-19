@@ -4,6 +4,7 @@ import { Tester } from "../src/models/Tester";
 import { Client } from "../src/models/Client";
 import { Project } from "../src/models/Project";
 import { Assignment } from "../src/models/Assignment";
+import { Notification } from "../src/models/Notification";
 import { joinProject, replaceInactiveStep1Tester } from "../src/services/matching.service";
 
 async function makeTester(tag: string) {
@@ -69,6 +70,51 @@ describe("matching.service", () => {
     expect(retried._id.toString()).toBe(first._id.toString());
     const refreshed = await Project.findById(project._id);
     expect(refreshed!.activeTesterCount).toBe(1);
+  });
+
+  it("creates a notification for a tester when an active slot is allocated", async () => {
+    const project = await makeProject(1);
+    const tester = await makeTester("allocated");
+
+    const assignment = await joinProject(project._id, tester._id);
+    const notification = await Notification.findOne({
+      recipientId: tester.userId,
+      type: "testing_link",
+    });
+
+    expect(assignment.status).toBe("active");
+    expect(notification).not.toBeNull();
+    expect(notification!.idempotencyKey).toContain(assignment._id.toString());
+    expect(notification!.payload).toMatchObject({
+      projectId: project._id.toString(),
+      status: "active",
+    });
+  });
+
+  it("lets an admin reactivate a previously removed tester in a second allocation", async () => {
+    const project = await makeProject(2);
+    const firstTester = await makeTester("first-allocation");
+    const returningTester = await makeTester("returning-allocation");
+    const oldAssignment = await Assignment.create({
+      projectId: project._id,
+      testerId: returningTester._id,
+      status: "removed",
+      currentStep: 1,
+      proofs: [{ step: 1, fileUrl: "old-proof", status: "verified", submittedAt: new Date() }],
+      replacedBy: firstTester._id,
+    });
+
+    const first = await joinProject(project._id, firstTester._id, { reactivateRemoved: true });
+    const second = await joinProject(project._id, returningTester._id, { reactivateRemoved: true });
+
+    expect(first.status).toBe("active");
+    expect(second._id.toString()).toBe(oldAssignment._id.toString());
+    expect(second.status).toBe("active");
+    expect(second.proofs).toHaveLength(0);
+    expect(second.replacedBy).toBeUndefined();
+    const refreshedProject = await Project.findById(project._id);
+    expect(refreshedProject!.activeTesterCount).toBe(2);
+    expect(await Notification.countDocuments({ recipientId: returningTester.userId, type: "testing_link" })).toBe(1);
   });
 
   it("replaces an inactive Step 1 tester and promotes the queued tester", async () => {

@@ -13,7 +13,7 @@ import ClientContactFlow from './ClientContactFlow';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Headphones, Sparkles, Plus, ArrowRight, ShieldCheck } from 'lucide-react';
 import type { TestApp } from '../../types';
-import type { BackendAssignment, BackendNotification, BackendProjectFile, LaunchOpsUser } from '../../lib/launchops-api';
+import type { BackendAssignment, BackendNotification, BackendProjectFile, BackendSupportTicket, LaunchOpsUser } from '../../lib/launchops-api';
 
 interface ClientFlowManagerProps {
   isDarkMode: boolean;
@@ -23,12 +23,18 @@ interface ClientFlowManagerProps {
   projects: TestApp[];
   isLoading?: boolean;
   error?: string;
-  onCreateProject: (project: Omit<TestApp, 'id' | 'testersCount' | 'bugsFound' | 'progress' | 'status'>) => Promise<void>;
+  onCreateProject: (project: Omit<TestApp, 'id' | 'testersCount' | 'bugsFound' | 'progress' | 'status'>) => Promise<TestApp>;
+  onGetVerifiedTesterEmails: (projectId: string) => Promise<{ emails: string[]; count: number }>;
   currentUser: LaunchOpsUser | null;
   notifications: BackendNotification[];
   onLoadProjectDetails: (projectId: string) => Promise<{ assignments: BackendAssignment[]; files: BackendProjectFile[] }>;
   onDownloadProjectFile: (key: string) => Promise<void>;
+  onUploadProjectFile: (projectId: string, file: File) => Promise<BackendProjectFile>;
+  onSubmitTestingLink: (projectId: string, optInUrl: string) => Promise<void>;
+  onConfirmEmailsAdded: (projectId: string) => Promise<void>;
   onSendSupport: (input: { subject: string; message: string; cc: string[] }, projectId?: string) => Promise<void>;
+  supportTickets: BackendSupportTicket[];
+  onReplyToSupport: (ticketId: string, body: string) => Promise<void>;
 }
 
 export default function ClientFlowManager({
@@ -40,11 +46,17 @@ export default function ClientFlowManager({
   isLoading,
   error,
   onCreateProject,
+  onGetVerifiedTesterEmails,
   currentUser,
   notifications,
   onLoadProjectDetails,
   onDownloadProjectFile,
-  onSendSupport
+  onUploadProjectFile,
+  onSubmitTestingLink,
+  onConfirmEmailsAdded,
+  onSendSupport,
+  supportTickets,
+  onReplyToSupport
 }: ClientFlowManagerProps) {
   // Mode: wizard vs dashboard
   const [viewMode, setViewMode] = useState<'wizard' | 'dashboard'>(() => {
@@ -74,6 +86,7 @@ export default function ClientFlowManager({
     appLink: ''
   });
   const [completedProjectSummary, setCompletedProjectSummary] = useState<any>(null);
+  const [createdProjectId, setCreatedProjectId] = useState('');
 
   // Support Drawer state
   const [isSupportOpen, setIsSupportOpen] = useState(false);
@@ -101,47 +114,43 @@ export default function ClientFlowManager({
   };
 
   // Step 4: App details submission
-  const handleStep4Next = (data: AppDetailsFormData) => {
+  const handleStep4Next = async (data: AppDetailsFormData) => {
     setAppDetails(data);
+    const serviceLabel = 'Play Store Closed Testing';
+    const requiredTesters = Number.parseInt(selectedTier?.testers ?? '14', 10) || 14;
+    const createdProject = await onCreateProject({
+      name: data.appName || 'UXOS',
+      version: '1.0.0',
+      category: serviceLabel,
+      devices: [],
+      packageTier: techSupport === 'console_setup' ? 'managed_testing' : 'testers_only',
+      serviceType: 'play_store_closed_testing',
+      serviceOption: techSupport,
+      packageName: data.packageName,
+      testersRequired: requiredTesters,
+      launchDate: new Date(Date.now() + 14 * 86400000).toLocaleDateString('en-IN'),
+      projectName: `${data.appName || 'UXOS'} Testing Track`,
+      apkUrl: data.appLink,
+      optInUrl: data.webLink,
+      instructions: '14-day Play Store closed testing campaign.',
+    });
+    setCreatedProjectId(createdProject.id);
     setCurrentStep(5);
   };
 
   // Step 5: Tester emails completion -> REDIRECT DIRECTLY TO CLIENT DASHBOARD
   const handleStep5Completed = async () => {
-    const serviceType = selectedService === 'ios'
-      ? 'ios_app_publishing'
-      : selectedService === 'ux'
-        ? 'user_experience_testing'
-        : 'play_store_closed_testing';
     const serviceLabel = selectedService === 'ios'
       ? 'iOS App Publishing'
       : selectedService === 'ux'
         ? 'User Experience Testing'
         : 'Play Store Closed Testing';
-    const serviceOption = selectedService === 'playstore' ? techSupport : 'standard';
-    const requiredTesters = Number.parseInt(selectedTier?.testers ?? '14', 10) || 14;
     const summary = {
       appName: appDetails.appName || 'UXOS',
       category: serviceLabel,
       tier: selectedTier ? `${selectedTier.testers} Onboarding (${selectedTier.price})` : '14 Testers Onboarding (₹2999/-)',
       service: serviceLabel,
     };
-    await onCreateProject({
-      name: appDetails.appName || 'UXOS',
-      version: '1.0.0',
-      category: serviceLabel,
-      devices: [],
-      packageTier: serviceOption === 'console_setup' ? 'managed_testing' : 'testers_only',
-      serviceType,
-      serviceOption,
-      packageName: appDetails.packageName,
-      testersRequired: requiredTesters,
-      launchDate: new Date(Date.now() + 14 * 86400000).toLocaleDateString('en-IN'),
-      projectName: `${appDetails.appName || 'UXOS'} Testing Track`,
-      apkUrl: appDetails.appLink,
-      optInUrl: appDetails.webLink,
-      instructions: selectedService === 'playstore' ? '14-day Play Store closed testing campaign.' : `${serviceLabel} service request.`,
-    });
     setCompletedProjectSummary(summary);
     if (typeof window !== 'undefined') {
       localStorage.setItem('launchops_client_has_published', 'true');
@@ -157,6 +166,7 @@ export default function ClientFlowManager({
     setTechSupport('testers_only');
     setSelectedTier(null);
     setAppDetails({ appName: 'UXOS', webLink: '', appLink: '' });
+    setCreatedProjectId('');
     setViewMode('wizard');
     if (typeof window !== 'undefined') {
       window.history.pushState(null, '', '/client');
@@ -178,7 +188,13 @@ export default function ClientFlowManager({
         notifications={notifications}
         onLoadProjectDetails={onLoadProjectDetails}
         onDownloadProjectFile={onDownloadProjectFile}
+        onUploadProjectFile={onUploadProjectFile}
+        onSubmitTestingLink={onSubmitTestingLink}
+        onConfirmEmailsAdded={onConfirmEmailsAdded}
+        onGetVerifiedTesterEmails={onGetVerifiedTesterEmails}
         onSendSupport={onSendSupport}
+        supportTickets={supportTickets}
+        onReplyToSupport={onReplyToSupport}
       />
     );
   }
@@ -302,8 +318,10 @@ export default function ClientFlowManager({
               >
                 <Step5TesterEmails
                   isDarkMode={isDarkMode}
+                  projectId={createdProjectId}
+                  requiredTesters={Number.parseInt(selectedTier?.testers ?? '14', 10) || 14}
+                  onLoadEmails={onGetVerifiedTesterEmails}
                   onCompleted={handleStep5Completed}
-                  onBack={() => setCurrentStep(4)}
                 />
               </motion.div>
             )}

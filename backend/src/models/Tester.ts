@@ -11,6 +11,8 @@ export interface ITester extends Document {
   userId: Types.ObjectId;
   devices: ITesterDevice[];
   experienceLevel: "beginner" | "intermediate" | "expert";
+  country?: string;
+  specialty?: string;
   upi: {
     vpa?: string;
     qrImageUrl?: string;
@@ -42,6 +44,8 @@ const testerSchema = new Schema<ITester>(
       enum: ["beginner", "intermediate", "expert"],
       default: "beginner",
     },
+    country: { type: String, trim: true },
+    specialty: { type: String, trim: true },
     upi: {
       vpa: { type: String, trim: true, unique: true, sparse: true },
       qrImageUrl: { type: String },

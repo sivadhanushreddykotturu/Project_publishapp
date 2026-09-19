@@ -95,6 +95,7 @@ export async function submitProof(params: {
   step: number;
   fileUrl: string;
   fileHash?: string;
+  googlePlayEmail?: string;
 }) {
   const assignment = await Assignment.findById(params.assignmentId);
   if (!assignment) throw ApiError.notFound("Assignment not found");
@@ -102,11 +103,17 @@ export async function submitProof(params: {
   if (params.step !== assignment.currentStep) {
     throw ApiError.badRequest(`Tester is on step ${assignment.currentStep}, not ${params.step}`);
   }
+  if (params.step === 4) {
+    const today = new Date().toISOString().slice(0, 10);
+    const alreadyCheckedInToday = assignment.proofs.some((proof) => proof.step === 4 && proof.submittedAt.toISOString().slice(0, 10) === today);
+    if (alreadyCheckedInToday) throw ApiError.badRequest("Today's testing check-in is already recorded");
+  }
 
   assignment.proofs.push({
     step: params.step,
     fileUrl: params.fileUrl,
     fileHash: params.fileHash,
+    googlePlayEmail: params.googlePlayEmail,
     status: "pending",
     submittedAt: new Date(),
   });

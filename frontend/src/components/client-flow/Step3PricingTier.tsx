@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { canSkipOnboardingPayment } from '../../lib/local-checkout';
 
 export interface TierInfo {
   index: number;
@@ -64,10 +65,18 @@ export default function Step3PricingTier({
   const [paidTierIndex, setPaidTierIndex] = useState<number | null>(null);
   const [isPaying, setIsPaying] = useState(false);
   const [paymentError, setPaymentError] = useState('');
+  const [skipPayment, setSkipPayment] = useState(false);
   const isPaid = paidTierIndex === selectedTierIndex;
+
+  useEffect(() => { setSkipPayment(canSkipOnboardingPayment()); }, []);
 
   const handlePay = async () => {
     setPaymentError('');
+    if (selectedTierIndex === 3) return;
+    if (canSkipOnboardingPayment()) {
+      onNext(currentTier);
+      return;
+    }
     setIsPaying(true);
     try {
       if (onPay && await onPay(currentTier)) {
@@ -246,17 +255,18 @@ export default function Step3PricingTier({
           disabled={isPaying || isPaid || selectedTierIndex === 3}
           className="px-12 py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-600/50 disabled:cursor-not-allowed text-white text-[15px] font-bold rounded-2xl shadow-md transition-all cursor-pointer"
         >
-          {isPaying ? 'Opening Razorpay…' : isPaid ? 'Payment Confirmed' : selectedTierIndex === 3 ? 'Contact Sales' : 'Pay Now'}
+          {isPaying ? 'Opening Razorpay…' : selectedTierIndex === 3 ? 'Contact Sales' : skipPayment ? 'Continue Without Payment' : isPaid ? 'Payment Confirmed' : 'Pay Now'}
         </button>
 
-        <button
+        {!skipPayment && <button
           onClick={() => onNext(currentTier)}
           disabled={!isPaid}
           className="px-16 py-3.5 bg-[#4F37FE] hover:bg-[#432EE0] disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none disabled:cursor-not-allowed text-white text-[15px] font-bold rounded-2xl shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer"
         >
           Start Testing
-        </button>
+        </button>}
       </div>
+      {skipPayment && <p className="text-center text-sm text-slate-500">Local testing: payment is skipped. No charge or payment confirmation will be created.</p>}
       {paymentError && <p className="text-center text-sm font-semibold text-red-500">{paymentError}</p>}
     </div>
   );

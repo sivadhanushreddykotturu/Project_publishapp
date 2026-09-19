@@ -14,6 +14,8 @@ const deviceSchema = z.object({
 const upsertProfileSchema = z.object({
   devices: z.array(deviceSchema).min(1),
   experienceLevel: z.enum(["beginner", "intermediate", "expert"]).optional(),
+  country: z.string().trim().max(100).optional(),
+  specialty: z.string().trim().max(120).optional(),
   upi: z.object({ vpa: z.string().min(1), qrImageUrl: z.string().url().optional() }),
 });
 

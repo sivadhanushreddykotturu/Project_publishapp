@@ -4,6 +4,7 @@ import { Project, IProject } from "../models/Project";
 import { Assignment } from "../models/Assignment";
 import { Tester } from "../models/Tester";
 import { User } from "../models/User";
+import { Client } from "../models/Client";
 import { MetricEvent } from "../models/MetricEvent";
 import { recordAudit } from "../middleware/audit";
 import { ApiError } from "../utils/apiError";
@@ -43,7 +44,14 @@ export async function getVerifiedTesterEmails(projectId: Types.ObjectId): Promis
     userId: { email: string };
   }>("userId");
 
-  return testers.map((t) => (t.userId as unknown as { email: string }).email).filter(Boolean);
+  const accountEmailByTester = new Map(testers.map((tester) => [
+    tester._id.toString(),
+    (tester.userId as unknown as { email: string }).email,
+  ]));
+  return [...new Set(verified.map((assignment) => {
+    const proof = [...assignment.proofs].reverse().find((item) => item.step === 1 && item.status === "verified");
+    return proof?.googlePlayEmail || accountEmailByTester.get(assignment.testerId.toString());
+  }).filter((email): email is string => Boolean(email)))];
 }
 
 /**
@@ -78,6 +86,15 @@ export async function submitEmailsForReview(projectId: Types.ObjectId, adminId: 
     after: { expectedApprovalAt: project.playIntegration.emailReviewExpectedApprovalAt },
   });
 
+  const admins = await User.find({ role: "admin", status: "active" });
+  await Promise.all(admins.map((admin) => dispatchNotification({
+    recipientUserId: admin._id,
+    type: "email_review_reminder",
+    channel: "email",
+    relatedId: `${project._id.toString()}:submitted`,
+    payload: { projectId: project._id.toString(), appName: project.appDetails.appName, status: "submitted" },
+  })));
+
   return project;
 }
 
@@ -89,6 +106,17 @@ async function verifyEmailReviewStep(project: IProject, source: "admin" | "auto"
   await project.save();
 
   await MetricEvent.create({ type: "email_review_verified", projectId: project._id, meta: { source } });
+
+  const client = await Client.findById(project.clientId);
+  if (client) {
+    await dispatchNotification({
+      recipientUserId: client.userId,
+      type: "email_review_reminder",
+      channel: "email",
+      relatedId: `${project._id.toString()}:approved`,
+      payload: { projectId: project._id.toString(), appName: project.appDetails.appName, status: "approved" },
+    });
+  }
 
   if (source === "auto") {
     const admins = await User.find({ role: "admin", status: "active" });
@@ -193,7 +221,8 @@ export async function distributeTestingLinks(projectId: Types.ObjectId) {
   const playStoreInvite = project && findStep(project, "play_store_invite");
   if (!playStoreInvite) return;
 
-  const assignments = await Assignment.find({ projectId, status: "active", currentStep: playStoreInvite.order });
+  const assignments = await Assignment.find({ projectId, status: "active", currentStep: { $gte: playStoreInvite.order } });
+  const notificationBatch = new Date().toISOString();
 
   for (const assignment of assignments) {
     const tester = await Tester.findById(assignment.testerId);
@@ -204,7 +233,7 @@ export async function distributeTestingLinks(projectId: Types.ObjectId) {
       recipientUserId: tester.userId,
       type: "testing_link",
       channel: "email",
-      relatedId: assignment._id.toString(),
+      relatedId: `${assignment._id.toString()}:${notificationBatch}`,
       payload: { redirectUrl, projectId: projectId.toString() },
     });
   }
