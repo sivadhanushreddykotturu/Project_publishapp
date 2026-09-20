@@ -730,6 +730,7 @@ export default function AdminConsole({
                             <div className="space-y-3">
                               {activeAss.map((ass) => {
                                 const tester = testers.find(t => t.id === ass.testerId);
+                                const hasPendingStep1 = ass.pendingProofSteps?.includes(1) ?? false;
                                 return (
                                   <div 
                                     key={ass.id}
@@ -744,27 +745,40 @@ export default function AdminConsole({
                                       <div>
                                         <span className={`text-xs font-extrabold block ${isDarkMode ? 'text-white' : 'text-slate-805'}`}>{tester?.name}</span>
                                         <span className="text-[9px] text-slate-500 block font-mono mt-0.5">Devices: {tester?.devices.join(', ')}</span>
+                                        {hasPendingStep1 && ass.testerEmail && (
+                                          <span className="mt-1 block text-[9px] font-semibold text-indigo-500">Google Play email: {ass.testerEmail}</span>
+                                        )}
                                       </div>
                                     </div>
 
                                     <div className="flex items-center gap-4">
                                       <span className="px-2.5 py-0.5 rounded-lg text-[9px] font-mono font-black bg-slate-500/10 text-slate-400">
-                                        Step {ass.currentStep} / 6
+                                        {hasPendingStep1 ? 'Step 1 Pending' : `Step ${ass.currentStep} / 6`}
                                       </span>
 
                                       <div className="flex items-center gap-1.5">
-                                        {/* Verify Step 1 Button */}
-                                        {ass.currentStep === 1 && ass.testerEmail && ass.step1Screenshot && (
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              onApproveTesterStep1(proj.id, ass.testerId);
-                                            }}
-                                            className="px-2.5 py-1.5 text-white font-extrabold text-[9px] uppercase border-0 rounded-lg cursor-pointer hover:opacity-90"
-                                            style={{ backgroundColor: '#10B981' }}
-                                          >
-                                            Verify Step 1
-                                          </button>
+                                        {hasPendingStep1 && ass.testerEmail && ass.step1Screenshot && (
+                                          <div className="flex items-center gap-1">
+                                            <button
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                onApproveTesterStep1(proj.id, ass.testerId);
+                                              }}
+                                              className="rounded-lg border-0 bg-emerald-600 px-2.5 py-1.5 text-[9px] font-extrabold uppercase text-white"
+                                            >
+                                              Approve Step 1
+                                            </button>
+                                            <button
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                const reason = window.prompt('Reason for rejecting Step 1');
+                                                if (reason) void onVerifyTesterProof(ass.id, 1, false, reason);
+                                              }}
+                                              className="rounded-lg border-0 bg-red-600 px-2 py-1.5 text-[9px] font-extrabold uppercase text-white"
+                                            >
+                                              Reject
+                                            </button>
+                                          </div>
                                         )}
                                         {ass.pendingProofSteps?.filter((step) => step !== 1 && (step !== 4 || ass.step4CheckInsCompleted >= 14)).map((step) => <div key={step} className="flex items-center gap-1"><button onClick={(event) => { event.stopPropagation(); void onVerifyTesterProof(ass.id, step, true); }} className="rounded-lg border-0 bg-emerald-600 px-2.5 py-1.5 text-[9px] font-extrabold uppercase text-white">Approve Step {step}</button><button onClick={(event) => { event.stopPropagation(); const reason = window.prompt(`Reason for rejecting Step ${step}`); if (reason) void onVerifyTesterProof(ass.id, step, false, reason); }} className="rounded-lg border-0 bg-red-600 px-2 py-1.5 text-[9px] font-extrabold uppercase text-white">Reject</button></div>)}
 
