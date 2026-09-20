@@ -73,10 +73,6 @@ export default function Step3PricingTier({
   const handlePay = async () => {
     setPaymentError('');
     if (selectedTierIndex === 3) return;
-    if (canSkipOnboardingPayment()) {
-      onNext(currentTier);
-      return;
-    }
     setIsPaying(true);
     try {
       if (onPay && await onPay(currentTier)) {
@@ -88,6 +84,11 @@ export default function Step3PricingTier({
     } finally {
       setIsPaying(false);
     }
+  };
+
+  const handleSkipPayment = () => {
+    setPaymentError('');
+    onNext(currentTier);
   };
 
   const features = [
@@ -255,18 +256,18 @@ export default function Step3PricingTier({
           disabled={isPaying || isPaid || selectedTierIndex === 3}
           className="px-12 py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-600/50 disabled:cursor-not-allowed text-white text-[15px] font-bold rounded-2xl shadow-md transition-all cursor-pointer"
         >
-          {isPaying ? 'Opening Razorpay…' : selectedTierIndex === 3 ? 'Contact Sales' : skipPayment ? 'Continue Without Payment' : isPaid ? 'Payment Confirmed' : 'Pay Now'}
+          {isPaying ? 'Opening Razorpay…' : selectedTierIndex === 3 ? 'Contact Sales' : isPaid ? 'Payment Confirmed' : 'Pay Now with Razorpay'}
         </button>
 
-        {!skipPayment && <button
-          onClick={() => onNext(currentTier)}
-          disabled={!isPaid}
-          className="px-16 py-3.5 bg-[#4F37FE] hover:bg-[#432EE0] disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none disabled:cursor-not-allowed text-white text-[15px] font-bold rounded-2xl shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer"
+        {skipPayment && selectedTierIndex !== 3 && <button
+          onClick={handleSkipPayment}
+          disabled={isPaying}
+          className="px-12 py-3.5 bg-[#4F37FE] hover:bg-[#432EE0] disabled:opacity-50 disabled:cursor-not-allowed text-white text-[15px] font-bold rounded-2xl shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer"
         >
-          Start Testing
+          Continue Without Payment
         </button>}
       </div>
-      {skipPayment && <p className="text-center text-sm text-slate-500">Payment is temporarily disabled. Continue to create your project without a charge.</p>}
+      {skipPayment && <p className="text-center text-sm text-slate-500">Choose Razorpay to preview the real checkout, or use the temporary bypass to create the project without recording a payment.</p>}
       {paymentError && <p className="text-center text-sm font-semibold text-red-500">{paymentError}</p>}
     </div>
   );
