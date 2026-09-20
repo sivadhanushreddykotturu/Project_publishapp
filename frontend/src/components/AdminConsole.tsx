@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { TestApp, BugReport, TesterAssignment, Tester, WithdrawalRequest } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { AdminDashboardSummary, BackendNotification, BackendProjectFile, BackendSupportTicket, LaunchOpsUser } from '../lib/launchops-api';
+import type { AdminDashboardSummary, BackendClient, BackendNotification, BackendProjectFile, BackendSupportTicket, LaunchOpsUser } from '../lib/launchops-api';
 
 interface AdminConsoleProps {
   isDarkMode: boolean;
@@ -14,6 +14,7 @@ interface AdminConsoleProps {
   bugs: BugReport[];
   assignments: TesterAssignment[];
   testers: Tester[];
+  clients: BackendClient[];
   withdrawals: WithdrawalRequest[];
   notifications: BackendNotification[];
   supportTickets: BackendSupportTicket[];
@@ -45,6 +46,7 @@ interface AdminConsoleProps {
   onDownloadCompletionReport: (projectId: string) => Promise<void>;
   onUpdatePlayIntegration: (projectId: string, input: { mode?: 'manual' | 'api'; track?: 'internal' | 'closed'; packageName?: string; aabFileUrl?: string; serviceAccountLinked?: boolean; testerGoogleGroupEmail?: string }) => Promise<void>;
   onSyncPlayIntegration: (projectId: string) => Promise<void>;
+  onCreateProjectForClient: (input: { clientId: string; package: NonNullable<TestApp['packageTier']>; serviceType: NonNullable<TestApp['serviceType']>; serviceOption: string; requiredTesters: number; requiredDeviceModels: string[]; appDetails: { appName: string; packageName?: string; description?: string; playStoreUrl?: string }; paymentDisposition: 'bypassed' | 'pending' | 'manual_paid'; customAmount?: number }) => Promise<void>;
   initialTab?: string;
   onTabChange?: (tab: string) => void;
 }
@@ -55,6 +57,7 @@ export default function AdminConsole({
   bugs,
   assignments,
   testers,
+  clients,
   withdrawals,
   notifications,
   supportTickets,
@@ -86,10 +89,15 @@ export default function AdminConsole({
   onDownloadCompletionReport,
   onUpdatePlayIntegration,
   onSyncPlayIntegration,
+  onCreateProjectForClient,
   initialTab,
   onTabChange
 }: AdminConsoleProps) {
   const [supportReplies, setSupportReplies] = useState<Record<string, string>>({});
+  const [adminProjectFormOpen, setAdminProjectFormOpen] = useState(false);
+  const [adminProjectSaving, setAdminProjectSaving] = useState(false);
+  const [adminProjectError, setAdminProjectError] = useState('');
+  const [adminProjectForm, setAdminProjectForm] = useState({ clientId: '', appName: '', packageName: '', description: '', requiredTesters: '14', devices: '', package: 'testers_only' as NonNullable<TestApp['packageTier']>, paymentDisposition: 'bypassed' as 'bypassed' | 'pending' | 'manual_paid' });
   const [sendingSupportReply, setSendingSupportReply] = useState<string | null>(null);
   // Tabs map directly to sidebar menu options
   const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'testers' | 'verifications' | 'bugs' | 'support' | 'cashouts'>(() => {
@@ -598,7 +606,24 @@ export default function AdminConsole({
                   <h2 className={`text-xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Testing Track Command</h2>
                   <p className="text-[11px] text-slate-500 mt-1">Verify sync steps, view assigned tester lists, and advance project milestones.</p>
                 </div>
+                <button type="button" onClick={() => setAdminProjectFormOpen((open) => !open)} className="rounded-xl border-0 bg-indigo-600 px-5 py-2.5 text-xs font-black text-white"><Plus className="mr-1 inline h-4 w-4" />Create for Client</button>
               </div>
+
+              {adminProjectFormOpen && <form onSubmit={async (event) => { event.preventDefault(); setAdminProjectSaving(true); setAdminProjectError(''); try { await onCreateProjectForClient({ clientId: adminProjectForm.clientId, package: adminProjectForm.package, serviceType: 'play_store_closed_testing', serviceOption: adminProjectForm.package, requiredTesters: Number(adminProjectForm.requiredTesters), requiredDeviceModels: adminProjectForm.devices.split(',').map((item) => item.trim()).filter(Boolean), appDetails: { appName: adminProjectForm.appName.trim(), packageName: adminProjectForm.packageName.trim() || undefined, description: adminProjectForm.description.trim() || undefined }, paymentDisposition: adminProjectForm.paymentDisposition }); setAdminProjectFormOpen(false); setAdminProjectForm({ clientId: '', appName: '', packageName: '', description: '', requiredTesters: '14', devices: '', package: 'testers_only', paymentDisposition: 'bypassed' }); } catch (createError) { setAdminProjectError(createError instanceof Error ? createError.message : 'Could not create project.'); } finally { setAdminProjectSaving(false); } }} className={`rounded-2xl border p-5 ${isDarkMode ? 'border-zinc-800 bg-[#18181B]' : 'border-slate-200 bg-white'}`}>
+                <div className="mb-4"><h3 className="text-sm font-black">Create project on behalf of a client</h3><p className="mt-1 text-[10px] text-slate-500">The selected client becomes the owner and receives a notification. The admin is recorded in the audit trail.</p></div>
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  <select required value={adminProjectForm.clientId} onChange={(event) => setAdminProjectForm((form) => ({ ...form, clientId: event.target.value }))} className={`rounded-xl border px-3 py-2.5 text-xs ${isDarkMode ? 'border-zinc-700 bg-zinc-950 text-white' : 'border-slate-200 bg-white'}`}><option value="">Select client</option>{clients.map((client) => <option key={client._id} value={client._id}>{client.companyName || client.contactName || client.userId.name} — {client.userId.email}</option>)}</select>
+                  <input required value={adminProjectForm.appName} onChange={(event) => setAdminProjectForm((form) => ({ ...form, appName: event.target.value }))} placeholder="App/project name" className={`rounded-xl border px-3 py-2.5 text-xs ${isDarkMode ? 'border-zinc-700 bg-zinc-950 text-white' : 'border-slate-200'}`} />
+                  <input value={adminProjectForm.packageName} onChange={(event) => setAdminProjectForm((form) => ({ ...form, packageName: event.target.value }))} placeholder="Package name (com.example.app)" className={`rounded-xl border px-3 py-2.5 text-xs ${isDarkMode ? 'border-zinc-700 bg-zinc-950 text-white' : 'border-slate-200'}`} />
+                  <select value={adminProjectForm.package} onChange={(event) => setAdminProjectForm((form) => ({ ...form, package: event.target.value as NonNullable<TestApp['packageTier']> }))} className={`rounded-xl border px-3 py-2.5 text-xs ${isDarkMode ? 'border-zinc-700 bg-zinc-950 text-white' : 'border-slate-200'}`}><option value="testers_only">Testers only</option><option value="managed_testing">Managed testing</option><option value="launch_ready">Launch ready</option></select>
+                  <input required min="1" type="number" value={adminProjectForm.requiredTesters} onChange={(event) => setAdminProjectForm((form) => ({ ...form, requiredTesters: event.target.value }))} placeholder="Required testers" className={`rounded-xl border px-3 py-2.5 text-xs ${isDarkMode ? 'border-zinc-700 bg-zinc-950 text-white' : 'border-slate-200'}`} />
+                  <select value={adminProjectForm.paymentDisposition} onChange={(event) => setAdminProjectForm((form) => ({ ...form, paymentDisposition: event.target.value as typeof form.paymentDisposition }))} className={`rounded-xl border px-3 py-2.5 text-xs ${isDarkMode ? 'border-zinc-700 bg-zinc-950 text-white' : 'border-slate-200'}`}><option value="bypassed">Payment bypassed</option><option value="pending">Payment pending</option><option value="manual_paid">Manually paid</option></select>
+                  <input value={adminProjectForm.devices} onChange={(event) => setAdminProjectForm((form) => ({ ...form, devices: event.target.value }))} placeholder="Required devices, comma-separated" className={`rounded-xl border px-3 py-2.5 text-xs md:col-span-2 ${isDarkMode ? 'border-zinc-700 bg-zinc-950 text-white' : 'border-slate-200'}`} />
+                  <input value={adminProjectForm.description} onChange={(event) => setAdminProjectForm((form) => ({ ...form, description: event.target.value }))} placeholder="Project description" className={`rounded-xl border px-3 py-2.5 text-xs ${isDarkMode ? 'border-zinc-700 bg-zinc-950 text-white' : 'border-slate-200'}`} />
+                </div>
+                {adminProjectError && <p className="mt-3 text-xs font-bold text-red-500">{adminProjectError}</p>}
+                <div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setAdminProjectFormOpen(false)} className="rounded-xl border border-slate-500/20 bg-transparent px-4 py-2 text-xs font-bold">Cancel</button><button disabled={adminProjectSaving || clients.length === 0} className="rounded-xl border-0 bg-emerald-600 px-5 py-2 text-xs font-black text-white disabled:opacity-40">{adminProjectSaving ? 'Creating...' : 'Create Project'}</button></div>
+              </form>}
 
               {projects.map((proj) => {
                 const isExpanded = expandedProjectId === proj.id;

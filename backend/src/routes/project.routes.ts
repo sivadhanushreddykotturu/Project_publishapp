@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   createProject,
+  createProjectForClient,
   listProjects,
   listTesterOpportunities,
   getProjectById,
@@ -87,6 +88,7 @@ const router = Router();
  *                 meta: { $ref: '#/components/schemas/PaginationMeta' }
  */
 router.post("/", requireAuth(), requireRole("client"), createProject);
+router.post("/admin", requireAuth(), requireRole("admin"), createProjectForClient);
 router.get("/", requireAuth(), requireRole("client", "admin"), listProjects);
 router.get("/opportunities", requireAuth(), requireRole("tester"), listTesterOpportunities);
 

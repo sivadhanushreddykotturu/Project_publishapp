@@ -26,6 +26,9 @@ import { User } from "../models/User";
 import { dispatchNotification } from "../services/notification.service";
 import { activateProject } from "../services/workflowEngine.service";
 import { deleteObjects } from "../services/storage.service";
+import { Invoice } from "../models/Invoice";
+import { computeInvoiceAmount, GST_RATE } from "../constants/packages";
+import { recordAudit } from "../middleware/audit";
 
 const createProjectSchema = z.object({
   package: z.enum(PACKAGES),
@@ -64,6 +67,7 @@ export const createProject = asyncHandler(async (req: Request, res: Response) =>
     requiredDeviceModels: body.requiredDeviceModels ?? [],
     status: "draft",
     verification: { required: false, status: "not_required" },
+    creationAudit: { source: "client", createdBy: req.dbUser!._id },
   });
 
   client.projects.push(project._id);
@@ -102,6 +106,70 @@ export const listProjects = asyncHandler(async (req: Request, res: Response) => 
     Project.countDocuments(filter),
   ]);
   res.status(200).json({ data: items, meta: buildPageMeta(page, limit, total) });
+});
+
+const adminCreateProjectSchema = createProjectSchema.extend({
+  clientId: z.string().min(1),
+  paymentDisposition: z.enum(["bypassed", "pending", "manual_paid"]),
+  customAmount: z.number().int().positive().optional(),
+}).superRefine((value, context) => {
+  if (value.package === "custom" && value.paymentDisposition !== "bypassed" && !value.customAmount) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["customAmount"], message: "customAmount is required for a paid custom project" });
+  }
+});
+
+/** Admin creates a project for an existing client, with an explicit commercial disposition. */
+export const createProjectForClient = asyncHandler(async (req: Request, res: Response) => {
+  const body = adminCreateProjectSchema.parse(req.body);
+  const client = await Client.findById(body.clientId).populate("userId");
+  if (!client) throw ApiError.notFound("Client not found");
+  const clientUser = client.userId as unknown as InstanceType<typeof User>;
+  if (clientUser.status !== "active") throw ApiError.conflict("The selected client account is not active");
+
+  const requiredTesters = body.requiredTesters ?? 14;
+  const project = await Project.create({
+    clientId: client._id,
+    package: body.package,
+    serviceType: body.serviceType,
+    serviceOption: body.serviceOption,
+    appDetails: body.appDetails,
+    requiredTesters,
+    requiredDeviceModels: body.requiredDeviceModels ?? [],
+    status: body.paymentDisposition === "pending" ? "awaiting_payment" : "draft",
+    verification: { required: false, status: "not_required" },
+    creationAudit: { source: "admin", createdBy: req.dbUser!._id, paymentDisposition: body.paymentDisposition },
+  });
+
+  client.projects.push(project._id);
+  client.activePackage = body.package;
+  await client.save();
+
+  let invoice = null;
+  if (body.paymentDisposition !== "bypassed") {
+    const pricing = body.package === "custom"
+      ? { amount: body.customAmount ?? 0, gst: Math.round((body.customAmount ?? 0) * GST_RATE) }
+      : computeInvoiceAmount(body.package, requiredTesters);
+    if (pricing.amount <= 0) throw ApiError.badRequest("customAmount is required for a custom project");
+    invoice = await Invoice.create({
+      clientId: client._id, projectId: project._id, package: body.package,
+      amount: pricing.amount, gst: pricing.gst,
+      status: body.paymentDisposition === "manual_paid" ? "manual_paid" : "pending",
+      paidAt: body.paymentDisposition === "manual_paid" ? new Date() : undefined,
+      gatewayRef: body.paymentDisposition === "manual_paid" ? `admin:${req.dbUser!._id}` : undefined,
+      dueDate: new Date(Date.now() + 7 * 24 * 3_600_000),
+    });
+  }
+
+  let publishedProject = project;
+  if (body.paymentDisposition !== "pending") {
+    const activation = await activateProject(project._id);
+    publishedProject = "project" in activation ? activation.project : activation;
+  }
+
+  await recordAudit({ actorId: req.dbUser!._id, action: "project.createdForClient", entityType: "Project", entityId: project._id, after: { clientId: client._id, paymentDisposition: body.paymentDisposition } });
+  await dispatchNotification({ recipientUserId: clientUser._id, type: "project_created_by_admin", channel: "email", relatedId: project._id.toString(), payload: { projectId: project._id.toString(), appName: project.appDetails.appName, paymentDisposition: body.paymentDisposition } });
+
+  res.status(201).json({ data: { project: publishedProject, invoice }, message: "Project created for client." });
 });
 
 async function loadVisibleProject(req: Request) {

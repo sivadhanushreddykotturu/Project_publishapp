@@ -94,6 +94,11 @@ export interface IProject extends Document {
   playIntegration: IPlayIntegration;
   verification: IClientVerification;
   clientFiles: Array<{ name: string; key: string; contentType: string; size: number; uploadedAt: Date }>;
+  creationAudit?: {
+    source: "client" | "admin";
+    createdBy?: Types.ObjectId;
+    paymentDisposition?: "bypassed" | "pending" | "manual_paid";
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -171,6 +176,11 @@ const projectSchema = new Schema<IProject>(
     clientFiles: {
       type: [{ name: String, key: String, contentType: String, size: Number, uploadedAt: { type: Date, default: Date.now } }],
       default: [],
+    },
+    creationAudit: {
+      source: { type: String, enum: ["client", "admin"], default: "client" },
+      createdBy: { type: Schema.Types.ObjectId, ref: "User" },
+      paymentDisposition: { type: String, enum: ["bypassed", "pending", "manual_paid"] },
     },
   },
   { timestamps: true }

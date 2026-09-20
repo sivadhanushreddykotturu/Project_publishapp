@@ -73,6 +73,15 @@ export type BackendProjectFile = {
   uploadedAt: string;
 };
 
+export type BackendClient = {
+  _id: string;
+  userId: LaunchOpsUser;
+  companyName?: string;
+  contactName: string;
+  activePackage?: BackendProject["package"];
+  projects: string[];
+};
+
 export type PublicTesterProfile = {
   _id: string;
   userId: { _id: string; name: string };
@@ -387,6 +396,24 @@ export function checkoutInvoice(invoiceId: string, token: string) {
   return apiRequest<ApiEnvelope<{ order: { id: string; amount: number; currency: string }; keyId: string }>>(`/api/v1/invoices/${invoiceId}/checkout`, {
     method: "POST", token,
   });
+}
+
+export function listAdminClients(token: string) {
+  return apiRequest<ApiEnvelope<BackendClient[]>>("/api/v1/clients?limit=100", { token });
+}
+
+export function createAdminProject(input: {
+  clientId: string;
+  package: BackendProject["package"];
+  serviceType: BackendProject["serviceType"];
+  serviceOption: string;
+  requiredTesters: number;
+  requiredDeviceModels: string[];
+  appDetails: BackendProject["appDetails"];
+  paymentDisposition: "bypassed" | "pending" | "manual_paid";
+  customAmount?: number;
+}, token: string) {
+  return apiRequest<ApiEnvelope<{ project: BackendProject; invoice: BackendInvoice | null }>>("/api/v1/projects/admin", { method: "POST", token, body: input });
 }
 
 export function updateCurrentLaunchOpsUser(input: { name?: string; phone?: string }, token: string) {

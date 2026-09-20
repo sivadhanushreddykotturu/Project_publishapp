@@ -62,6 +62,7 @@ function emailSubject(type: NotificationType): string {
     email_review_reminder: "Google's tester-list review window has passed — check Play Console",
     client_verification_approved: "You're verified — your invoice is ready",
     client_verification_rejected: "We need more information before we can proceed",
+    project_created_by_admin: "A new LaunchOps project was created for your account",
   };
   return subjects[type];
 }

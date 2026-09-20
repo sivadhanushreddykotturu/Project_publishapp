@@ -114,6 +114,7 @@ export const NOTIFICATION_TYPES = [
   "email_review_reminder",
   "client_verification_approved",
   "client_verification_rejected",
+  "project_created_by_admin",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

@@ -34,7 +34,8 @@ import {
   submitClientVerification, submitProjectBugReport, updateMyTesterProfile, verifyAssignment,
   updateAdminTesterStatus, promoteQueuedAssignment, resendAdminNotification, getProjectCompletionReport,
   updateProjectPlayIntegration, syncProjectPlayIntegration,
-  type BackendInvoice, type BackendNotification, type BackendTesterProfile, type BackendProjectFile, type LaunchOpsUser, type AdminDashboardSummary, type BackendSupportTicket,
+  listAdminClients, createAdminProject,
+  type BackendInvoice, type BackendNotification, type BackendTesterProfile, type BackendProjectFile, type BackendClient, type LaunchOpsUser, type AdminDashboardSummary, type BackendSupportTicket,
 } from './lib/launchops-api';
 import {
   mapAssignment, mapBugReport, mapProject, mapTesterProfile, mapWallet, mapWithdrawal,
@@ -188,6 +189,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   // Tester Flow Data States
   const [activeTester, setActiveTester] = useState<Tester>(emptyTester);
   const [adminTesters, setAdminTesters] = useState<Tester[]>([]);
+  const [adminClients, setAdminClients] = useState<BackendClient[]>([]);
 
   const [assignments, setAssignments] = useState<TesterAssignment[]>([]);
 
@@ -255,8 +257,8 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
 
   const refreshAdminData = async () => {
     const token = await getTokenOrThrow();
-    const [me, projectResponse, testerResponse, withdrawalResponse, notificationResponse, dashboardResponse, supportResponse] = await Promise.all([
-      getCurrentLaunchOpsUser(token), listProjects(token), listAdminTesters(token), listAdminWithdrawals(token), listMyNotifications(token), getAdminDashboard(token), listMySupportTickets(token),
+    const [me, projectResponse, testerResponse, clientResponse, withdrawalResponse, notificationResponse, dashboardResponse, supportResponse] = await Promise.all([
+      getCurrentLaunchOpsUser(token), listProjects(token), listAdminTesters(token), listAdminClients(token), listAdminWithdrawals(token), listMyNotifications(token), getAdminDashboard(token), listMySupportTickets(token),
     ]);
     setCurrentUser(me.data.user);
     const testers = testerResponse.data.map((profile) => mapTesterProfile(profile as BackendTesterProfile, profile.userId));
@@ -275,6 +277,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     }));
     setApps(projectResponse.data.map((project) => ({ ...mapProject(project), bugsFound: mappedBugs.filter((bug) => bug.appId === project._id).length })));
     setAdminTesters(testers);
+    setAdminClients(clientResponse.data);
     setAssignments(mappedAssignments);
     setBugs(mappedBugs);
     setWithdrawals(withdrawalResponse.data.map((item) => mapWithdrawal(item, typeof item.testerId === 'string' ? item.testerId : item.testerId._id)));
@@ -939,6 +942,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   };
   const apiUpdatePlayIntegration = async (projectId: string, input: Parameters<typeof updateProjectPlayIntegration>[1]) => { await updateProjectPlayIntegration(projectId, input, await getTokenOrThrow()); await refreshAdminData(); };
   const apiSyncPlayIntegration = async (projectId: string) => { await syncProjectPlayIntegration(projectId, await getTokenOrThrow()); await refreshAdminData(); };
+  const apiCreateProjectForClient = async (input: Parameters<typeof createAdminProject>[0]) => { await createAdminProject(input, await getTokenOrThrow()); await refreshAdminData(); };
   const apiCompleteWithdrawal = async (id: string, transactionId: string) => { await completeAdminWithdrawal(id, transactionId, await getTokenOrThrow()); await refreshAdminData(); };
   const apiRejectWithdrawal = async (id: string, reason: string) => { await rejectAdminWithdrawal(id, reason, await getTokenOrThrow()); await refreshAdminData(); };
 
@@ -1111,6 +1115,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 bugs={bugs}
                 assignments={assignments}
                 testers={adminTesters}
+                clients={adminClients}
                 withdrawals={withdrawals}
                 notifications={notifications}
                 supportTickets={supportTickets}
@@ -1142,6 +1147,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 onDownloadCompletionReport={apiDownloadCompletionReport}
                 onUpdatePlayIntegration={apiUpdatePlayIntegration}
                 onSyncPlayIntegration={apiSyncPlayIntegration}
+                onCreateProjectForClient={apiCreateProjectForClient}
                 initialTab={initialSubTab}
                 onTabChange={(tab) => handleSetTab('admin', tab)}
               />}
