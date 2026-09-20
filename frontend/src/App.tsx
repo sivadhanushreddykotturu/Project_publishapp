@@ -988,9 +988,9 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                   if (role === 'admin') {
                     handleSetTab('admin');
                   } else if (role === 'client') {
-                    // The backend project list decides whether this returning client
-                    // lands on the dashboard or the new-project wizard.
-                    handleSetTab('client');
+                    // Every authenticated client lands on the dashboard. Existing
+                    // projects load there; new clients can start their first project.
+                    handleSetTab('client', 'dashboard');
                   } else {
                     setActiveTester({ ...emptyTester, name });
                     handleSetTab('tester');
