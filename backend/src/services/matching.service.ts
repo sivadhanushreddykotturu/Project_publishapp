@@ -167,6 +167,45 @@ export async function promoteFromQueue(projectId: Types.ObjectId) {
   return promoted;
 }
 
+/** Admin promotion of a specific queued tester when a project has an open slot. */
+export async function promoteSpecificQueuedAssignment(assignmentId: Types.ObjectId) {
+  const queued = await Assignment.findOne({ _id: assignmentId, status: "queued" });
+  if (!queued) throw ApiError.badRequest("This tester is not currently queued");
+
+  const project = await Project.findOneAndUpdate(
+    { _id: queued.projectId, $expr: { $lt: ["$activeTesterCount", "$requiredTesters"] } },
+    { $inc: { activeTesterCount: 1 } },
+    { new: true }
+  );
+  if (!project) throw ApiError.conflict("No open tester slot is available");
+
+  const promoted = await Assignment.findOneAndUpdate(
+    { _id: assignmentId, status: "queued" },
+    { $set: { status: "active", currentStep: 1, assignedAt: new Date(), lastActivityAt: new Date() }, $unset: { queuePosition: 1 } },
+    { new: true }
+  );
+  if (!promoted) {
+    await Project.findByIdAndUpdate(queued.projectId, { $inc: { activeTesterCount: -1 } });
+    throw ApiError.conflict("The queue changed before this tester could be promoted");
+  }
+
+  project.waitlistCount = Math.max(0, (project.waitlistCount ?? 0) - 1);
+  project.joinState = project.activeTesterCount >= project.requiredTesters ? "full" : "open";
+  await project.save();
+
+  const tester = await Tester.findById(promoted.testerId);
+  if (tester) {
+    await dispatchNotification({
+      recipientUserId: tester.userId,
+      type: "queue_promoted",
+      channel: "email",
+      relatedId: promoted._id.toString(),
+      payload: { projectId: queued.projectId.toString() },
+    });
+  }
+  return promoted;
+}
+
 /**
  * Removes a Step-1 tester who has gone inactive past the configured threshold and
  * promotes the next queued tester into their slot. Automatic replacement is only

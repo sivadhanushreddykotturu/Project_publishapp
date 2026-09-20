@@ -1,9 +1,9 @@
-import { TestApp, BugReport, Tester, TesterAssignment, WithdrawalRequest, Transaction } from '../types';
+import { TestApp, BugReport, TesterAssignment, WithdrawalRequest, Transaction } from '../types';
 
 /**
  * LaunchOps Centralized API Client Module
  * -------------------------------------------------------------
- * Configured with seamless backend API endpoints and fallback to local state.
+ * Configured for the LaunchOps backend API.
  * To point to your live backend server, set NEXT_PUBLIC_API_BASE_URL in .env.local
  * e.g. NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api
  */

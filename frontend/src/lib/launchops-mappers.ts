@@ -82,6 +82,10 @@ export function mapProject(project: BackendProject): TestApp {
     playIntegration: {
       serviceAccountSet: Boolean(project.playIntegration?.serviceAccountLinked),
       packageName: project.playIntegration?.packageName ?? project.appDetails.packageName ?? "",
+      mode: project.playIntegration?.mode,
+      track: project.playIntegration?.track,
+      aabFileUrl: project.playIntegration?.aabFileUrl,
+      testerGoogleGroupEmail: project.playIntegration?.testerGoogleGroupEmail,
       lastApiError: project.playIntegration?.lastApiError,
     },
   };
@@ -102,6 +106,7 @@ export function mapTesterProfile(profile: BackendTesterProfile, user: LaunchOpsU
     rating: profile.ratingAvg || 0,
     specialty: profile.specialty ?? `${profile.experienceLevel[0].toUpperCase()}${profile.experienceLevel.slice(1)} tester`,
     status: profile.status === "active" ? "Online" : "Idle",
+    accountStatus: profile.status,
     upiId: profile.upi?.vpa ?? "",
     qrCodeUrl: profile.upi?.qrImageUrl,
     walletBalance: paiseToRupees(profile.walletBalance),

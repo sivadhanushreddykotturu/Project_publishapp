@@ -35,6 +35,10 @@ interface ClientFlowManagerProps {
   onSendSupport: (input: { subject: string; message: string; cc: string[] }, projectId?: string) => Promise<void>;
   supportTickets: BackendSupportTicket[];
   onReplyToSupport: (ticketId: string, body: string) => Promise<void>;
+  onLogout: () => void;
+  onReadNotification: (notificationId: string) => void;
+  onUpdateProfile: (input: { name?: string; phone?: string }) => Promise<void>;
+  onDownloadCompletionReport: (projectId: string) => Promise<void>;
 }
 
 export default function ClientFlowManager({
@@ -56,7 +60,11 @@ export default function ClientFlowManager({
   onConfirmEmailsAdded,
   onSendSupport,
   supportTickets,
-  onReplyToSupport
+  onReplyToSupport,
+  onLogout,
+  onReadNotification,
+  onUpdateProfile,
+  onDownloadCompletionReport
 }: ClientFlowManagerProps) {
   // Mode: wizard vs dashboard
   const [viewMode, setViewMode] = useState<'wizard' | 'dashboard'>(() => {
@@ -183,7 +191,7 @@ export default function ClientFlowManager({
     return (
       <ClientAppDashboard
         isDarkMode={isDarkMode}
-        onLogout={onBackToHome}
+        onLogout={onLogout}
         onNewAppWizard={handleStartNewApp}
         newRegisteredApp={completedProjectSummary}
         projects={projects}
@@ -200,6 +208,9 @@ export default function ClientFlowManager({
         onSendSupport={onSendSupport}
         supportTickets={supportTickets}
         onReplyToSupport={onReplyToSupport}
+        onReadNotification={onReadNotification}
+        onUpdateProfile={onUpdateProfile}
+        onDownloadCompletionReport={onDownloadCompletionReport}
       />
     );
   }

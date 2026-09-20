@@ -103,6 +103,9 @@ interface ClientAppDashboardProps {
   onSendSupport: (input: { subject: string; message: string; cc: string[] }, projectId?: string) => Promise<void>;
   supportTickets: BackendSupportTicket[];
   onReplyToSupport: (ticketId: string, body: string) => Promise<void>;
+  onReadNotification: (notificationId: string) => void;
+  onUpdateProfile: (input: { name?: string; phone?: string }) => Promise<void>;
+  onDownloadCompletionReport: (projectId: string) => Promise<void>;
   newRegisteredApp?: {
     appName: string;
     category?: string;
@@ -132,7 +135,10 @@ export default function ClientAppDashboard({
   onGetVerifiedTesterEmails,
   onSendSupport,
   supportTickets,
-  onReplyToSupport
+  onReplyToSupport,
+  onReadNotification,
+  onUpdateProfile,
+  onDownloadCompletionReport
 }: ClientAppDashboardProps) {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(initialDarkMode);
   const [activeNav, setActiveNav] = useState<'dashboard' | 'testing' | 'services' | 'support'>('testing');
@@ -145,6 +151,11 @@ export default function ClientAppDashboard({
   const [supportSent, setSupportSent] = useState(false);
   const [supportSending, setSupportSending] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [profileName, setProfileName] = useState(currentUser?.name ?? '');
+  const [profilePhone, setProfilePhone] = useState(currentUser?.phone ?? '');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMessage, setProfileMessage] = useState('');
   const [detailError, setDetailError] = useState('');
   const [detailLoading, setDetailLoading] = useState(false);
   const [projectAssignments, setProjectAssignments] = useState<BackendAssignment[]>([]);
@@ -432,6 +443,7 @@ export default function ClientAppDashboard({
                 <span>Support —</span>
               </button>
             )}
+            {selectedApp && <button type="button" onClick={() => { void onDownloadCompletionReport(selectedApp.id); }} className={`rounded-full border px-4 py-2 text-[12px] font-bold ${isDarkMode ? 'border-white/10 bg-[#0F1017] text-white' : 'border-slate-200 bg-white text-[#4F37FE]'}`}><Download className="mr-1 inline h-3.5 w-3.5" />Report</button>}
 
             <div
               className="text-right cursor-pointer"
@@ -448,19 +460,27 @@ export default function ClientAppDashboard({
             </div>
 
             {/* Notification Bell */}
-            <div className="w-10 h-10 rounded-full bg-[#4F37FE] text-white flex items-center justify-center shadow-md shadow-[#4F37FE]/20 cursor-pointer">
+            <button type="button" onClick={() => { setNotificationOpen((open) => !open); setProfileOpen(false); }} className="relative w-10 h-10 rounded-full border-0 bg-[#4F37FE] text-white flex items-center justify-center shadow-md shadow-[#4F37FE]/20 cursor-pointer">
               <Bell className="w-5 h-5 stroke-[2.3]" />
-            </div>
+              {notifications.some((item) => !item.readAt) && <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500" />}
+            </button>
+            {notificationOpen && <div className={`absolute right-12 top-12 z-50 max-h-96 w-80 overflow-y-auto rounded-2xl border p-2 shadow-xl ${isDarkMode ? 'border-white/10 bg-[#0F1017]' : 'border-slate-200 bg-white'}`}>
+              <div className="flex items-center justify-between px-2 py-2"><strong className="text-xs">Notifications</strong><span className="text-[10px] text-slate-500">{notifications.filter((item) => !item.readAt).length} unread</span></div>
+              {notifications.length === 0 ? <p className="p-3 text-xs text-slate-500">No notifications yet.</p> : notifications.slice(0, 20).map((item) => <button type="button" key={item._id} onClick={() => { if (!item.readAt) onReadNotification(item._id); setNotificationOpen(false); }} className={`mb-1 w-full rounded-xl border p-3 text-left text-xs ${item.readAt ? 'border-slate-500/10 opacity-60' : 'border-indigo-500/20 bg-indigo-500/10'}`}><span className="block font-bold">{item.type.replace(/_/g, ' ')}</span><span className="mt-1 block text-[10px] text-slate-500">{String(item.payload.appName ?? item.payload.subject ?? '')}</span></button>)}
+            </div>}
 
             <div onMouseEnter={() => setProfileOpen(true)} onClick={() => setProfileOpen((open) => !open)} className="w-10 h-10 rounded-full bg-[#4F37FE] text-white flex items-center justify-center border-2 border-white dark:border-slate-800 shadow-sm font-black cursor-pointer">
               {(currentUser?.name || currentUser?.email || 'C').charAt(0).toUpperCase()}
             </div>
             {profileOpen && (
-              <div onMouseLeave={() => setProfileOpen(false)} className={`absolute right-0 top-12 z-50 w-72 rounded-2xl border p-4 shadow-xl ${isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200'}`}>
-                <p className="font-black">{currentUser?.name || 'Client'}</p>
+              <form onSubmit={async (event) => { event.preventDefault(); setProfileSaving(true); setProfileMessage(''); try { await onUpdateProfile({ name: profileName.trim(), phone: profilePhone.trim() }); setProfileMessage('Profile updated.'); } catch (profileError) { setProfileMessage(profileError instanceof Error ? profileError.message : 'Could not update profile.'); } finally { setProfileSaving(false); } }} onMouseLeave={() => setProfileOpen(false)} className={`absolute right-0 top-12 z-50 w-72 rounded-2xl border p-4 shadow-xl ${isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200'}`}>
+                <p className="font-black">Client profile</p>
                 <p className="mt-1 text-sm text-slate-500 break-all">{currentUser?.email || 'No email available'}</p>
-                <p className="mt-3 text-xs font-bold uppercase tracking-wider text-[#4F37FE]">Client account</p>
-              </div>
+                <input value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Name" className={`mt-3 w-full rounded-xl border px-3 py-2 text-xs ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-slate-200'}`} />
+                <input value={profilePhone} onChange={(event) => setProfilePhone(event.target.value)} placeholder="Phone" className={`mt-2 w-full rounded-xl border px-3 py-2 text-xs ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-slate-200'}`} />
+                {profileMessage && <p className="mt-2 text-[10px] font-semibold text-slate-500">{profileMessage}</p>}
+                <button disabled={profileSaving} className="mt-3 w-full rounded-xl border-0 bg-[#4F37FE] py-2 text-xs font-bold text-white disabled:opacity-50">{profileSaving ? 'Saving...' : 'Save profile'}</button>
+              </form>
             )}
           </div>
         </header>

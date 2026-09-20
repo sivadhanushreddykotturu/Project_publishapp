@@ -29,6 +29,10 @@ export interface TestApp {
   playIntegration?: {
     serviceAccountSet: boolean;
     packageName: string;
+    mode?: 'manual' | 'api';
+    track?: 'internal' | 'closed';
+    aabFileUrl?: string;
+    testerGoogleGroupEmail?: string;
     lastApiError?: string;
   };
   projectName?: string;
@@ -101,6 +105,7 @@ export interface Tester {
   rating: number;
   specialty: string;
   status: 'Online' | 'Testing' | 'Idle';
+  accountStatus?: 'active' | 'inactive' | 'suspended';
   
   // Wallet & Profile extensions
   upiId?: string;

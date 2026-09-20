@@ -7,6 +7,7 @@ import { ApiError } from "../utils/apiError";
 import { asyncHandler } from "../utils/asyncHandler";
 import { submitProof, verifyProof } from "../services/workflowEngine.service";
 import { manuallyReplaceTester } from "../services/playIntegration.service";
+import { promoteSpecificQueuedAssignment } from "../services/matching.service";
 
 async function loadOwnedAssignment(req: Request) {
   const assignment = await Assignment.findById(req.params.id);
@@ -69,4 +70,9 @@ export const verifyAssignmentStep = asyncHandler(async (req: Request, res: Respo
 export const replaceAssignmentTester = asyncHandler(async (req: Request, res: Response) => {
   const result = await manuallyReplaceTester(new Types.ObjectId(req.params.id), req.dbUser!._id);
   res.status(200).json({ data: result });
+});
+
+export const promoteQueuedTester = asyncHandler(async (req: Request, res: Response) => {
+  const assignment = await promoteSpecificQueuedAssignment(new Types.ObjectId(req.params.id));
+  res.status(200).json({ data: assignment });
 });

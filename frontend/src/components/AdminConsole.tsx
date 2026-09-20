@@ -39,6 +39,12 @@ interface AdminConsoleProps {
   onClearProjectFiles: (projectId: string) => Promise<number>;
   onReplyToSupport: (ticketId: string, body: string) => Promise<void>;
   onUpdateSupportStatus: (ticketId: string, status: BackendSupportTicket['status']) => Promise<void>;
+  onUpdateTesterStatus: (testerId: string, status: 'active' | 'inactive' | 'suspended') => Promise<void>;
+  onPromoteQueuedTester: (assignmentId: string) => Promise<void>;
+  onResendNotification: (notificationId: string) => Promise<void>;
+  onDownloadCompletionReport: (projectId: string) => Promise<void>;
+  onUpdatePlayIntegration: (projectId: string, input: { mode?: 'manual' | 'api'; track?: 'internal' | 'closed'; packageName?: string; aabFileUrl?: string; serviceAccountLinked?: boolean; testerGoogleGroupEmail?: string }) => Promise<void>;
+  onSyncPlayIntegration: (projectId: string) => Promise<void>;
   initialTab?: string;
   onTabChange?: (tab: string) => void;
 }
@@ -74,6 +80,12 @@ export default function AdminConsole({
   onClearProjectFiles,
   onReplyToSupport,
   onUpdateSupportStatus,
+  onUpdateTesterStatus,
+  onPromoteQueuedTester,
+  onResendNotification,
+  onDownloadCompletionReport,
+  onUpdatePlayIntegration,
+  onSyncPlayIntegration,
   initialTab,
   onTabChange
 }: AdminConsoleProps) {
@@ -358,6 +370,7 @@ export default function AdminConsole({
             </button>
             {notificationDropdownOpen && <div className={`absolute right-0 top-12 w-80 max-h-96 overflow-y-auto rounded-xl border p-2 shadow-xl ${isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-slate-200'}`}>
               {notifications.filter((notification) => !notification.readAt).length === 0 ? <p className="p-3 text-xs text-slate-500">You're all caught up.</p> : notifications.filter((notification) => !notification.readAt).map((notification) => <button key={notification._id} onClick={() => { onReadNotification(notification._id); if (notification.type === 'project_request') handleTabSelect('projects'); else if (notification.type === 'support_request') handleTabSelect('support'); setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs border mb-1 transition-colors ${isDarkMode ? 'bg-indigo-500/15 border-indigo-500/30 text-white' : 'bg-indigo-50 border-indigo-200 text-slate-900'}`}><span className="flex items-center justify-between gap-2 font-bold"><span>{notification.type === 'project_request' ? 'New published project' : notification.type.replace(/_/g, ' ')}</span><span className="text-[8px] uppercase px-1.5 py-0.5 rounded-full bg-indigo-600 text-white">New</span></span><span className="text-slate-500 block mt-1">{String(notification.payload.appName ?? '')}</span></button>) }
+              {notifications.filter((notification) => notification.status === 'failed').map((notification) => <div key={`failed-${notification._id}`} className="mb-1 rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs"><p className="font-bold text-red-500">Failed: {notification.type.replace(/_/g, ' ')}</p><p className="mt-1 truncate text-[9px] text-slate-500">{notification.lastError || 'Delivery failed'}</p><button type="button" onClick={() => { void onResendNotification(notification._id); }} className="mt-2 rounded-lg border-0 bg-red-600 px-2.5 py-1 text-[9px] font-black uppercase text-white">Retry delivery</button></div>)}
             </div>}
             </div>
 
@@ -590,6 +603,7 @@ export default function AdminConsole({
               {projects.map((proj) => {
                 const isExpanded = expandedProjectId === proj.id;
                 const activeAss = assignments.filter(a => a.projectId === proj.id && a.status === 'active');
+                const queuedAss = assignments.filter(a => a.projectId === proj.id && a.status === 'queued');
                 
                 return (
                   <div 
@@ -642,6 +656,16 @@ export default function AdminConsole({
                           </div>
 
                           <div className="flex gap-2">
+                            <button onClick={() => { void onDownloadCompletionReport(proj.id); }} className="rounded-xl border border-slate-500/25 bg-transparent px-4 py-2.5 text-xs font-black text-slate-500">Download Report</button>
+                            <button onClick={async () => {
+                              const packageName = window.prompt('Google Play package name', proj.playIntegration?.packageName || proj.packageName || '');
+                              if (!packageName) return;
+                              const aabFileUrl = window.prompt('AAB file URL', proj.playIntegration?.aabFileUrl || '');
+                              if (!aabFileUrl) return;
+                              const testerGoogleGroupEmail = window.prompt('Tester Google Group email (optional)', proj.playIntegration?.testerGoogleGroupEmail || '') || undefined;
+                              await onUpdatePlayIntegration(proj.id, { mode: 'api', track: 'closed', packageName, aabFileUrl, testerGoogleGroupEmail, serviceAccountLinked: window.confirm('Has the Google service account been granted Play Console access?') });
+                            }} className="rounded-xl border border-indigo-500/25 bg-indigo-500/5 px-4 py-2.5 text-xs font-black text-indigo-500">Configure Play API</button>
+                            {proj.playIntegration?.mode === 'api' && <button onClick={() => { void onSyncPlayIntegration(proj.id); }} className="rounded-xl border-0 bg-purple-600 px-4 py-2.5 text-xs font-black text-white">Sync Play Release</button>}
                             <button
                               onClick={() => {
                                 const currentStep = Math.round((proj.progress || 0) / 16.6);
@@ -807,6 +831,11 @@ export default function AdminConsole({
                           )}
                         </div>
 
+                        <div>
+                          <h4 className="mb-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-500 font-mono">Waitlist ({queuedAss.length})</h4>
+                          {queuedAss.length === 0 ? <p className="text-xs text-slate-500">No testers waiting for a slot.</p> : <div className="space-y-2">{queuedAss.map((ass) => { const tester = testers.find((item) => item.id === ass.testerId); const hasSpace = activeAss.length < (proj.testersRequired ?? 14); return <div key={ass.id} className="flex items-center justify-between rounded-xl border border-amber-500/20 bg-amber-500/5 p-3"><div><p className="text-xs font-bold">{tester?.name || 'Tester'}</p><p className="text-[9px] text-slate-500">Queue position {ass.queuePosition ?? '-'}</p></div><button disabled={!hasSpace} onClick={() => { void onPromoteQueuedTester(ass.id); }} className="rounded-lg border-0 bg-emerald-600 px-3 py-1.5 text-[9px] font-black uppercase text-white disabled:opacity-40" title={hasSpace ? 'Promote into the open slot' : 'Remove or replace an active tester first'}>Promote</button></div>; })}</div>}
+                        </div>
+
                         <div className={`rounded-2xl border p-5 ${isDarkMode ? 'border-white/10 bg-black/30' : 'border-slate-200 bg-slate-50'}`}>
                           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                             <div>
@@ -945,6 +974,11 @@ export default function AdminConsole({
                         <h3 className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{t.name}</h3>
                         <span className="text-[10px] text-slate-400 block font-mono">{t.country}</span>
                       </div>
+                      <select value={t.accountStatus ?? (t.status === 'Online' ? 'active' : 'inactive')} onChange={(event) => { void onUpdateTesterStatus(t.id, event.target.value as 'active' | 'inactive' | 'suspended'); }} className={`ml-auto rounded-lg border px-2 py-1 text-[9px] font-black uppercase ${isDarkMode ? 'border-zinc-700 bg-zinc-950 text-white' : 'border-slate-200 bg-white'}`}>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="suspended">Suspended</option>
+                      </select>
                     </div>
 
                     <div className="space-y-4 text-xs border-t pt-4 border-slate-200/5 font-semibold text-slate-600 dark:text-slate-355">

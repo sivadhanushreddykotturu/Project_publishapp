@@ -110,7 +110,11 @@ export type BackendProject = {
   playIntegration?: {
     optInUrl?: string;
     packageName?: string;
+    mode?: "manual" | "api";
+    track?: "internal" | "closed";
+    aabFileUrl?: string;
     serviceAccountLinked?: boolean;
+    testerGoogleGroupEmail?: string;
     lastApiError?: string;
   };
   verification?: {
@@ -541,4 +545,40 @@ export function advanceProjectMilestone(projectId: string, step: number, token: 
   return apiRequest<ApiEnvelope<BackendProject>>(`/api/v1/projects/${projectId}/${action.path}`, {
     method: "POST", token, body: action.body,
   });
+}
+
+export function updateAdminTesterStatus(testerId: string, status: BackendTesterProfile["status"], token: string) {
+  return apiRequest<ApiEnvelope<BackendTesterProfile>>(`/api/v1/testers/${testerId}/status`, {
+    method: "PATCH", token, body: { status },
+  });
+}
+
+export function promoteQueuedAssignment(assignmentId: string, token: string) {
+  return apiRequest<ApiEnvelope<BackendAssignment>>(`/api/v1/assignments/${assignmentId}/promote`, { method: "POST", token });
+}
+
+export function resendAdminNotification(notificationId: string, token: string) {
+  return apiRequest<ApiEnvelope<BackendNotification>>(`/api/v1/notifications/${notificationId}/resend`, { method: "POST", token });
+}
+
+export type CompletionReport = {
+  project: { id: string; appName: string; status: string };
+  testerCompletionSummary: Array<{ testerId: unknown; status: string; currentStep: number }>;
+  bugReports: BackendBugReport[];
+  generatedAt: string;
+};
+
+export function getProjectCompletionReport(projectId: string, token: string) {
+  return apiRequest<ApiEnvelope<CompletionReport>>(`/api/v1/projects/${projectId}/completion-report`, { token });
+}
+
+export function updateProjectPlayIntegration(projectId: string, input: {
+  mode?: "manual" | "api"; track?: "internal" | "closed"; packageName?: string;
+  aabFileUrl?: string; serviceAccountLinked?: boolean; testerGoogleGroupEmail?: string;
+}, token: string) {
+  return apiRequest<ApiEnvelope<BackendProject>>(`/api/v1/projects/${projectId}/play-integration`, { method: "PATCH", token, body: input });
+}
+
+export function syncProjectPlayIntegration(projectId: string, token: string) {
+  return apiRequest<ApiEnvelope<{ project: BackendProject; mode?: string }>>(`/api/v1/projects/${projectId}/sync-play-release`, { method: "POST", token });
 }

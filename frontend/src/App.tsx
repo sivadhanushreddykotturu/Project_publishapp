@@ -32,6 +32,8 @@ import {
   mergeBugReports, publishBugReport, rejectAdminWithdrawal, replaceAssignment,
   requestWalletWithdrawal, reviewProjectVerification, submitAssignmentProof,
   submitClientVerification, submitProjectBugReport, updateMyTesterProfile, verifyAssignment,
+  updateAdminTesterStatus, promoteQueuedAssignment, resendAdminNotification, getProjectCompletionReport,
+  updateProjectPlayIntegration, syncProjectPlayIntegration,
   type BackendInvoice, type BackendNotification, type BackendTesterProfile, type BackendProjectFile, type LaunchOpsUser, type AdminDashboardSummary, type BackendSupportTicket,
 } from './lib/launchops-api';
 import {
@@ -253,9 +255,10 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
 
   const refreshAdminData = async () => {
     const token = await getTokenOrThrow();
-    const [projectResponse, testerResponse, withdrawalResponse, notificationResponse, dashboardResponse, supportResponse] = await Promise.all([
-      listProjects(token), listAdminTesters(token), listAdminWithdrawals(token), listMyNotifications(token), getAdminDashboard(token), listMySupportTickets(token),
+    const [me, projectResponse, testerResponse, withdrawalResponse, notificationResponse, dashboardResponse, supportResponse] = await Promise.all([
+      getCurrentLaunchOpsUser(token), listProjects(token), listAdminTesters(token), listAdminWithdrawals(token), listMyNotifications(token), getAdminDashboard(token), listMySupportTickets(token),
     ]);
+    setCurrentUser(me.data.user);
     const testers = testerResponse.data.map((profile) => mapTesterProfile(profile as BackendTesterProfile, profile.userId));
     const [queueResponses, bugResponses] = await Promise.all([
       Promise.all(projectResponse.data.map((project) => listProjectAssignments(project._id, token))),
@@ -920,6 +923,22 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     const response = await updateCurrentLaunchOpsUser(input, await getTokenOrThrow());
     setCurrentUser(response.data.user);
   };
+  const apiUpdateClientProfile = async (input: { name?: string; phone?: string }) => {
+    const response = await updateCurrentLaunchOpsUser(input, await getTokenOrThrow());
+    setCurrentUser(response.data.user);
+  };
+  const apiUpdateTesterStatus = async (testerId: string, status: BackendTesterProfile['status']) => { await updateAdminTesterStatus(testerId, status, await getTokenOrThrow()); await refreshAdminData(); };
+  const apiPromoteQueuedTester = async (assignmentId: string) => { await promoteQueuedAssignment(assignmentId, await getTokenOrThrow()); await refreshAdminData(); };
+  const apiResendNotification = async (notificationId: string) => { await resendAdminNotification(notificationId, await getTokenOrThrow()); await refreshAdminData(); };
+  const apiDownloadCompletionReport = async (projectId: string) => {
+    const response = await getProjectCompletionReport(projectId, await getTokenOrThrow());
+    const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${response.data.project.appName.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-completion-report.json`; anchor.click();
+    URL.revokeObjectURL(url);
+  };
+  const apiUpdatePlayIntegration = async (projectId: string, input: Parameters<typeof updateProjectPlayIntegration>[1]) => { await updateProjectPlayIntegration(projectId, input, await getTokenOrThrow()); await refreshAdminData(); };
+  const apiSyncPlayIntegration = async (projectId: string) => { await syncProjectPlayIntegration(projectId, await getTokenOrThrow()); await refreshAdminData(); };
   const apiCompleteWithdrawal = async (id: string, transactionId: string) => { await completeAdminWithdrawal(id, transactionId, await getTokenOrThrow()); await refreshAdminData(); };
   const apiRejectWithdrawal = async (id: string, reason: string) => { await rejectAdminWithdrawal(id, reason, await getTokenOrThrow()); await refreshAdminData(); };
 
@@ -1068,6 +1087,10 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 onSendSupport={apiSendClientSupport}
                 supportTickets={supportTickets}
                 onReplyToSupport={apiReplyToSupport}
+                onLogout={() => { void handleLogout(); }}
+                onReadNotification={apiMarkNotificationRead}
+                onUpdateProfile={apiUpdateClientProfile}
+                onDownloadCompletionReport={apiDownloadCompletionReport}
               />
             </motion.div>
           )}
@@ -1113,6 +1136,12 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 onClearProjectFiles={apiClearAdminProjectFiles}
                 onReplyToSupport={apiReplyToSupport}
                 onUpdateSupportStatus={apiUpdateSupportStatus}
+                onUpdateTesterStatus={apiUpdateTesterStatus}
+                onPromoteQueuedTester={apiPromoteQueuedTester}
+                onResendNotification={apiResendNotification}
+                onDownloadCompletionReport={apiDownloadCompletionReport}
+                onUpdatePlayIntegration={apiUpdatePlayIntegration}
+                onSyncPlayIntegration={apiSyncPlayIntegration}
                 initialTab={initialSubTab}
                 onTabChange={(tab) => handleSetTab('admin', tab)}
               />}

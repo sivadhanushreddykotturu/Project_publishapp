@@ -103,9 +103,6 @@ export default function AuthScreen({ isDarkMode, initialRole = 'tester', onLogin
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-slate-500 mt-2">
-              Tip: Login with <span className="font-mono text-indigo-500">client@launchops.com</span> or <span className="font-mono text-indigo-500">admin@launchops.com</span> to mock route.
-            </p>
           </div>
 
           {/* Toggle Sign Up / Login (for Tester and Client) */}

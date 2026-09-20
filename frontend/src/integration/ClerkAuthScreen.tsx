@@ -181,7 +181,7 @@ export default function ClerkAuthScreen({ isDarkMode, initialRole = "tester", on
                 ))}
               </div>
 
-              <SignInButton mode="redirect" forceRedirectUrl="/">
+              <SignInButton mode="redirect" forceRedirectUrl={`/auth/${selectedRole}`}>
                 <button className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition hover:shadow-lg hover:shadow-indigo-500/20 cursor-pointer border-0">
                   Sign In
                 </button>
@@ -189,7 +189,7 @@ export default function ClerkAuthScreen({ isDarkMode, initialRole = "tester", on
 
               <SignUpButton
                 mode="redirect"
-                forceRedirectUrl="/"
+                forceRedirectUrl={`/auth/${selectedRole}`}
               >
                 <button
                   className={`w-full py-3.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-3 transition border cursor-pointer ${

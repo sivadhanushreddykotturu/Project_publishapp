@@ -5,6 +5,7 @@ import {
   submitAssignmentProof,
   verifyAssignmentStep,
   replaceAssignmentTester,
+  promoteQueuedTester,
 } from "../controllers/assignment.controller";
 import { requireAuth, requireRole } from "../middleware/auth";
 
@@ -131,5 +132,6 @@ router.post("/:id/verify", requireAuth(), requireRole("admin"), verifyAssignment
  *                       oneOf: [{ $ref: '#/components/schemas/Assignment' }, { type: 'null' }]
  */
 router.post("/:id/replace", requireAuth(), requireRole("admin"), replaceAssignmentTester);
+router.post("/:id/promote", requireAuth(), requireRole("admin"), promoteQueuedTester);
 
 export default router;
