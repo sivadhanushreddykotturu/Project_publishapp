@@ -139,7 +139,10 @@ export default async function TesterOverview() {
               const app = a.projectId?.appDetails;
               const appName = app?.appName || "Android App";
               const totalSteps = 3;
-              const stepPercent = Math.min(100, Math.round(((a.currentStep || 1) / totalSteps) * 100));
+              const currentStepNum = a.currentStep || 1;
+              // Progress reflects completed steps: on Step 1 -> 0 completed (0%), on Step 2 -> 1 completed (33%)
+              const completedSteps = a.status === "completed" ? totalSteps : Math.max(0, currentStepNum - 1);
+              const stepPercent = Math.min(100, Math.round((completedSteps / totalSteps) * 100));
               const totalPaise = (a.projectId?.steps || []).reduce(
                 (acc: number, step: { config?: { payoutPaise?: number } }) => {
                   return acc + (Number(step?.config?.payoutPaise) || 0);
@@ -170,9 +173,9 @@ export default async function TesterOverview() {
                     <div className="mt-5 space-y-2">
                       <div className="flex items-center justify-between text-[12px] font-semibold">
                         <span className="text-slate-600">
-                          Step {a.currentStep || 1} of {totalSteps}
+                          Step {currentStepNum} of {totalSteps} · {completedSteps === 0 ? "Not completed" : `${completedSteps}/${totalSteps} Done`}
                         </span>
-                        <span className="text-[#4F46E5]">{stepPercent}%</span>
+                        <span className="text-[#4F46E5] font-bold">{stepPercent}%</span>
                       </div>
                       <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
                         <div
@@ -193,7 +196,7 @@ export default async function TesterOverview() {
                       href={`/tester/tests/${a._id}`}
                       className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#4F46E5] py-2.5 text-[13.5px] font-semibold text-white shadow-xs hover:bg-[#4338CA] transition-all"
                     >
-                      Continue Testing
+                      {currentStepNum === 1 ? "Start Step 1: Web Opt-In" : "Continue Testing"}
                       <ArrowRight className="size-4" />
                     </Link>
                   </div>
