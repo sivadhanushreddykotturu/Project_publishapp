@@ -60,8 +60,8 @@ export function createApp(): express.Express {
     }),
   );
 
-  app.get("/health", (_req, res) => {
-    res.json({ ok: true, service: "defineux-api", env: env.NODE_ENV });
+  app.get(["/health", "/ping", "/api/v1/health", "/api/v1/ping"], (_req, res) => {
+    res.status(200).json({ ok: true, service: "defineux-api", time: new Date().toISOString() });
   });
 
   // --- routers ---
