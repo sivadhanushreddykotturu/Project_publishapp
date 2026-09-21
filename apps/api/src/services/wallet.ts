@@ -17,6 +17,10 @@ export async function creditEarning(input: {
   assignmentId?: Types.ObjectId;
   note?: string;
 }): Promise<{ credited: boolean }> {
+  if (input.amountPaise <= 0) {
+    return { credited: false };
+  }
+
   const session = await mongoose.startSession();
   try {
     let credited = false;

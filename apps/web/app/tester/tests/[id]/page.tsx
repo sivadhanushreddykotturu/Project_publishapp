@@ -1,7 +1,9 @@
 import { serverApi } from "@/lib/server-api";
-import { StepTestingView } from "@/components/tester/StepTestingView";
+import { StepTestingView, type StepTestingProps } from "@/components/tester/StepTestingView";
 
 export const dynamic = "force-dynamic";
+
+type AssignmentRecord = NonNullable<StepTestingProps["assignment"]>;
 
 export default async function TestDetailPage({
   params,
@@ -10,26 +12,45 @@ export default async function TestDetailPage({
 }) {
   const { id } = await params;
 
-  let assignment = null;
+  let assignment: AssignmentRecord | null = null;
   // If id looks like a Mongo ObjectId (24 hex characters), attempt to fetch real assignment
   if (/^[0-9a-fA-F]{24}$/.test(id)) {
     try {
-      const data = await serverApi<{
-        assignment: {
-          _id: string;
-          currentStep: number;
-          status: string;
-          proofs: Array<{ step: number; fileUrl: string; status: string }>;
-          projectId: {
-            _id: string;
-            appDetails: { appName: string; packageName: string };
-            playIntegration?: { optInUrl?: string };
-          };
-        };
-      }>(`/assignments/${id}`);
-      assignment = data.assignment;
+      const res = await serverApi<
+        { assignment?: AssignmentRecord } | AssignmentRecord
+      >(`/assignments/${id}`);
+
+      assignment =
+        res && typeof res === "object" && "assignment" in res && res.assignment
+          ? res.assignment
+          : (res as AssignmentRecord);
     } catch {
       assignment = null;
+    }
+  }
+
+  // Fallback: Check tester's active assignments to find matching project or assignment
+  if (!assignment) {
+    try {
+      const myRes = await serverApi<{ assignments?: AssignmentRecord[] } | AssignmentRecord[]>("/assignments/me");
+      const list: AssignmentRecord[] = Array.isArray(myRes)
+        ? myRes
+        : Array.isArray(myRes?.assignments)
+        ? myRes.assignments
+        : [];
+
+      const found = list.find(
+        (a) =>
+          a._id === id ||
+          a.projectId?._id === id ||
+          a.projectId?.appDetails?.appName?.toLowerCase() === id.toLowerCase() ||
+          Boolean(a.projectId?.appDetails?.appName?.toLowerCase()?.includes(id.toLowerCase())),
+      );
+      if (found) {
+        assignment = found;
+      }
+    } catch {
+      // Ignore fallback error
     }
   }
 
@@ -41,12 +62,17 @@ export default async function TestDetailPage({
     facebook: "Facebook",
   };
 
-  const initialStep = id === "deloitte" ? 2 : 1;
+  const appName =
+    assignment?.projectId?.appDetails?.appName ||
+    appNames[id.toLowerCase()] ||
+    "Android App";
+
+  const initialStep = assignment?.currentStep ?? 1;
 
   return (
     <StepTestingView
       id={id}
-      appName={appNames[id.toLowerCase()]}
+      appName={appName}
       initialStep={initialStep}
       assignment={assignment}
     />

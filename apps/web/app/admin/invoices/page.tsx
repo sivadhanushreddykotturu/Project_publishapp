@@ -20,8 +20,9 @@ interface AdminInvoiceRow {
 export default async function AdminInvoices() {
   let invoices: AdminInvoiceRow[] = [];
   try {
-    const data = await serverApi<{ invoices: AdminInvoiceRow[] }>("/invoices");
-    invoices = data.invoices;
+    // Backend returns flat array (api.ts unwraps { data: [] }).
+    const data = await serverApi<AdminInvoiceRow[]>("/invoices?limit=100");
+    invoices = Array.isArray(data) ? data : [];
   } catch {
     invoices = [];
   }

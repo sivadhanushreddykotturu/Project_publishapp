@@ -20,8 +20,9 @@ interface EmailRow {
 export default async function AdminNotificationsPage() {
   let emails: EmailRow[] = [];
   try {
-    const data = await serverApi<{ notifications: EmailRow[] }>("/notifications");
-    emails = data.notifications;
+    // Backend returns flat array (api.ts unwraps { data: [] }).
+    const data = await serverApi<EmailRow[]>("/notifications?limit=50");
+    emails = Array.isArray(data) ? data : [];
   } catch {
     emails = [];
   }

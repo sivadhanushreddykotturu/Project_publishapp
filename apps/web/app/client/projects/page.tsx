@@ -21,8 +21,15 @@ interface ProjectRow {
 export default async function ClientProjects() {
   let projects: ProjectRow[] = [];
   try {
-    const data = await serverApi<{ projects: ProjectRow[] }>("/projects/me");
-    projects = data.projects;
+    const data = await serverApi<{ projects?: ProjectRow[] } | ProjectRow[]>("/projects/me").catch(
+      () => serverApi<{ projects?: ProjectRow[] } | ProjectRow[]>("/projects?limit=100"),
+    );
+    projects =
+      data && typeof data === "object" && "projects" in data && Array.isArray(data.projects)
+        ? data.projects
+        : Array.isArray(data)
+        ? data
+        : [];
   } catch {
     projects = [];
   }

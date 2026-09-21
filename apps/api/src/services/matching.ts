@@ -43,6 +43,18 @@ export async function joinProject(
   });
   if (existing) return { assignment: existing, queued: existing.status === "queued" };
 
+  // Enforce maximum 3 active tests per tester
+  const activeCount = await Assignment.countDocuments({
+    testerId: tester._id,
+    status: "active",
+  });
+  if (activeCount >= 3) {
+    throw conflict(
+      "You have reached the maximum limit of 3 active tests. Complete an ongoing test before joining another.",
+      "ACTIVE_LIMIT_REACHED",
+    );
+  }
+
   // 1. try to claim an active slot atomically
   const claimed = await Project.findOneAndUpdate(
     {

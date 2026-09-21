@@ -14,6 +14,18 @@ interface DeviceRow {
   fingerprint: string;
 }
 
+const ANDROID_VERSIONS = [
+  "Android 16",
+  "Android 15",
+  "Android 14",
+  "Android 13",
+  "Android 12",
+  "Android 11",
+  "Android 10",
+  "Android 9",
+  "Android 8",
+];
+
 /**
  * First-run tester setup — devices + UPI are collected before the dashboard
  * unlocks. Everything here stays editable later in Profile.
@@ -23,7 +35,7 @@ export function TesterSetup() {
   const { getToken } = useAuth();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [devices, setDevices] = useState<DeviceRow[]>([
-    { platform: "android", model: "", osVersion: "", fingerprint: "" },
+    { platform: "android", model: "", osVersion: "Android 14", fingerprint: "" },
   ]);
   const [vpa, setVpa] = useState("");
   const [experienceLevel, setExperienceLevel] = useState("beginner");
@@ -107,7 +119,7 @@ export function TesterSetup() {
                   placeholder="e.g. Pixel 8a or Galaxy S23"
                   className="min-w-[130px] flex-1 rounded-2xl border border-black/10 px-4 py-3 text-[14px] outline-none placeholder:text-ink-400 focus:border-ink-950"
                 />
-                <input
+                <select
                   value={d.osVersion}
                   onChange={(e) =>
                     setDevices((ds) =>
@@ -116,9 +128,14 @@ export function TesterSetup() {
                       ),
                     )
                   }
-                  placeholder="e.g. Android 14"
-                  className="w-[120px] rounded-2xl border border-black/10 px-4 py-3 text-[14px] outline-none placeholder:text-ink-400 focus:border-ink-950"
-                />
+                  className="w-[140px] rounded-2xl border border-black/10 bg-white px-4 py-3 text-[14px] font-medium outline-none cursor-pointer focus:border-ink-950"
+                >
+                  {ANDROID_VERSIONS.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
                 {devices.length > 1 && (
                   <button
                     type="button"
@@ -139,7 +156,7 @@ export function TesterSetup() {
               onClick={() =>
                 setDevices((ds) => [
                   ...ds,
-                  { platform: "android", model: "", osVersion: "", fingerprint: "" },
+                  { platform: "android", model: "", osVersion: "Android 14", fingerprint: "" },
                 ])
               }
               className="mt-4 inline-flex items-center gap-2 text-[13.5px] font-semibold text-ink-800 hover:text-orange-500"

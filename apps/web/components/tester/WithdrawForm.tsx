@@ -48,7 +48,7 @@ export function WithdrawForm({
       await api("/wallet/withdrawals", {
         token,
         method: "POST",
-        body: { amountPaise },
+        body: { amount: amountPaise }, // backend expects { amount } in paise
       });
       setDone(true);
       setAmount("");

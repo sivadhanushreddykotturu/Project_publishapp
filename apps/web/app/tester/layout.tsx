@@ -15,19 +15,29 @@ export default async function TesterLayout({
   if (!session) redirect("/sign-in");
   if (session.role !== "tester") redirect(roleHome(session.role));
 
-    // First-run gate: at least one device is required before the dashboard unlocks
     let needsSetup = false;
+    let initialDevice: { model: string; osVersion: string } | null = null;
     try {
       const data = await serverApi<{
-        tester: { devices?: unknown[]; upi?: { vpa?: string } };
+        tester?: { devices?: Array<{ model: string; osVersion?: string; androidVersion?: string }>; upi?: { vpa?: string } };
+        devices?: Array<{ model: string; osVersion?: string; androidVersion?: string }>;
+        upi?: { vpa?: string };
       }>("/testers/me");
-      needsSetup = (data.tester.devices?.length ?? 0) === 0;
+      const profile = data && "tester" in data && data.tester ? data.tester : data;
+      needsSetup = (profile?.devices?.length ?? 0) === 0;
+      const first = profile?.devices?.[0];
+      if (first) {
+        initialDevice = {
+          model: first.model,
+          osVersion: first.osVersion || first.androidVersion || "Android 14",
+        };
+      }
     } catch {
       // API hiccup — fail open; individual pages handle their own errors
     }
 
   return (
-    <DashboardShell role="tester">
+    <DashboardShell role="tester" initialDevice={initialDevice}>
       {needsSetup ? <TesterSetup /> : children}
     </DashboardShell>
   );

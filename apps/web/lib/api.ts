@@ -17,7 +17,7 @@ interface ApiOptions {
   body?: unknown;
 }
 
-/** Typed client for the DefineUX API. Pass a Clerk session token. */
+/** Typed client for the LaunchOps backend API. Pass a Clerk session token. */
 export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: opts.method ?? "GET",
@@ -29,18 +29,23 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     cache: "no-store",
   });
 
-  const json = (await res.json().catch(() => null)) as
-    | { ok: true; data: T }
-    | { ok: false; error: { code: string; message: string } }
-    | null;
+  const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
 
-  if (!res.ok || !json || json.ok === false) {
-    const err = json && json.ok === false ? json.error : null;
-    throw new ApiClientError(
-      res.status,
-      err?.code ?? "UNKNOWN",
-      err?.message ?? `Request failed (${res.status})`,
-    );
+  if (!res.ok) {
+    // Handle backend error shapes: { error: { code, message } } or { message }
+    const errObj = json?.error as { code?: string; message?: string } | null | undefined;
+    const errMsg =
+      errObj?.message ??
+      (typeof json?.message === "string" ? json.message : null) ??
+      `Request failed (${res.status})`;
+    const errCode = errObj?.code ?? "UNKNOWN";
+    throw new ApiClientError(res.status, errCode, errMsg);
   }
-  return json.data;
+
+  // The LaunchOps backend returns { data: T } (not { ok: true, data: T }).
+  // Unwrap .data when present, otherwise return the raw payload.
+  if (json !== null && typeof json === "object" && "data" in json) {
+    return json.data as T;
+  }
+  return json as T;
 }

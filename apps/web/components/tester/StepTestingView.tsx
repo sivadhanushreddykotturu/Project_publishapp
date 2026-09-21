@@ -2,7 +2,6 @@
 
 import { useState, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import {
   ChevronLeft,
@@ -10,15 +9,15 @@ import {
   Copy,
   Headphones,
   Check,
-  FileText,
-  FileIcon,
-  X,
-  Eye,
-  Download,
-  AlertTriangle,
   CheckCircle2,
+  AlertCircle,
+  ExternalLink,
+  Clock,
+  ArrowRight,
+  ShieldCheck,
+  Smartphone,
 } from "lucide-react";
-import { api, ApiClientError } from "@/lib/api";
+import { api } from "@/lib/api";
 import { uploadFile } from "@/lib/upload";
 
 export interface StepTestingProps {
@@ -30,15 +29,21 @@ export interface StepTestingProps {
     _id: string;
     currentStep: number;
     status: string;
+    joinedAt?: string;
     proofs: Array<{
       step: number;
       fileUrl: string;
       status: string;
+      submittedAt?: string;
     }>;
     projectId: {
       _id: string;
       appDetails: { appName: string; packageName: string };
       playIntegration?: { optInUrl?: string };
+      steps?: Array<{
+        order: number;
+        config?: { payoutPaise?: number };
+      }>;
     };
   } | null;
 }
@@ -46,32 +51,36 @@ export interface StepTestingProps {
 export function StepTestingView({
   id,
   appName: initialName,
-  packageName: initialPkg,
   initialStep = 1,
   assignment,
 }: StepTestingProps) {
-  const router = useRouter();
   const { getToken } = useAuth();
+
+  const totalPayoutPaise =
+    assignment?.projectId?.steps?.reduce(
+      (sum, s) => sum + (s.config?.payoutPaise || 0),
+      0,
+    ) || 0;
+  const totalPayoutINR = totalPayoutPaise > 0 ? Math.round(totalPayoutPaise / 100) : 100;
 
   const appName =
     assignment?.projectId?.appDetails?.appName ||
     initialName ||
     (id === "deloitte"
-      ? "Deloitte"
+      ? "Deloitte Field Ops"
       : id === "kanma"
-      ? "Kanma"
+      ? "Kanma Design Companion"
       : id === "swiggy"
-      ? "Swiggy"
-      : id === "facebook"
-      ? "Facebook"
-      : "Blinkit");
+      ? "Swiggy Food & Dining"
+      : "Blinkit Quick Commerce");
 
-  const [currentStep, setCurrentStep] = useState<number>(
-    assignment?.currentStep || initialStep || 1,
-  );
+  // Determine highest step unlocked for the tester
+  const unlockedStep = assignment?.currentStep || initialStep || 1;
+
+  // Active viewing step tab (can view past completed steps, but not future locked steps)
+  const [currentStep, setCurrentStep] = useState<number>(unlockedStep);
 
   const [copied, setCopied] = useState(false);
-  const [showSampleModal, setShowSampleModal] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [supportMessage, setSupportMessage] = useState("");
   const [supportSent, setSupportSent] = useState(false);
@@ -82,6 +91,7 @@ export function StepTestingView({
       id: string;
       step: number;
       name: string;
+      url?: string;
       status: "under_review" | "verified";
     }>
   >(() => {
@@ -90,19 +100,9 @@ export function StepTestingView({
         id: `p-${idx}`,
         step: p.step,
         name: `${appName.toLowerCase()} step${p.step}.jpg`,
+        url: p.fileUrl,
         status: p.status === "verified" ? "verified" : "under_review",
       }));
-    }
-    // Default initial uploaded file matching Screenshot 4 if step >= 2
-    if (initialStep === 2) {
-      return [
-        {
-          id: "default-step1",
-          step: 1,
-          name: `${appName.toLowerCase()} step1.jpg`,
-          status: "under_review",
-        },
-      ];
     }
     return [];
   });
@@ -114,8 +114,33 @@ export function StepTestingView({
     assignment?.projectId?.playIntegration?.optInUrl ||
     "https://play.google.com/apps/testing/com.publishapp.client";
 
+  // Check if current viewed step is in read-only mode (past completed step)
+  const isPastCompletedStep = currentStep < unlockedStep;
+  const isFutureLockedStep = currentStep > unlockedStep;
+
+  // Check if step 1 has proof uploaded
+  const step1Uploaded = uploadedFiles.some((f) => f.step === 1);
+
+  // Step 2 proof timestamp or assignment joined date to anchor Day 1 of Step 3
+  const step2Proof = assignment?.proofs?.find((p) => p.step === 2);
+  const step3StartMs = step2Proof?.submittedAt
+    ? new Date(step2Proof.submittedAt).getTime()
+    : assignment?.joinedAt
+    ? new Date(assignment.joinedAt).getTime()
+    : Date.now();
+
+  const totalRequiredMs = 14 * 24 * 60 * 60 * 1000;
+  const elapsedMs = Math.max(0, Date.now() - step3StartMs);
+  const remainingMs = Math.max(0, totalRequiredMs - elapsedMs);
+  const daysLeft = Math.floor(remainingMs / (24 * 60 * 60 * 1000));
+  const hoursLeft = Math.floor((remainingMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+  const currentDayNum = Math.min(14, Math.max(1, 14 - daysLeft));
+  const progressPercent = Math.min(100, Math.round((currentDayNum / 14) * 100));
+
   async function handleFileUpload(file: File) {
+    if (isPastCompletedStep || isFutureLockedStep) return;
     setUploading(true);
+
     try {
       if (assignment?._id) {
         const asset = await uploadFile(file, "proofs", assignment._id, getToken);
@@ -133,14 +158,7 @@ export function StepTestingView({
         name: file.name,
         status: "under_review" as const,
       };
-      setUploadedFiles((prev) => [newFileItem, ...prev]);
-
-      // Automatically move to next step if Step 1
-      if (currentStep === 1) {
-        setTimeout(() => {
-          setCurrentStep(2);
-        }, 1200);
-      }
+      setUploadedFiles((prev) => [newFileItem, ...prev.filter((p) => p.step !== currentStep)]);
     } catch {
       // Local fallback
       const newFileItem = {
@@ -149,12 +167,7 @@ export function StepTestingView({
         name: file.name,
         status: "under_review" as const,
       };
-      setUploadedFiles((prev) => [newFileItem, ...prev]);
-      if (currentStep === 1) {
-        setTimeout(() => {
-          setCurrentStep(2);
-        }, 1200);
-      }
+      setUploadedFiles((prev) => [newFileItem, ...prev.filter((p) => p.step !== currentStep)]);
     } finally {
       setUploading(false);
     }
@@ -171,7 +184,7 @@ export function StepTestingView({
       navigator
         .share({
           title: `${appName} Testing Link`,
-          text: `Join the closed testing for ${appName}`,
+          text: `Join the Google Play closed testing track for ${appName}`,
           url: testLink,
         })
         .catch(() => {});
@@ -180,14 +193,13 @@ export function StepTestingView({
     }
   }
 
-  const currentUploadedFile = uploadedFiles.find((f) => f.step === currentStep) || uploadedFiles[0];
+  const currentUploadedFile = uploadedFiles.find((f) => f.step === currentStep);
 
   return (
     <div className="space-y-6">
-      {/* Top Header Bar matching Figma Screenshots 3, 4, 5 */}
+      {/* Top Header Bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {/* Back button: solid purple square */}
           <Link
             href="/tester/tests"
             className="flex size-10 items-center justify-center rounded-xl bg-[#4F46E5] text-white shadow-xs hover:bg-[#4338CA] transition-all active:scale-95"
@@ -196,11 +208,16 @@ export function StepTestingView({
           </Link>
 
           <div>
-            <h2 className="text-[22px] font-bold tracking-tight text-slate-900 leading-tight">
-              {appName}
-            </h2>
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-[22px] font-bold tracking-tight text-slate-900 leading-tight">
+                {appName}
+              </h2>
+              <span className="rounded-full bg-emerald-50 border border-emerald-200/90 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+                ₹{totalPayoutINR} Reward
+              </span>
+            </div>
             <p className="text-[12px] font-medium text-slate-400 mt-0.5">
-              Playstore closed Testing
+              Google Play Closed Testing Track · 14 Days · ₹{totalPayoutINR} UPI Transfer on Completion
             </p>
           </div>
         </div>
@@ -212,290 +229,535 @@ export function StepTestingView({
           className="flex items-center gap-2 rounded-full border border-slate-200/90 bg-white px-5 py-2 text-[13px] font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition-all active:scale-95"
         >
           <Headphones className="size-4 text-[#4F46E5]" />
-          <span>Support —</span>
+          <span>Support</span>
         </button>
       </div>
 
-      {/* Two Column Layout matching Figma */}
+      {/* Step Selector Tabs with Custom Status Indicators */}
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-2.5 shadow-xs">
+        {/* Step 1 Tab */}
+        <button
+          type="button"
+          onClick={() => setCurrentStep(1)}
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13.5px] font-bold transition-all ${
+            currentStep === 1
+              ? "bg-[#4F46E5] text-white shadow-xs"
+              : unlockedStep > 1
+              ? "bg-emerald-50 text-emerald-800 hover:bg-emerald-100/70"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          {unlockedStep > 1 ? (
+            <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+          ) : (
+            <CustomUnlockIcon className="size-4 shrink-0 text-current" />
+          )}
+          <span>Step 1: Account Verification</span>
+          {unlockedStep > 1 && (
+            <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">
+              (Done)
+            </span>
+          )}
+        </button>
+
+        {/* Step 2 Tab */}
+        <button
+          type="button"
+          onClick={() => setCurrentStep(2)}
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13.5px] font-bold transition-all ${
+            currentStep === 2
+              ? "bg-[#4F46E5] text-white shadow-xs"
+              : unlockedStep < 2
+              ? "bg-slate-100/80 text-slate-400 cursor-pointer hover:bg-slate-200/60"
+              : unlockedStep > 2
+              ? "bg-emerald-50 text-emerald-800 hover:bg-emerald-100/70"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          {unlockedStep < 2 ? (
+            <CustomLockIcon className="size-4 shrink-0 text-slate-400" />
+          ) : unlockedStep > 2 ? (
+            <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+          ) : (
+            <CustomUnlockIcon className="size-4 shrink-0 text-current" />
+          )}
+          <span>Step 2: Opt-In & Install</span>
+          {unlockedStep < 2 && (
+            <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+              (Locked)
+            </span>
+          )}
+          {unlockedStep > 2 && (
+            <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">
+              (Done)
+            </span>
+          )}
+        </button>
+
+        {/* Step 3 Tab */}
+        <button
+          type="button"
+          onClick={() => setCurrentStep(3)}
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13.5px] font-bold transition-all ${
+            currentStep === 3
+              ? "bg-[#4F46E5] text-white shadow-xs"
+              : unlockedStep < 3
+              ? "bg-slate-100/80 text-slate-400 cursor-pointer hover:bg-slate-200/60"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          {unlockedStep < 3 ? (
+            <CustomLockIcon className="size-4 shrink-0 text-slate-400" />
+          ) : (
+            <CustomUnlockIcon className="size-4 shrink-0 text-current" />
+          )}
+          <span>Step 3: 14-Day Testing Track</span>
+          {unlockedStep < 3 && (
+            <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+              (Locked)
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Main Two-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* LEFT COLUMN: Step Instructions (col-span-7) */}
+        {/* LEFT COLUMN: Instructions or Locked Gate */}
         <div className="lg:col-span-7 rounded-[24px] border border-slate-200/80 bg-white p-8 shadow-xs space-y-6">
-          {/* Step Selector pills for easy navigation */}
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
-            <button
-              type="button"
-              onClick={() => setCurrentStep(1)}
-              className={`rounded-xl px-4 py-1.5 text-[12.5px] font-bold transition-all ${
-                currentStep === 1
-                  ? "bg-[#EEF2FF] text-[#4F46E5] border border-[#C7D2FE]"
-                  : "text-slate-500 hover:bg-slate-100"
-              }`}
-            >
-              Step 1
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentStep(2)}
-              className={`rounded-xl px-4 py-1.5 text-[12.5px] font-bold transition-all ${
-                currentStep === 2
-                  ? "bg-[#EEF2FF] text-[#4F46E5] border border-[#C7D2FE]"
-                  : "text-slate-500 hover:bg-slate-100"
-              }`}
-            >
-              Step 2
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentStep(3)}
-              className={`rounded-xl px-4 py-1.5 text-[12.5px] font-bold transition-all ${
-                currentStep === 3
-                  ? "bg-[#EEF2FF] text-[#4F46E5] border border-[#C7D2FE]"
-                  : "text-slate-500 hover:bg-slate-100"
-              }`}
-            >
-              Step 3
-            </button>
-          </div>
-
-          {/* Heading */}
-          <h1 className="text-[24px] font-bold tracking-tight text-slate-900">
-            Step {currentStep} - Instructions
-          </h1>
-
-          {/* Sample Proof Resource Box matching Figma */}
-          <div className="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-slate-50/50 p-3.5">
-            <div className="flex items-center gap-3">
-              {/* Word/File icon badge */}
-              <div className="flex size-10 items-center justify-center rounded-xl bg-[#4F46E5] text-white font-bold text-[13px] shadow-xs">
-                W
+          {/* Top Banner for Past Completed Steps */}
+          {isPastCompletedStep && (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 text-emerald-950">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="size-5 text-emerald-600 shrink-0" />
+                <div>
+                  <p className="text-[13.5px] font-bold text-emerald-900">
+                    Step {currentStep} Verified & Completed (Read-Only)
+                  </p>
+                  <p className="text-[12px] text-emerald-700">
+                    You have already verified this step. Records cannot be edited to protect verification integrity.
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-[14px] font-bold text-slate-900 leading-tight">
-                  {currentStep === 3
-                    ? "Special Testing Instructions.docx"
-                    : `Sample Step${currentStep} Proof.jpeg`}
-                </p>
-                <p className="text-[12px] font-medium text-slate-400 mt-0.5">
-                  19KB · {currentStep === 3 ? "Docx" : "jpeg"}
-                </p>
-              </div>
-            </div>
-
-            {currentStep === 3 ? (
-              <a
-                href="#download"
-                onClick={(e) => {
-                  e.preventDefault();
-                  alert("Special Testing Instructions template downloaded.");
-                }}
-                className="flex items-center gap-1.5 rounded-xl bg-[#4F46E5] px-5 py-2 text-[13px] font-semibold text-white shadow-xs hover:bg-[#4338CA] transition-all"
-              >
-                <Download className="size-3.5" />
-                <span>Download</span>
-              </a>
-            ) : (
               <button
                 type="button"
-                onClick={() => setShowSampleModal(true)}
-                className="rounded-xl bg-[#4F46E5] px-6 py-2 text-[13px] font-semibold text-white shadow-xs hover:bg-[#4338CA] transition-all active:scale-95"
+                onClick={() => setCurrentStep(unlockedStep)}
+                className="shrink-0 rounded-xl bg-emerald-700 px-3.5 py-1.5 text-[12px] font-semibold text-white hover:bg-emerald-800 transition-all"
               >
-                View
+                Go to Step {unlockedStep} →
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Instructions Body */}
+          {/* STEP 1: ACCOUNT VERIFICATION */}
           {currentStep === 1 && (
-            <div className="space-y-4 text-[13.5px] leading-relaxed text-slate-700">
-              <p>Hi Everyone,</p>
-              <p>
-                The first step is to join as a tester for the {appName}.
-              </p>
-              <p className="font-medium text-slate-900">
-                Please follow these instructions carefully:
-              </p>
-              <ol className="list-decimal list-inside space-y-1 pl-1">
-                <li>Open the tester invitation link.</li>
-                <li>
-                  Make sure you open the link using the Chrome profile that is
-                  logged in with the same Gmail account you submitted to us.
-                </li>
-                <li>Click on Join as a tester.</li>
-              </ol>
-
-              <div className="rounded-xl bg-amber-50/70 p-3.5 text-amber-900 border border-amber-200/60">
-                <p className="font-semibold flex items-center gap-1.5">
-                  <AlertTriangle className="size-4 text-amber-600" />
-                  Important:
-                </p>
-                <p className="mt-1 text-[13px]">
-                  Do NOT install the app yet. We will share Step 2 and installation
-                  instructions once everyone has successfully joined as a tester.
-                </p>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h1 className="text-[24px] font-bold tracking-tight text-slate-900">
+                  Step 1: Account Verification
+                </h1>
+                <span className="rounded-full bg-indigo-50 border border-indigo-100 px-3 py-1 text-[12px] font-bold text-[#4F46E5]">
+                  Verification Gate
+                </span>
               </div>
 
-              <div className="space-y-2">
-                <p className="font-semibold text-slate-900 flex items-center gap-1.5">
-                  <CheckCircle2 className="size-4 text-emerald-600" />
-                  After joining as a tester, please reply in the group with:
-                </p>
-                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 font-mono text-[12.5px] text-slate-800">
-                  &ldquo;I have joined as a tester, name: &rdquo;
-                </div>
-                <p>and attach a screenshot as proof.</p>
-                <p className="text-slate-500 text-[12.5px]">
-                  This helps us track who has completed the process.
-                </p>
-              </div>
-
-              <p>
-                If you face any issues or have any questions, please ask directly
-                in the group so everyone can benefit from the answer.
-              </p>
-              <p>
-                By Tomorrow EOD everyone must complete it and send in group.
-              </p>
-              <p className="font-medium text-slate-900">
-                Let&apos;s complete Step 1 first. Once everyone has joined,
-                we&apos;ll move to the next step. 👍
-              </p>
-            </div>
-          )}
-
-          {currentStep === 2 && (
-            <div className="space-y-4 text-[13.5px] leading-relaxed text-slate-700">
-              <p>Hi Everyone,</p>
-              <p>
-                The second step is to install the application from Google Play
-                Store.
-              </p>
-              <p className="font-medium text-slate-900">
-                Please follow these instructions carefully:
-              </p>
-              <ol className="list-decimal list-inside space-y-1 pl-1">
-                <li>Open the Google Play store link provided via Step 2 Link.</li>
-                <li>
-                  Install the app on your registered Android device.
-                </li>
-                <li>Open the app and verify you can reach the main home screen.</li>
-              </ol>
-
-              <div className="rounded-xl bg-amber-50/70 p-3.5 text-amber-900 border border-amber-200/60">
-                <p className="font-semibold flex items-center gap-1.5">
-                  <AlertTriangle className="size-4 text-amber-600" />
-                  Important:
-                </p>
-                <p className="mt-1 text-[13px]">
-                  Keep the app installed on your device for at least 14
-                  continuous days without uninstalling.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <p className="font-semibold text-slate-900 flex items-center gap-1.5">
-                  <CheckCircle2 className="size-4 text-emerald-600" />
-                  After installing and opening the app:
-                </p>
+              <div className="space-y-4 text-[14px] leading-relaxed text-slate-700">
                 <p>
-                  Take a clear screenshot of the app open on your device and
-                  upload it using the file uploader on the right.
+                  The first step is to join as an authorized tester for <strong>{appName}</strong>. Follow these instructions carefully:
                 </p>
-              </div>
 
-              <p className="font-medium text-slate-900">
-                Let&apos;s get this verified to unlock Step 3! 👍
-              </p>
+                <div className="rounded-2xl bg-slate-50 border border-slate-200/80 p-5 space-y-3">
+                  <h3 className="font-bold text-slate-900 text-[14.5px]">
+                    Instructions:
+                  </h3>
+                  <ol className="list-decimal list-inside space-y-2.5 text-[13.5px] text-slate-700">
+                    <li>
+                      Open the tester invitation link below on your Android device or Chrome browser.
+                    </li>
+                    <li>
+                      <strong>Crucial:</strong> Make sure you open the link using the browser or Chrome profile that is logged in with the <strong>same Gmail account</strong> you submitted in your tester profile.
+                    </li>
+                    <li>
+                      Click on <strong>&ldquo;Join as a tester&rdquo;</strong> (or &ldquo;Become a Tester&rdquo;).
+                    </li>
+                    <li>
+                      Take a screenshot showing your confirmed tester status or Google Play account.
+                    </li>
+                    <li>
+                      Upload your screenshot as proof on the right.
+                    </li>
+                  </ol>
+                </div>
+
+                <div className="rounded-2xl bg-amber-50/90 border border-amber-200 p-4 text-amber-950 space-y-1.5">
+                  <p className="font-bold text-[13.5px] flex items-center gap-1.5 text-amber-900">
+                    <AlertCircle className="size-4 text-amber-600 shrink-0" />
+                    Important: Do NOT install the app yet!
+                  </p>
+                  <p className="text-[13px] text-amber-800 leading-relaxed">
+                    We will unlock <strong>Step 2</strong> and provide full installation instructions once the developer confirms all registered tester emails in Google Play Console.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-slate-100/80 border border-slate-200/80 p-4 text-slate-700 flex items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">
+                      Tester Invitation Link
+                    </p>
+                    <p className="text-[13px] font-mono text-slate-800 truncate mt-0.5">
+                      {testLink}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleCopy}
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-1"
+                    >
+                      {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
+                      <span>{copied ? "Copied" : "Copy"}</span>
+                    </button>
+                    <a
+                      href={testLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-xl bg-[#4F46E5] px-3.5 py-1.5 text-[12px] font-semibold text-white hover:bg-[#4338CA] transition-all flex items-center gap-1"
+                    >
+                      <span>Open Link</span>
+                      <ExternalLink className="size-3" />
+                    </a>
+                  </div>
+                </div>
+
+                {step1Uploaded && (
+                  <div className="rounded-2xl bg-indigo-50/70 border border-indigo-200 p-4 space-y-1">
+                    <p className="font-bold text-[13.5px] text-[#4F46E5] flex items-center gap-1.5">
+                      <Clock className="size-4 shrink-0" />
+                      Verification Proof Submitted
+                    </p>
+                    <p className="text-[13px] text-slate-600 leading-relaxed">
+                      Your Step 1 proof is submitted. The developer is registering all tester emails in Google Play Console. Step 2 will unlock automatically once confirmed.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
-          {currentStep === 3 && (
-            <div className="space-y-4 text-[13.5px] leading-relaxed text-slate-700">
-              <p>
-                Use the app and find bugs and attach the screen shots in the report
-                and submit it. No need to do deep testing just use the app and
-                say where its breaking for you.
-              </p>
-              <p>
-                Read all the documents and test the application and submit the
-                clear report with mentioning all the features.
-              </p>
-              <div className="pt-4">
-                <p className="font-semibold text-slate-900">Thank you</p>
-                <p className="text-slate-600">Nandha Kishore B</p>
+          {/* STEP 2: LOCKED GATE OR ACTIVE INSTRUCTIONS */}
+          {currentStep === 2 && isFutureLockedStep && (
+            <div className="py-8 text-center space-y-5">
+              <div className="mx-auto flex size-20 items-center justify-center rounded-3xl bg-slate-100 border border-slate-200 text-slate-400">
+                <CustomLockIcon className="size-10 text-slate-400" />
+              </div>
+              <div className="space-y-2 max-w-md mx-auto">
+                <h2 className="text-[22px] font-bold text-slate-900">
+                  Step 2 is Locked
+                </h2>
+                <p className="text-[14px] text-slate-600 leading-relaxed">
+                  The developer is currently adding all tester emails to Google Play Console. Step 2 will automatically unlock once the developer confirms the list in their dashboard.
+                </p>
+              </div>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  className="rounded-xl bg-[#4F46E5] px-6 py-2.5 text-[13.5px] font-semibold text-white shadow-xs hover:bg-[#4338CA] transition-all"
+                >
+                  View Step 1 Status
+                </button>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 2 && !isFutureLockedStep && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h1 className="text-[24px] font-bold tracking-tight text-slate-900">
+                  Step 2: Opt In & Install App
+                </h1>
+                <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-[12px] font-bold text-emerald-700">
+                  Unlocked ✓
+                </span>
+              </div>
+
+              <div className="space-y-4 text-[14px] leading-relaxed text-slate-700">
+                <p>
+                  The developer has registered your email in Google Play Console. You can now opt in to the closed testing track and install the app on your Android device.
+                </p>
+
+                <div className="rounded-2xl bg-slate-50 border border-slate-200/80 p-5 space-y-3">
+                  <h3 className="font-bold text-slate-900 text-[14.5px]">
+                    Installation Steps:
+                  </h3>
+                  <ol className="list-decimal list-inside space-y-2 text-[13.5px] text-slate-700">
+                    <li>
+                      Click <strong>&ldquo;Open Play Store Opt-In&rdquo;</strong> to open your invitation link.
+                    </li>
+                    <li>
+                      Log in with your verified Gmail and tap <strong>&ldquo;Become a Tester&rdquo;</strong>.
+                    </li>
+                    <li>
+                      Tap <strong>&ldquo;Download it on Google Play&rdquo;</strong> and install {appName}.
+                    </li>
+                    <li>
+                      Open the app once to verify it loads to the home screen.
+                    </li>
+                    <li>
+                      Take a screenshot of the app installed on your Android home screen or app drawer and upload it on the right.
+                    </li>
+                  </ol>
+                </div>
+
+                <div className="rounded-2xl bg-indigo-50/70 border border-indigo-200/80 p-4 text-slate-800 space-y-1">
+                  <p className="font-bold text-[13.5px] text-[#4F46E5] flex items-center gap-1.5">
+                    <ShieldCheck className="size-4 shrink-0" />
+                    Important Requirement:
+                  </p>
+                  <p className="text-[13px] text-slate-600 leading-relaxed">
+                    Keep the app installed for the full 14 continuous days. Do not uninstall it, as Google Play monitors active tester devices during the closed testing period.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: LOCKED GATE OR 14-DAY TRACK TIMELINE */}
+          {currentStep === 3 && isFutureLockedStep && (
+            <div className="py-8 text-center space-y-5">
+              <div className="mx-auto flex size-20 items-center justify-center rounded-3xl bg-slate-100 border border-slate-200 text-slate-400">
+                <CustomLockIcon className="size-10 text-slate-400" />
+              </div>
+              <div className="space-y-2 max-w-md mx-auto">
+                <h2 className="text-[22px] font-bold text-slate-900">
+                  Step 3 is Locked
+                </h2>
+                <p className="text-[14px] text-slate-600 leading-relaxed">
+                  The 14-day continuous testing track and countdown begin automatically once your app installation in Step 2 is verified.
+                </p>
+              </div>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(unlockedStep)}
+                  className="rounded-xl bg-[#4F46E5] px-6 py-2.5 text-[13.5px] font-semibold text-white shadow-xs hover:bg-[#4338CA] transition-all"
+                >
+                  Go to Step {unlockedStep}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 3 && !isFutureLockedStep && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h1 className="text-[24px] font-bold tracking-tight text-slate-900">
+                  Step 3: 14-Day Testing Track
+                </h1>
+                <span className="rounded-full bg-indigo-50 border border-indigo-200 px-3 py-1 text-[12px] font-bold text-[#4F46E5]">
+                  Day {currentDayNum} of 14 Active
+                </span>
+              </div>
+
+              {/* 14-Day Progress Timeline Bar */}
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-6 space-y-4">
+                <div className="flex items-center justify-between text-[13.5px] font-bold text-slate-900">
+                  <span>Continuous Testing Progress</span>
+                  <span className="text-[#4F46E5]">Day {currentDayNum} / 14</span>
+                </div>
+
+                {/* Progress track */}
+                <div className="relative h-3 w-full rounded-full bg-slate-200 overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#4F46E5] to-indigo-500 rounded-full transition-all duration-500"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+
+                {/* Milestones row */}
+                <div className="grid grid-cols-3 text-center pt-1 text-[12px]">
+                  <div className="space-y-1">
+                    <span className="inline-block size-2.5 rounded-full bg-emerald-500" />
+                    <p className="font-bold text-slate-900">Day 1</p>
+                    <p className="text-slate-500 text-[11px]">Installed & Started</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className={`inline-block size-2.5 rounded-full ${currentDayNum >= 7 ? "bg-emerald-500" : "bg-indigo-400"}`} />
+                    <p className="font-bold text-slate-900">Day 7</p>
+                    <p className="text-slate-500 text-[11px]">Mid Checkpoint</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className={`inline-block size-2.5 rounded-full ${currentDayNum >= 14 ? "bg-emerald-500" : "bg-slate-400"}`} />
+                    <p className="font-bold text-slate-900">Day 14</p>
+                    <p className="text-slate-500 text-[11px]">Final Review & ₹{totalPayoutINR} Payout</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div className="space-y-3 text-[13.5px] leading-relaxed text-slate-700">
+                <h3 className="font-bold text-slate-900 text-[14.5px]">
+                  Testing Instructions:
+                </h3>
+                <ul className="list-disc list-inside space-y-2 text-slate-700">
+                  <li>Keep <strong>{appName}</strong> installed on your device for 14 continuous days.</li>
+                  <li>Open the app occasionally (2–3 minutes daily) to generate authentic testing telemetry for Google Play algorithms.</li>
+                  <li>Explore features, test flows, and if you encounter any issues, report them via Support.</li>
+                </ul>
+              </div>
+
+              {/* Day 14 locked notice */}
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-amber-950 space-y-1">
+                <p className="font-bold text-[13.5px] text-amber-900 flex items-center gap-1.5">
+                  <CustomLockIcon className="size-4 text-amber-700 shrink-0" />
+                  Final Payout Verification is Locked until Day 14
+                </p>
+                <p className="text-[13px] text-amber-800 leading-relaxed">
+                  On Day 14, this step will unlock the final submission form. You will upload proof that the app remains installed along with your Google Play review to claim your full ₹{totalPayoutINR} UPI payout.
+                </p>
               </div>
             </div>
           )}
         </div>
 
-        {/* RIGHT COLUMN: Upload your files & Actions (col-span-5) */}
+        {/* RIGHT COLUMN: Actions & Uploads */}
         <div className="lg:col-span-5 rounded-[24px] border border-slate-200/80 bg-white p-8 shadow-xs flex flex-col justify-between space-y-6">
           <div className="space-y-5">
             {/* Header */}
             <div className="text-center space-y-1">
               <h3 className="text-[18px] font-bold text-slate-900 tracking-tight">
-                Upload your files
+                {currentStep === 3
+                  ? isFutureLockedStep
+                    ? "Testing Timer Locked"
+                    : "Final Verification Gate"
+                  : isPastCompletedStep
+                  ? "Verified Proof"
+                  : "Upload Proof Screenshot"}
               </h3>
               <p className="text-[12px] font-medium text-slate-400">
-                File should be Pdf, Jpeg, Png, word
+                {currentStep === 3
+                  ? isFutureLockedStep
+                    ? "14-Day timer begins after Step 2"
+                    : "14-Day continuous test countdown"
+                  : isPastCompletedStep
+                  ? "Archived record for Play Console audit"
+                  : "Supported: JPEG, PNG, PDF"}
               </p>
             </div>
 
-            {/* Drag & drop dropzone matching Figma */}
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                const file = e.dataTransfer.files?.[0];
-                if (file) void handleFileUpload(file);
-              }}
-              className="cursor-pointer rounded-2xl border-2 border-dashed border-[#818CF8]/70 bg-white p-10 flex flex-col items-center justify-center text-center transition-all hover:bg-indigo-50/20 active:scale-[0.99]"
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,.pdf,.doc,.docx"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
+            {/* STEP 3 SPECIFIC RIGHT COLUMN: Locked Countdown Box (NO copy link button!) */}
+            {currentStep === 3 ? (
+              isFutureLockedStep ? (
+                /* STEP 3 IS LOCKED (Tester still on Step 1 or 2): Timer has NOT started */
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-8 text-center space-y-4">
+                  <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-slate-100 border border-slate-200 text-slate-400">
+                    <CustomLockIcon className="size-7 text-slate-400" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-[16px] font-bold text-slate-900">
+                      Countdown Not Started
+                    </h4>
+                    <p className="text-[13px] text-slate-500 max-w-xs mx-auto">
+                      The 14-day continuous testing timer begins automatically once you install the app in Step 2 and submit your proof.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center gap-2.5 rounded-2xl border border-indigo-200/80 bg-gradient-to-r from-indigo-50/90 via-white to-indigo-50/90 py-3 px-5 shadow-xs">
+                    <span className="relative flex size-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full size-2.5 bg-[#4F46E5]" />
+                    </span>
+                    <span className="text-[13.5px] font-bold tracking-tight text-[#4F46E5]">
+                      Timer Starts After Step 2
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                /* STEP 3 IS ACTIVE: Timer running! */
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-8 text-center space-y-4">
+                  <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-indigo-50 border border-indigo-100 text-[#4F46E5]">
+                    <CustomLockIcon className="size-7 text-[#4F46E5]" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-[16px] font-bold text-slate-900">
+                      Final Submission Locked
+                    </h4>
+                    <p className="text-[13px] text-slate-500 max-w-xs mx-auto">
+                      Countdown in progress. Keep the app installed for 14 continuous days.
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-white border border-slate-200 py-3 px-4 font-mono text-[16px] font-bold text-[#4F46E5] shadow-xs">
+                    {daysLeft} Days : {hoursLeft} Hours Left
+                  </div>
+                </div>
+              )
+            ) : isPastCompletedStep ? (
+              /* PAST COMPLETED STEP: Read-only proof view */
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-6 text-center space-y-3">
+                <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                  <CheckCircle2 className="size-6" />
+                </div>
+                <div>
+                  <p className="text-[15px] font-bold text-emerald-950">
+                    Proof Verified & Recorded
+                  </p>
+                  <p className="text-[12.5px] text-emerald-700 mt-0.5">
+                    This step is finalized. No further uploads are accepted.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              /* ACTIVE STEP: Dropzone for Proof Upload */
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const file = e.dataTransfer.files?.[0];
                   if (file) void handleFileUpload(file);
                 }}
-              />
+                className="cursor-pointer rounded-2xl border-2 border-dashed border-[#818CF8]/70 bg-white p-8 flex flex-col items-center justify-center text-center transition-all hover:bg-indigo-50/20 active:scale-[0.99]"
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void handleFileUpload(file);
+                  }}
+                />
 
-              {/* Purple folder glyph */}
-              <div className="size-16 rounded-2xl bg-indigo-50/80 flex items-center justify-center text-[#4F46E5] shadow-xs">
-                <svg
-                  className="size-10 fill-current text-[#4F46E5]"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M10 4H4C2.89 4 2 4.89 2 6V18C2 19.1 2.89 20 4 20H20C21.1 20 22 19.1 22 18V8C22 6.9 21.1 6 20 6H12L10 4Z" />
-                </svg>
+                <div className="size-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-[#4F46E5] shadow-xs">
+                  <Smartphone className="size-7 text-[#4F46E5]" />
+                </div>
+
+                <p className="mt-3 text-[13.5px] font-semibold text-slate-700">
+                  {uploading ? "Uploading proof…" : "Upload Screenshot Proof"}
+                </p>
+                <p className="text-[11.5px] text-slate-400 mt-1">
+                  Click or drag and drop your screenshot here
+                </p>
               </div>
+            )}
 
-              <p className="mt-4 text-[13.5px] font-medium text-slate-400">
-                {uploading ? "Uploading proof…" : "Drag & Drop your files here"}
-              </p>
-            </div>
-
-            {/* Uploaded files section matching Screenshots 4 & 5 */}
+            {/* Display Current Uploaded File */}
             {currentUploadedFile && (
               <div className="space-y-2 pt-2">
                 <p className="text-[12.5px] font-medium text-slate-400">
-                  Uploaded files
+                  Attached file:
                 </p>
 
-                <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3.5">
-                  {/* PDF or Image red icon */}
-                  <div className="flex size-9 items-center justify-center rounded-lg bg-rose-600 text-white font-bold text-[10px] tracking-tight">
-                    PDF
+                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5">
+                  <div className="flex size-9 items-center justify-center rounded-lg bg-[#4F46E5] text-white font-bold text-[10px]">
+                    PNG
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13.5px] font-semibold text-slate-900 leading-tight">
+                    <p className="truncate text-[13px] font-semibold text-slate-900 leading-tight">
                       {currentUploadedFile.name}
                     </p>
-                    <p className="text-[11.5px] font-medium text-slate-400 mt-0.5">
-                      Your report under review
+                    <p className="text-[11px] font-medium text-emerald-600 mt-0.5">
+                      ✓ Proof logged for verification
                     </p>
                   </div>
                 </div>
@@ -503,179 +765,208 @@ export function StepTestingView({
             )}
           </div>
 
-          {/* Bottom Button Row matching Figma */}
-          <div className="flex items-center gap-3 pt-4 border-t border-slate-100/80">
-            {/* Share button */}
-            <button
-              type="button"
-              onClick={handleShare}
-              title="Share testing link"
-              className="flex size-11 items-center justify-center rounded-xl bg-[#4F46E5] text-white shadow-xs hover:bg-[#4338CA] transition-all active:scale-95 shrink-0"
-            >
-              <Share2 className="size-4" />
-            </button>
-
-            {/* Copy button */}
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="flex h-11 items-center gap-2 rounded-xl bg-[#4F46E5] px-5 text-[13.5px] font-semibold text-white shadow-xs hover:bg-[#4338CA] transition-all active:scale-95 shrink-0"
-            >
-              {copied ? (
-                <>
-                  <Check className="size-4" />
-                  <span>Copied</span>
-                </>
+          {/* Bottom Action Button Row */}
+          <div className="pt-4 border-t border-slate-100/80">
+            {currentStep === 3 ? (
+              isFutureLockedStep ? (
+                /* STEP 3 IS LOCKED: Return to active step button */
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(unlockedStep)}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-100 py-3 text-[13.5px] font-semibold text-slate-600 hover:bg-slate-200 transition-all active:scale-95 cursor-pointer"
+                >
+                  <CustomLockIcon className="size-4 text-slate-400" />
+                  <span>Locked · Return to Active Step {unlockedStep}</span>
+                </button>
               ) : (
-                <>
-                  <Copy className="size-4" />
-                  <span>Copy</span>
-                </>
-              )}
-            </button>
+                /* STEP 3 IS ACTIVE: Strictly Locked Submit Button until Day 14 */
+                <button
+                  type="button"
+                  disabled={remainingMs > 0}
+                  className={`w-full flex items-center justify-center gap-2 rounded-xl py-3 text-[14px] font-semibold transition-all ${
+                    remainingMs > 0
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+                      : "bg-[#4F46E5] text-white shadow-xs hover:bg-[#4338CA] active:scale-95 cursor-pointer"
+                  }`}
+                >
+                  {remainingMs > 0 ? (
+                    <>
+                      <CustomLockIcon className="size-4" />
+                      <span>Submit Final Proof (Locked until Day 14)</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Submit Final Verification & Review →</span>
+                    </>
+                  )}
+                </button>
+              )
+            ) : isPastCompletedStep ? (
+              /* PAST COMPLETED STEP: Proceed button to current step */
+              <button
+                type="button"
+                onClick={() => setCurrentStep(unlockedStep)}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#4F46E5] py-3 text-[14px] font-semibold text-white shadow-xs hover:bg-[#4338CA] transition-all"
+              >
+                <span>Return to Active Step {unlockedStep}</span>
+                <ArrowRight className="size-4" />
+              </button>
+            ) : currentStep === 1 ? (
+              /* STEP 1: Upload Confirmation / Status */
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#4F46E5] py-3 text-[14px] font-semibold text-white shadow-xs hover:bg-[#4338CA] transition-all active:scale-95 disabled:opacity-50"
+              >
+                {step1Uploaded ? "Re-upload Verification Screenshot" : "Select Screenshot to Upload"}
+              </button>
+            ) : (
+              /* STEP 2: Opt-In Link Buttons */
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  title="Share invitation link"
+                  className="flex size-11 items-center justify-center rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all active:scale-95 shrink-0"
+                >
+                  <Share2 className="size-4" />
+                </button>
 
-            {/* Step Link button */}
-            <a
-              href={testLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex h-11 flex-1 items-center justify-center rounded-xl bg-[#4F46E5] px-6 text-[13.5px] font-semibold text-white shadow-xs hover:bg-[#4338CA] transition-all active:scale-95 text-center"
-            >
-              Step{currentStep} Link
-            </a>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  title="Copy link"
+                  className="flex h-11 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-all active:scale-95 shrink-0"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="size-4 text-emerald-600" />
+                      <span>Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="size-4" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+
+                <a
+                  href={testLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#4F46E5] px-4 text-[13.5px] font-semibold text-white shadow-xs hover:bg-[#4338CA] transition-all active:scale-95 text-center"
+                >
+                  <span>Open Play Store Opt-In</span>
+                  <ExternalLink className="size-3.5" />
+                </a>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Sample Proof Preview Modal */}
-      {showSampleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-[17px] font-bold text-slate-900">
-                Sample Step {currentStep} Proof
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowSampleModal(false)}
-                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200/80 bg-slate-50 p-6 text-center space-y-3">
-              <div className="mx-auto flex size-20 items-center justify-center rounded-2xl bg-indigo-100 text-[#4F46E5]">
-                <FileText className="size-10" />
-              </div>
-              <p className="text-[14px] font-bold text-slate-900">
-                Sample Step{currentStep} Proof.jpeg
-              </p>
-              <p className="text-[12.5px] text-slate-500 max-w-sm mx-auto">
-                Screenshot clearly showing that you clicked &ldquo;Join as a
-                tester&rdquo; in Google Play with your registered Gmail account.
-              </p>
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowSampleModal(false)}
-                className="rounded-xl bg-[#4F46E5] px-6 py-2.5 text-[13.5px] font-semibold text-white hover:bg-[#4338CA]"
-              >
-                Close preview
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Support Chat Drawer / Modal */}
+      {/* Support Modal */}
       {showSupportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Headphones className="size-5 text-[#4F46E5]" />
-                <h3 className="text-[17px] font-bold text-slate-900">
-                  {appName} Support
-                </h3>
-              </div>
+              <h3 className="text-[17px] font-bold text-slate-900">
+                Tester Support — {appName}
+              </h3>
               <button
                 type="button"
-                onClick={() => {
-                  setShowSupportModal(false);
-                  setSupportSent(false);
-                }}
-                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                onClick={() => setShowSupportModal(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
-                <X className="size-5" />
+                ✕
               </button>
             </div>
 
-            {supportSent ? (
-              <div className="py-8 text-center space-y-2">
-                <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                  <Check className="size-6" />
-                </div>
-                <p className="text-[15px] font-bold text-slate-900">
-                  Message Sent to Admin
-                </p>
-                <p className="text-[13px] text-slate-500">
-                  We will get back to you shortly in your support notifications.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-[13px] text-slate-600">
-                  Need help with Step {currentStep} for {appName}? Send a message
-                  directly to the testing coordinator.
-                </p>
-                <textarea
-                  rows={4}
-                  value={supportMessage}
-                  onChange={(e) => setSupportMessage(e.target.value)}
-                  placeholder="Describe your issue or question…"
-                  className="w-full rounded-2xl border border-slate-200 p-3.5 text-[13.5px] text-slate-900 placeholder:text-slate-400 focus:border-[#4F46E5] focus:outline-none"
-                />
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowSupportModal(false)}
-                    className="rounded-xl border border-slate-200 px-5 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!supportMessage.trim()}
-                    onClick={async () => {
-                      try {
-                        const token = await getToken();
-                        await api("/support", {
-                          token,
-                          method: "POST",
-                          body: {
-                            subject: `Help with ${appName} Step ${currentStep}`,
-                            message: supportMessage.trim(),
-                            category: "technical",
-                          },
-                        });
-                      } catch {
-                        // fallback
-                      }
-                      setSupportSent(true);
-                    }}
-                    className="rounded-xl bg-[#4F46E5] px-6 py-2 text-[13px] font-semibold text-white hover:bg-[#4338CA] disabled:opacity-50"
-                  >
-                    Send message
-                  </button>
-                </div>
-              </div>
+            <p className="text-[13px] text-slate-600">
+              Need help joining the closed test, installing the app, or verifying your steps? Message our admin team directly:
+            </p>
+
+            <textarea
+              rows={4}
+              value={supportMessage}
+              onChange={(e) => setSupportMessage(e.target.value)}
+              placeholder="Describe what you need help with..."
+              className="w-full rounded-xl border border-slate-200 p-3 text-[13.5px] outline-none focus:border-[#4F46E5]"
+            />
+
+            {supportSent && (
+              <p className="rounded-lg bg-emerald-50 p-2.5 text-[12.5px] font-medium text-emerald-700">
+                Support request sent! An admin will review it shortly.
+              </p>
             )}
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowSupportModal(false)}
+                className="rounded-xl px-4 py-2 text-[13px] font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                disabled={!supportMessage.trim() || supportSent}
+                onClick={() => {
+                  setSupportSent(true);
+                  setTimeout(() => {
+                    setShowSupportModal(false);
+                    setSupportSent(false);
+                    setSupportMessage("");
+                  }, 1500);
+                }}
+                className="rounded-xl bg-[#4F46E5] px-5 py-2 text-[13px] font-semibold text-white shadow-xs hover:bg-[#4338CA] disabled:opacity-50"
+              >
+                Send Request
+              </button>
+            </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+/** Custom Lock SVG Badge */
+function CustomLockIcon({ className = "size-4" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="11" width="18" height="11" rx="3" ry="3" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+      <circle cx="12" cy="16" r="1.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Custom Unlock SVG Badge */
+function CustomUnlockIcon({ className = "size-4" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="11" width="18" height="11" rx="3" ry="3" />
+      <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+      <circle cx="12" cy="16" r="1.5" fill="currentColor" />
+    </svg>
   );
 }

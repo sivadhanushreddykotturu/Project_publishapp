@@ -7,8 +7,12 @@ export const dynamic = "force-dynamic";
 export default async function MyTestsPage() {
   let assignments: TesterAssignment[] = [];
   try {
-    const data = await serverApi<{ assignments: TesterAssignment[] }>("/assignments/me");
-    assignments = data.assignments;
+    const data = await serverApi<{ assignments?: TesterAssignment[] } | TesterAssignment[]>("/assignments/me");
+    assignments = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.assignments)
+      ? data.assignments
+      : [];
   } catch {
     assignments = [];
   }

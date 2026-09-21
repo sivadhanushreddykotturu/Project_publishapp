@@ -84,7 +84,7 @@ export function Features() {
 
           <div className="grid gap-5 md:grid-cols-3">
             {/* Android Closed Testing */}
-            <div className="rounded-[22px] border-2 border-ink-950 bg-white p-6 shadow-sm">
+            <div className="flex flex-col rounded-[22px] border-2 border-ink-950 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="grid size-10 place-items-center rounded-xl bg-lime-300 text-ink-950">
                   <Smartphone className="size-5" />
@@ -93,7 +93,24 @@ export function Features() {
                   <CheckCircle2 className="size-3.5" /> Auto-Publish
                 </span>
               </div>
-              <h4 className="mt-4 text-[18px] font-bold text-ink-950">
+              
+              <div className="my-6 flex justify-center">
+                <div className="relative h-28 w-28 md:h-32 md:w-32 overflow-hidden rounded-2xl">
+                  <video
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="h-full w-full object-contain pointer-events-none"
+                  >
+                    <source src="/headphone-bot-av1.mp4" type="video/mp4; codecs=av01.0.05M.08" />
+                    <source src="/headphone-bot-vp9.webm" type="video/webm; codecs=vp9" />
+                    <source src="/headphone-bot-h264.mp4" type="video/mp4" />
+                  </video>
+                </div>
+              </div>
+
+              <h4 className="mt-auto text-[18px] font-bold text-ink-950">
                 Play Store Closed Testing
               </h4>
               <p className="mt-1.5 text-[13.5px] leading-snug text-ink-500">
@@ -102,7 +119,7 @@ export function Features() {
             </div>
 
             {/* iOS App Testing */}
-            <div className="rounded-[22px] border border-black/10 bg-white p-6 shadow-sm">
+            <div className="flex flex-col rounded-[22px] border border-black/10 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="grid size-10 place-items-center rounded-xl bg-blue-100 text-blue-800">
                   <Apple className="size-5" />
@@ -111,7 +128,12 @@ export function Features() {
                   Client Track
                 </span>
               </div>
-              <h4 className="mt-4 text-[18px] font-bold text-ink-950">
+
+              <div className="my-8 flex justify-center">
+                <img src="/apple-logo.svg" alt="Apple logo" className="h-28 w-28 object-contain opacity-90 drop-shadow-sm" />
+              </div>
+
+              <h4 className="mt-auto text-[18px] font-bold text-ink-950">
                 iOS TestFlight Testing
               </h4>
               <p className="mt-1.5 text-[13.5px] leading-snug text-ink-500">
@@ -120,7 +142,7 @@ export function Features() {
             </div>
 
             {/* UX Testing */}
-            <div className="rounded-[22px] border border-black/10 bg-white p-6 shadow-sm">
+            <div className="flex flex-col rounded-[22px] border border-black/10 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="grid size-10 place-items-center rounded-xl bg-purple-100 text-purple-800">
                   <Sparkles className="size-5" />
@@ -129,7 +151,12 @@ export function Features() {
                   Client Track
                 </span>
               </div>
-              <h4 className="mt-4 text-[18px] font-bold text-ink-950">
+
+              <div className="my-8 flex justify-center">
+                <img src="/ux-mobile.svg" alt="UX Testing illustration" className="h-28 w-28 object-contain drop-shadow-sm" />
+              </div>
+
+              <h4 className="mt-auto text-[18px] font-bold text-ink-950">
                 User Experience Testing
               </h4>
               <p className="mt-1.5 text-[13.5px] leading-snug text-ink-500">

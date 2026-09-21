@@ -21,7 +21,7 @@ export function Footer() {
           </Link>
         </nav>
         <p className="text-[13px] text-ink-400">
-          © {new Date().getFullYear()} DefineUX. Built for builders.
+          © {new Date().getFullYear()} UXOS. Built for builders.
         </p>
       </div>
     </footer>

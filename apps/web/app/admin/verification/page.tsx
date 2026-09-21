@@ -8,8 +8,10 @@ export const dynamic = "force-dynamic";
 export default async function AdminVerificationPage() {
   let items: ReviewItem[] = [];
   try {
-    const data = await serverApi<{ items: ReviewItem[] }>("/verification");
-    items = data.items;
+    // Backend has no /verification route — pending verification projects are at
+    // GET /projects?status=pending_verification. Each project maps to a ReviewItem.
+    const data = await serverApi<ReviewItem[]>("/projects?status=pending_verification&limit=100");
+    items = Array.isArray(data) ? data : [];
   } catch {
     items = [];
   }

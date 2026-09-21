@@ -58,27 +58,21 @@ interface ProjectAssignment {
 }
 
 const STEP_LABELS: Record<string, string> = {
-  verification: "Verification",
-  play_store_invite: "Play Store invite",
-  testflight_invite: "TestFlight invite",
-  app_usage: "App usage",
-  app_testing: "App testing",
-  completion: "Completion",
+  verification: "Account & Opt-In Verification",
+  play_store_invite: "Play Store Download & Install",
+  testflight_invite: "TestFlight Download & Install",
+  completion: "14-Day Continuous Testing Track",
 };
 
 const CLIENT_STEP_DESCRIPTIONS: Record<string, string> = {
   verification:
-    "We verify every tester's account and device with a screenshot proof before they're accepted onto your project.",
+    "Testers verify their registered Android device and accept the closed testing invite on Google Play.",
   play_store_invite:
-    "Testers opt in to your closed track, install the app from the Play Store, and prove the install with a screenshot.",
+    "Testers download and install your app directly from the Google Play Store and submit screenshot proof of install.",
   testflight_invite:
-    "Testers accept your TestFlight invite, install the app, and prove the install with a screenshot.",
-  app_usage:
-    "Testers use your app daily for 14 days, submitting a short check-in note or screenshot each day.",
-  app_testing:
-    "Testers hunt for bugs and file structured reports — our QA team deduplicates them before they reach you.",
+    "Testers accept the TestFlight invite, install the app, and submit screenshot proof of install.",
   completion:
-    "Testers keep the app installed through the final day, and your completion report is generated.",
+    "Testers keep the app installed on real Android devices for 14 continuous days to satisfy Google Play Console policy.",
 };
 
 interface PublishedBug {
@@ -126,33 +120,63 @@ export default async function ClientProjectDetail({
   let report: CompletionReport | null = null;
 
   try {
-    const data = await serverApi<{ project: ProjectDetail }>(`/projects/${id}`);
-    project = data.project;
-
-    const [inv, b, assignRes] = await Promise.all([
-      serverApi<{ invoices: InvoiceRow[] }>("/invoices/me").catch(() => ({ invoices: [] })),
-      serverApi<{ bugs: PublishedBug[] }>(`/projects/${id}/bug-reports`).catch(() => ({ bugs: [] })),
-      serverApi<{ assignments: ProjectAssignment[] }>(`/projects/${id}/assignments`).catch(() => ({ assignments: [] })),
+    const [projectRes, invListRes, bRes, assignRes] = await Promise.all([
+      serverApi<{ project?: ProjectDetail } | ProjectDetail>(`/projects/${id}`),
+      serverApi<{ invoices?: InvoiceRow[] } | InvoiceRow[]>("/invoices/me").catch(() => null),
+      serverApi<{ bugs?: PublishedBug[] } | PublishedBug[]>(`/projects/${id}/bug-reports?limit=100`).catch(() => null),
+      serverApi<{ assignments?: ProjectAssignment[] } | ProjectAssignment[]>(`/projects/${id}/assignments`).catch(() => null),
     ]);
 
-    invoice = inv.invoices.find((i) => i.projectId === id) ?? null;
-    bugs = b.bugs;
-    assignments = assignRes.assignments;
+    project = (projectRes && typeof projectRes === "object" && "project" in projectRes && projectRes.project
+      ? projectRes.project
+      : projectRes) as ProjectDetail;
 
-    if (project.status === "completed") {
-      const r = await serverApi<{ report: CompletionReport }>(
+    const invList =
+      invListRes && typeof invListRes === "object" && "invoices" in invListRes && Array.isArray(invListRes.invoices)
+        ? invListRes.invoices
+        : Array.isArray(invListRes)
+        ? invListRes
+        : [];
+
+    const b =
+      bRes && typeof bRes === "object" && "bugs" in bRes && Array.isArray(bRes.bugs)
+        ? bRes.bugs
+        : Array.isArray(bRes)
+        ? bRes
+        : [];
+
+    const assignList =
+      assignRes && typeof assignRes === "object" && "assignments" in assignRes && Array.isArray(assignRes.assignments)
+        ? assignRes.assignments
+        : Array.isArray(assignRes)
+        ? assignRes
+        : [];
+
+    invoice = invList.find((i) => i.projectId === id) ?? null;
+    bugs = b;
+    assignments = assignList;
+
+    if (project && project.status === "completed") {
+      const repRes = await serverApi<{ report?: CompletionReport } | CompletionReport>(
         `/projects/${id}/completion-report`,
-      ).catch(() => ({ report: null }));
-      report = r.report;
+      ).catch(() => null);
+      report = (repRes && typeof repRes === "object" && "report" in repRes && repRes.report
+        ? repRes.report
+        : repRes) as CompletionReport | null;
     }
   } catch {
     notFound();
   }
 
-  const fallbackLetter = (project!.appDetails.appName.trim()[0] || "A").toUpperCase();
+  if (!project || !project.appDetails) {
+    notFound();
+  }
+
+  const appName = project.appDetails.appName?.trim() || "App";
+  const fallbackLetter = (appName[0] || "A").toUpperCase();
   const fillPercent = Math.min(
     100,
-    Math.round(((project!.activeTesterCount ?? 0) / (project!.requiredTesters || 14)) * 100),
+    Math.round(((project.activeTesterCount ?? 0) / (project.requiredTesters || 14)) * 100),
   );
 
   const activeAssignments = assignments.filter((a) => a.status === "active");
@@ -404,7 +428,7 @@ export default async function ClientProjectDetail({
                       <td className="px-5 py-3.5">
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[12px] font-semibold text-emerald-700">
                           <span className="size-1.5 rounded-full bg-emerald-500" />
-                          Step {a.currentStep}/5
+                          Step {a.currentStep}/{project.steps?.length || 3}
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-slate-500 text-[12.5px]">
@@ -427,21 +451,23 @@ export default async function ClientProjectDetail({
         <p className="mt-1 text-[13px] text-ink-400">
           Where your tester cohort stands, stage by stage.
         </p>
-        {project!.steps.length === 0 ? (
+        {project.steps.length === 0 ? (
           <p className="mt-3 text-[14px] text-ink-500">
-            The five-step workflow appears here once payment is confirmed.
+            The 3-step closed testing workflow appears here once payment is confirmed.
           </p>
         ) : (
           <ol className="mt-5 space-y-4">
-            {project!.steps.map((s) => (
-              <li key={s.order} className="flex items-start gap-4">
+            {project.steps
+              .filter((s) => s.type !== "app_usage" && s.type !== "app_testing")
+              .map((s, idx) => (
+              <li key={s.order ?? idx} className="flex items-start gap-4">
                 <StepIcon state={s.state} />
                 <div className="min-w-0">
                   <p className="text-[15px] font-medium text-ink-950">
-                    Step {s.order} · {STEP_LABELS[s.type] ?? s.type}
+                    Step {idx + 1} · {STEP_LABELS[s.type] ?? s.type}
                   </p>
                   <p className="mt-0.5 text-[13.5px] leading-snug text-ink-500">
-                    {CLIENT_STEP_DESCRIPTIONS[s.type] ?? s.config.instructions}
+                    {CLIENT_STEP_DESCRIPTIONS[s.type] ?? s.config?.instructions}
                   </p>
                 </div>
                 <span className="ml-auto shrink-0">
@@ -460,7 +486,7 @@ export default async function ClientProjectDetail({
             Published findings ({bugs.length})
           </h3>
           <p className="mt-1 text-[13px] text-ink-400">
-            Reviewed and deduplicated by our QA team — one report per bug.
+            Feedback and bug reports submitted directly by real Android testers during closed testing.
           </p>
           <div className="mt-5 space-y-4">
             {bugs.map((b) => (

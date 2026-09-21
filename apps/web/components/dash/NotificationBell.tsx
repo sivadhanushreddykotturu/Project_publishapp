@@ -9,7 +9,7 @@ import { api } from "@/lib/api";
 interface InAppNotification {
   _id: string;
   type: string;
-  payload: { title: string; body: string; link?: string };
+  payload?: { title?: string; body?: string; link?: string; subject?: string; text?: string };
   readAt?: string;
   createdAt: string;
 }
@@ -24,14 +24,25 @@ export function NotificationBell({ variant = "default" }: { variant?: "default" 
   async function load() {
     try {
       const token = await getToken();
-      const data = await api<{ notifications: InAppNotification[]; unread: number }>(
+      const res = await api<{ notifications?: InAppNotification[]; unread?: number } | InAppNotification[]>(
         "/notifications/me",
         { token },
       );
-      setItems(data.notifications);
-      setUnread(data.unread);
+      const list = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.notifications)
+        ? res.notifications
+        : [];
+      const unreadCount =
+        typeof res === "object" && res && "unread" in res && typeof res.unread === "number"
+          ? res.unread
+          : list.filter((x) => !x?.readAt).length;
+
+      setItems(list);
+      setUnread(unreadCount);
     } catch {
-      /* bell stays quiet on error */
+      setItems([]);
+      setUnread(0);
     }
   }
 
@@ -53,12 +64,12 @@ export function NotificationBell({ variant = "default" }: { variant?: "default" 
   async function markRead(n: InAppNotification) {
     if (n.readAt) return;
     const token = await getToken();
-    await api(`/notifications/${n._id}/read`, { token, method: "PATCH" }).catch(
-      () => {},
-    );
-    setItems((xs) => xs.map((x) => (x._id === n._id ? { ...x, readAt: "now" } : x)));
+    await api(`/notifications/${n._id}/read`, { token, method: "PATCH" }).catch(() => {});
+    setItems((xs) => (xs || []).map((x) => (x._id === n._id ? { ...x, readAt: "now" } : x)));
     setUnread((u) => Math.max(0, u - 1));
   }
+
+  const notificationList = items || [];
 
   return (
     <div ref={ref} className="relative">
@@ -70,7 +81,7 @@ export function NotificationBell({ variant = "default" }: { variant?: "default" 
         }}
         className={`relative grid size-10 place-items-center rounded-full transition-all ${
           variant === "purple"
-            ? "bg-[#4F46E5] text-white shadow-sm hover:bg-[#4338CA]"
+            ? "bg-[#4F46E5] text-[#FFFFFF] shadow-sm hover:bg-[#4338CA]"
             : "border border-black/5 bg-white text-ink-800 hover:border-black/15"
         }`}
       >
@@ -88,27 +99,29 @@ export function NotificationBell({ variant = "default" }: { variant?: "default" 
             Notifications
           </p>
           <div className="max-h-[380px] overflow-y-auto">
-            {items.length === 0 ? (
+            {notificationList.length === 0 ? (
               <p className="px-5 py-8 text-center text-[13px] text-ink-400">
                 Nothing yet — we&apos;ll keep you posted.
               </p>
             ) : (
-              items.map((n) => {
+              notificationList.map((n) => {
+                const title = n.payload?.title || n.payload?.subject || n.type || "Notification";
+                const bodyText = n.payload?.body || n.payload?.text || "";
                 const body = (
                   <div
                     className={`border-b border-black/5 px-5 py-4 last:border-0 ${
                       n.readAt ? "opacity-60" : "bg-lime-200/20"
                     }`}
                   >
-                    <p className="text-[13.5px] font-semibold text-ink-950">
-                      {n.payload.title}
-                    </p>
-                    <p className="mt-1 line-clamp-2 text-[12.5px] leading-snug text-ink-500">
-                      {n.payload.body}
-                    </p>
+                    <p className="text-[13.5px] font-semibold text-ink-950">{title}</p>
+                    {bodyText && (
+                      <p className="mt-1 line-clamp-2 text-[12.5px] leading-snug text-ink-500">
+                        {bodyText}
+                      </p>
+                    )}
                   </div>
                 );
-                return n.payload.link ? (
+                return n.payload?.link ? (
                   <Link
                     key={n._id}
                     href={n.payload.link}

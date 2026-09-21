@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { Rocket, Smartphone, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api";
 import { Logo } from "@/components/marketing/LogoMark";
@@ -14,16 +14,19 @@ export function RolePicker() {
   const router = useRouter();
   const params = useSearchParams();
   const { getToken } = useAuth();
+  const { user: clerkUser } = useUser();
 
   const prefill = params.get("role");
   const [role, setRole] = useState<Pick | null>(
     prefill === "client" || prefill === "tester" ? prefill : null,
   );
-  const [name, setName] = useState("");
+  const [name, setName] = useState(
+    () => clerkUser?.fullName || clerkUser?.firstName || "",
+  );
 
   // Tester upfront details (Single Android device only)
   const [deviceModel, setDeviceModel] = useState("");
-  const [deviceOs, setDeviceOs] = useState("Android 14");
+  const [deviceOs, setDeviceOs] = useState("Android 17");
   const [upi, setUpi] = useState("");
 
   // Client target track
@@ -34,6 +37,11 @@ export function RolePicker() {
 
   async function submit() {
     if (!role || busy) return;
+
+    if (!name.trim()) {
+      setError("Please enter your full name.");
+      return;
+    }
 
     if (role === "tester" && (!deviceModel.trim() || !deviceOs.trim())) {
       setError("Please provide your Android device model and OS version to register.");
@@ -50,6 +58,7 @@ export function RolePicker() {
         body: {
           role,
           name: name.trim() || undefined,
+          email: clerkUser?.primaryEmailAddress?.emailAddress,
           ...(role === "tester"
             ? {
                 device: {
@@ -113,12 +122,13 @@ export function RolePicker() {
         <div className="mt-6 space-y-5 rounded-[24px] border border-black/8 bg-white p-6 shadow-sm animate-in fade-in duration-200">
           <label className="block">
             <span className="mb-1.5 block text-[13.5px] font-semibold text-ink-800">
-              Your name <span className="font-normal text-ink-400">(optional)</span>
+              Your Full Name <span className="text-rose-500">*</span>
             </span>
             <input
+              required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Alex"
+              placeholder="e.g. Dhanush Reddy"
               className="w-full rounded-2xl border border-black/10 px-4 py-3 text-[14.5px] outline-none placeholder:text-ink-400 focus:border-ink-950"
             />
           </label>
@@ -154,12 +164,22 @@ export function RolePicker() {
                   <span className="mb-1 block text-[12.5px] font-medium text-ink-700">
                     Android Version *
                   </span>
-                  <input
+                  <select
                     value={deviceOs}
                     onChange={(e) => setDeviceOs(e.target.value)}
-                    placeholder="e.g. Android 14"
-                    className="w-full rounded-2xl border border-black/10 px-4 py-2.5 text-[14px] outline-none placeholder:text-ink-400 focus:border-ink-950"
-                  />
+                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-2.5 text-[14px] font-medium text-ink-900 outline-none focus:border-ink-950 cursor-pointer"
+                  >
+                    <option value="Android 17">Android 17</option>
+                    <option value="Android 16">Android 16</option>
+                    <option value="Android 15">Android 15</option>
+                    <option value="Android 14">Android 14</option>
+                    <option value="Android 13">Android 13</option>
+                    <option value="Android 12">Android 12</option>
+                    <option value="Android 11">Android 11</option>
+                    <option value="Android 10">Android 10</option>
+                    <option value="Android 9">Android 9 (Pie)</option>
+                    <option value="Android 8">Android 8 (Oreo)</option>
+                  </select>
                 </label>
               </div>
 

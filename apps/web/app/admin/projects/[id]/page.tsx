@@ -282,7 +282,7 @@ export default async function AdminProjectDetail({
                     </div>
 
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 font-semibold text-emerald-700">
-                      Step {a.currentStep}/5
+                      Step {a.currentStep}/{project.steps?.length || 3}
                     </span>
 
                     {a.inactivityFlag && (

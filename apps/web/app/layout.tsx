@@ -10,9 +10,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "DefineUX — Real testers for Google Play closed testing",
+  title: "UXOS — Real testers for Google Play closed testing",
   description:
-    "DefineUX runs your Google Play closed test or iOS TestFlight beta: 14+ real testers on real devices, daily engagement, structured bug reports, and a completion report ready for Play Console and App Store Connect.",
+    "UXOS runs your Google Play closed test or iOS TestFlight beta: 14+ real testers on real devices, daily engagement, structured bug reports, and a completion report ready for Play Console and App Store Connect.",
 };
 
 export default function RootLayout({

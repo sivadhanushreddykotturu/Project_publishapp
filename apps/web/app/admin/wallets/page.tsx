@@ -8,10 +8,9 @@ export const dynamic = "force-dynamic";
 export default async function AdminWalletsPage() {
   let withdrawals: AdminWithdrawal[] = [];
   try {
-    const data = await serverApi<{ withdrawals: AdminWithdrawal[] }>(
-      "/wallet/withdrawals",
-    );
-    withdrawals = data.withdrawals;
+    // Backend returns flat array (api.ts unwraps { data: [] }).
+    const data = await serverApi<AdminWithdrawal[]>("/wallet/withdrawals?limit=100");
+    withdrawals = Array.isArray(data) ? data : [];
   } catch {
     withdrawals = [];
   }

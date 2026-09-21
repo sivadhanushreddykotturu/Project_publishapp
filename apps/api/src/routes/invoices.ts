@@ -4,6 +4,7 @@ import { Client, Invoice, Project, User } from "../models/index.js";
 import { markInvoicePaid } from "../services/billing.js";
 import { forbidden, notFound } from "../utils/errors.js";
 import { ah, ok } from "../utils/asyncHandler.js";
+import { env } from "../config/env.js";
 import type { Types } from "mongoose";
 
 export const invoicesRouter = Router();
@@ -27,8 +28,22 @@ invoicesRouter.get(
 invoicesRouter.get(
   "/",
   requireAuth,
-  requireRole("admin"),
-  ah(async (_req, res) => {
+  requireRole("admin", "client"),
+  ah(async (req, res) => {
+    const { clerkUserId, role } = auth(req);
+
+    if (role === "client") {
+      const user = await User.findOne({ clerkUserId });
+      const client = await Client.findOne({ userId: user?._id });
+      if (!client) throw notFound("Client profile");
+      const invoices = await Invoice.find({ clientId: client._id })
+        .populate("projectId", "appDetails.appName")
+        .sort({ createdAt: -1 })
+        .lean();
+      ok(res, { invoices });
+      return;
+    }
+
     const invoices = await Invoice.find()
       .populate("clientId", "companyName contactName")
       .populate("projectId", "appDetails.appName")
@@ -92,8 +107,8 @@ invoicesRouter.post(
       }
     }
 
-    const keyId = process.env.RAZORPAY_KEY_ID || "rzp_test_fallback";
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    const keyId = env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || "rzp_test_TcQmyabHwa5iER";
+    const keySecret = env.RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET;
 
     // If real Razorpay credentials exist, create order via Razorpay API
     let orderId = `order_sim_${invoice._id.toString().slice(-8)}_${Date.now()}`;
@@ -123,6 +138,7 @@ invoicesRouter.post(
 
     ok(res, {
       orderId,
+      amount: invoice.totalPaise,
       amountPaise: invoice.totalPaise,
       currency: "INR",
       keyId,

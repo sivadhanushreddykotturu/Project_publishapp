@@ -5,33 +5,32 @@ import { StatCard } from "@/components/dash/EmptySection";
 
 export const dynamic = "force-dynamic";
 
-interface Summary {
-  users: Record<string, number>;
-  projects: Record<string, number>;
-  pendingProofs: number;
-  openBugs: number;
-  pendingWithdrawals: number;
-  pendingInvoices: number;
+// Real backend shape from GET /metrics/admin-dashboard
+interface AdminDashboardSummary {
+  projects: { total: number; active: number };
+  testers: { total: number; active: number; inactive: number };
+  assignments: { total: number; active: number; queued: number; completed: number };
+  bugs: { total: number; published: number; resolvedToday: number };
+  payouts: { paidTotal: number; pending: number };
+  replacementsToday: number;
+  successRate: number;
 }
 
 export default async function AdminOverview() {
-  let summary: Summary | null = null;
+  let summary: AdminDashboardSummary | null = null;
   try {
-    summary = await serverApi<Summary>("/admin/summary");
+    summary = await serverApi<AdminDashboardSummary>("/metrics/admin-dashboard");
   } catch {
     summary = null;
   }
 
-  const s = summary ?? {
-    users: {},
-    projects: {},
-    pendingProofs: 0,
-    openBugs: 0,
-    pendingWithdrawals: 0,
-    pendingInvoices: 0,
-  };
-  const activeProjects =
-    (s.projects.active ?? 0) + (s.projects.in_progress ?? 0);
+  // Map backend AdminDashboardSummary to display values
+  const activeProjects = summary?.projects.active ?? 0;
+  const totalTesters = summary?.testers.total ?? 0;
+  const activeTesters = summary?.testers.active ?? 0;
+  const pendingProofs = summary?.assignments.queued ?? 0;
+  const openBugs = summary?.bugs.total ?? 0;
+  const pendingWithdrawals = summary?.payouts.pending ?? 0;
 
   return (
     <div className="space-y-8">
@@ -76,35 +75,36 @@ export default async function AdminOverview() {
         <Link href="/admin/testers" className="block transition-transform hover:scale-[1.01]">
           <StatCard
             label="Testers"
-            value={String(s.users.tester ?? 0)}
-            hint={`${s.users.client ?? 0} clients`}
+            value={String(totalTesters)}
+            hint={`${activeTesters} active`}
           />
         </Link>
         <Link href="/admin/verification" className="block transition-transform hover:scale-[1.01]">
           <StatCard
-            label="Proofs awaiting review"
-            value={String(s.pendingProofs)}
+            label="Queued assignments"
+            value={String(pendingProofs)}
             hint="Verification queue"
           />
         </Link>
         <Link href="/admin/bugs" className="block transition-transform hover:scale-[1.01]">
-          <StatCard label="Open bug reports" value={String(s.openBugs)} hint="QA bug triage" />
+          <StatCard label="Open bug reports" value={String(openBugs)} hint="QA bug triage" />
         </Link>
         <Link href="/admin/wallets" className="block transition-transform hover:scale-[1.01]">
           <StatCard
             label="Pending withdrawals"
-            value={String(s.pendingWithdrawals)}
+            value={String(pendingWithdrawals)}
             hint="48h payout SLA"
           />
         </Link>
         <Link href="/admin/invoices" className="block transition-transform hover:scale-[1.01]">
           <StatCard
-            label="Pending invoices"
-            value={String(s.pendingInvoices)}
-            hint="Manual mark-paid available"
+            label="Success rate"
+            value={`${summary?.successRate ?? 0}%`}
+            hint="Projects completed successfully"
           />
         </Link>
       </div>
     </div>
   );
+
 }

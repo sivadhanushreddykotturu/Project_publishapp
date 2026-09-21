@@ -5,31 +5,49 @@ import { formatINR } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-interface WalletData {
-  balancePaise: number;
-  minWithdrawalPaise: number;
-  upiSet: boolean;
-  transactions: Array<{
+// Real backend shape from GET /wallet/me
+interface BackendWalletSummary {
+  balance: number; // paise
+  pendingWithdrawals: number;
+  availableForWithdrawal: number;
+  history: Array<{
     _id: string;
-    type: string;
-    amountPaise: number;
+    type: "earning" | "withdrawal";
+    amount: number; // paise
     status: string;
     note?: string;
-    upiRef?: string;
+    transactionId?: string;
     createdAt: string;
   }>;
 }
 
+// Backend tester profile — we need this to check if UPI is set.
+interface BackendTesterProfile {
+  upi?: { vpa?: string; qrImageUrl?: string };
+}
+
 export default async function TesterWalletPage() {
-  let wallet: WalletData | null = null;
+  let wallet: BackendWalletSummary | null = null;
+  let upiSet = false;
   try {
-    wallet = await serverApi<WalletData>("/wallet/me");
+    [wallet] = await Promise.all([
+      serverApi<BackendWalletSummary>("/wallet/me"),
+    ]);
+    // Try to fetch tester profile to check upi status
+    try {
+      const data = await serverApi<{ tester?: BackendTesterProfile }>("/testers/me");
+      const profile = data && "tester" in data && data.tester ? data.tester : (data as unknown as BackendTesterProfile);
+      upiSet = Boolean(profile?.upi?.vpa);
+    } catch {
+      upiSet = false;
+    }
   } catch {
     wallet = null;
   }
 
-  const balance = wallet?.balancePaise ?? 0;
-  const transactions = wallet?.transactions ?? [];
+  const balance = wallet?.balance ?? 0;
+  const transactions = wallet?.history ?? [];
+
 
   return (
     <div className="space-y-6">
@@ -51,8 +69,8 @@ export default async function TesterWalletPage() {
           </p>
           <WithdrawForm
             balancePaise={balance}
-            minWithdrawalPaise={wallet?.minWithdrawalPaise ?? 10_000}
-            upiSet={wallet?.upiSet ?? false}
+            minWithdrawalPaise={10_000}
+            upiSet={upiSet}
           />
         </div>
       </div>
@@ -79,7 +97,7 @@ export default async function TesterWalletPage() {
                   </p>
                   <p className="mt-0.5 text-[12px] text-ink-400">
                     {new Date(tx.createdAt).toLocaleString("en-IN")}
-                    {tx.upiRef ? ` · ref ${tx.upiRef}` : ""}
+                    {tx.transactionId ? ` · ref ${tx.transactionId}` : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -89,7 +107,7 @@ export default async function TesterWalletPage() {
                     }`}
                   >
                     {tx.type === "earning" ? "+" : "−"}
-                    {formatINR(tx.amountPaise)}
+                    {formatINR(tx.amount)}
                   </span>
                   <StatusPill status={tx.status} />
                 </div>

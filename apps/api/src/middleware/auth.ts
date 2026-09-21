@@ -2,7 +2,9 @@ import type { NextFunction, Request, Response } from "express";
 import { verifyToken } from "@clerk/backend";
 import type { Role } from "@defineux/types";
 import { env } from "../config/env.js";
-import { User } from "../models/index.js";
+import { logger } from "../config/logger.js";
+import { User, Client, Tester } from "../models/index.js";
+import { resolveIdentity, setClerkRole } from "../services/clerk.js";
 import { unauthorized, forbidden } from "../utils/errors.js";
 import { ah } from "../utils/asyncHandler.js";
 
@@ -41,21 +43,86 @@ async function resolveAuth(req: Request): Promise<AuthContext> {
       secretKey: env.CLERK_SECRET_KEY!,
     })) as Record<string, unknown>;
 
+    const clerkUserId = claims.sub as string;
     const metadata = (claims.metadata || claims.public_metadata || claims.publicMetadata) as
       | { role?: Role }
       | undefined;
     let role: Role | null = metadata?.role ?? null;
 
-    // If role is not embedded in the session JWT, query database User
-    if (!role && claims.sub) {
-      const dbUser = await User.findOne({ clerkUserId: claims.sub }).select("role").lean();
-      if (dbUser?.role) {
-        role = dbUser.role as Role;
+    if (clerkUserId) {
+      let dbUser = await User.findOne({ clerkUserId });
+
+      if (!dbUser) {
+        try {
+          const identity = await resolveIdentity(clerkUserId).catch(() => null);
+          const email = identity?.email || `user_${clerkUserId}@placeholder.local`;
+          const name = identity?.name || email.split("@")[0] || "User";
+
+          const existingUser = await User.findOne({ email });
+          if (existingUser) {
+            existingUser.clerkUserId = clerkUserId;
+            if (!existingUser.role) existingUser.role = "tester";
+            await existingUser.save();
+            dbUser = existingUser;
+          } else {
+            const url = req.originalUrl || req.url || "";
+            const defaultRole: Role =
+              metadata?.role ||
+              (url.includes("/admin") ? "admin" : url.includes("/client") ? "client" : "tester");
+
+            dbUser = await User.create({
+              clerkUserId,
+              email,
+              name,
+              role: defaultRole,
+            });
+
+            if (defaultRole === "client") {
+              await Client.create({ userId: dbUser._id, contactName: name });
+            } else if (defaultRole === "tester") {
+              await Tester.create({ userId: dbUser._id });
+            }
+            await setClerkRole(clerkUserId, defaultRole).catch(() => {});
+          }
+        } catch (err) {
+          logger.warn({ err, clerkUserId }, "Auto-provisioning user failed in resolveAuth");
+        }
+      }
+
+      if (dbUser) {
+        // If role was changed in Clerk Dashboard (e.g. to "admin"), automatically sync to MongoDB
+        if (metadata?.role && dbUser.role !== metadata.role) {
+          logger.info(
+            { clerkUserId, oldRole: dbUser.role, newRole: metadata.role },
+            "Syncing role from Clerk metadata to MongoDB User",
+          );
+          dbUser.role = metadata.role;
+          await dbUser.save();
+          role = metadata.role;
+
+          // Ensure corresponding profile exists if switched to client or tester
+          if (metadata.role === "client") {
+            const clientExists = await Client.findOne({ userId: dbUser._id });
+            if (!clientExists) {
+              await Client.create({ userId: dbUser._id, contactName: dbUser.name });
+            }
+          } else if (metadata.role === "tester") {
+            const testerExists = await Tester.findOne({ userId: dbUser._id });
+            if (!testerExists) {
+              await Tester.create({ userId: dbUser._id });
+            }
+          }
+        } else if (dbUser.role) {
+          role = dbUser.role as Role;
+          if (!metadata?.role) {
+            await setClerkRole(clerkUserId, role).catch(() => {});
+          }
+        }
       }
     }
 
     return {
-      clerkUserId: claims.sub as string,
+      clerkUserId,
       role,
       sessionId: (claims.sid as string) ?? null,
     };

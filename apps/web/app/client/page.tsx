@@ -10,10 +10,17 @@ export default async function ClientOverview() {
   try {
     const [meData, projData] = await Promise.all([
       serverApi<MeResponse>("/users/me").catch(() => null),
-      serverApi<{ projects: ProjectRow[] }>("/projects/me").catch(() => null),
+      serverApi<{ projects?: ProjectRow[] } | ProjectRow[]>("/projects/me").catch(
+        () => serverApi<{ projects?: ProjectRow[] } | ProjectRow[]>("/projects?limit=100"),
+      ),
     ]);
     me = meData;
-    projects = projData?.projects ?? [];
+    projects =
+      projData && typeof projData === "object" && "projects" in projData && Array.isArray(projData.projects)
+        ? projData.projects
+        : Array.isArray(projData)
+        ? projData
+        : [];
   } catch {
     me = null;
     projects = [];

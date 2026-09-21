@@ -1,17 +1,34 @@
 import { serverApi } from "@/lib/server-api";
-import { type TicketSummary } from "@/components/dash/SupportCenter";
-import { TesterSupportView } from "@/components/tester/TesterSupportView";
+import { TesterSupportView, type TesterSupportTicket } from "@/components/tester/TesterSupportView";
+import { type TesterAssignment } from "@/components/tester/AssignmentCard";
 
 export const dynamic = "force-dynamic";
 
 export default async function TesterSupportPage() {
-  let tickets: TicketSummary[] = [];
+  let tickets: TesterSupportTicket[] = [];
+  let assignments: TesterAssignment[] = [];
+
   try {
-    const data = await serverApi<{ tickets: TicketSummary[] }>("/support-tickets");
-    tickets = data.tickets;
+    const [ticketRes, assignRes] = await Promise.all([
+      serverApi<{ tickets: TesterSupportTicket[] } | TesterSupportTicket[]>("/support-tickets").catch(() => []),
+      serverApi<{ assignments?: TesterAssignment[] } | TesterAssignment[]>("/assignments/me").catch(() => []),
+    ]);
+
+    tickets = Array.isArray(ticketRes)
+      ? ticketRes
+      : Array.isArray(ticketRes?.tickets)
+      ? ticketRes.tickets
+      : [];
+
+    assignments = Array.isArray(assignRes)
+      ? assignRes
+      : Array.isArray(assignRes?.assignments)
+      ? assignRes.assignments
+      : [];
   } catch {
     tickets = [];
+    assignments = [];
   }
 
-  return <TesterSupportView tickets={tickets} />;
+  return <TesterSupportView assignments={assignments} initialTickets={tickets} />;
 }

@@ -41,6 +41,7 @@ supportRouter.get(
     const filter = role === "admin" ? {} : { raisedBy: user?._id };
     const tickets = await SupportTicket.find(filter)
       .populate("raisedBy", "name email role")
+      .populate("projectId", "appDetails")
       .sort({ updatedAt: -1 })
       .lean();
     ok(res, { tickets });
@@ -52,6 +53,7 @@ async function loadTicketFor(req: Parameters<typeof auth>[0]) {
   const user = await User.findOne({ clerkUserId });
   const ticket = await SupportTicket.findById(req.params.id)
     .populate("raisedBy", "name email role")
+    .populate("projectId", "appDetails")
     .lean();
   if (!ticket) throw notFound("Ticket");
   if (role !== "admin" && String(ticket.raisedBy._id ?? ticket.raisedBy) !== String(user?._id)) {

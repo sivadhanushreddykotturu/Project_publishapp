@@ -21,12 +21,13 @@ export default async function TesterReportsPage() {
   let bugs: MyBug[] = [];
   let assignments: TesterAssignment[] = [];
   try {
+    // Backend returns flat arrays (api.ts unwraps { data: [] }).
     const [b, a] = await Promise.all([
-      serverApi<{ bugs: MyBug[] }>("/bug-reports/me"),
-      serverApi<{ assignments: TesterAssignment[] }>("/assignments/me"),
+      serverApi<MyBug[]>("/bug-reports/me"),
+      serverApi<TesterAssignment[]>("/assignments/me"),
     ]);
-    bugs = b.bugs;
-    assignments = a.assignments.filter((x) =>
+    bugs = Array.isArray(b) ? b : [];
+    assignments = (Array.isArray(a) ? a : []).filter((x) =>
       ["active", "completed"].includes(x.status),
     );
   } catch {

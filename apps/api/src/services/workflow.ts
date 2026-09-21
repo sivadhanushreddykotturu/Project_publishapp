@@ -69,7 +69,7 @@ export function getTemplate(
         type: "verification",
         config: {
           deadlineHours: 24,
-          payoutPaise: 3_000,
+          payoutPaise: 0,
           requiresProof: true,
           projectLevelGate: true,
           instructions: VERIFY_INSTRUCTIONS[projectType],
@@ -80,7 +80,7 @@ export function getTemplate(
         type: INVITE_STEPS[projectType].type,
         config: {
           deadlineHours: 48,
-          payoutPaise: 4_000,
+          payoutPaise: 0,
           requiresProof: true,
           projectLevelGate: true,
           instructions: INVITE_STEPS[projectType].instructions,
@@ -88,37 +88,14 @@ export function getTemplate(
       },
       {
         order: 3,
-        type: "app_usage",
-        config: {
-          deadlineHours: pkg.durationDays * 24,
-          payoutPaise: 8_000,
-          requiresProof: true,
-          projectLevelGate: false,
-          instructions: `Use the app daily for ${pkg.durationDays} days. Submit a short check-in note or screenshot each day you use it.`,
-        },
-      },
-      {
-        order: 4,
-        type: "app_testing",
-        config: {
-          deadlineHours: 7 * 24,
-          payoutPaise: 10_000,
-          requiresProof: false,
-          projectLevelGate: false,
-          instructions:
-            "Hunt for bugs: file structured reports with severity and repro steps. Found nothing? Submit a 'no issues' declaration.",
-        },
-      },
-      {
-        order: 5,
         type: "completion",
         config: {
-          deadlineHours: 48,
-          payoutPaise: 5_000,
+          deadlineHours: pkg.durationDays * 24,
+          payoutPaise: 10_000,
           requiresProof: true,
           projectLevelGate: false,
           instructions:
-            "Final step: keep the app installed through the last day, submit the closing survey screenshot, and you're done.",
+            "Keep the app installed for 14 days and submit your Google Play review proof to release the full payout.",
         },
       },
     ],

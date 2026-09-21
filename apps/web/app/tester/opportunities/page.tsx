@@ -12,19 +12,42 @@ interface Opportunity {
   activeTesterCount: number;
   waitlistCount: number;
   appDetails: { appName: string; packageName: string; description?: string };
+  payoutINR?: number;
   myAssignment: { status: string; queuePosition?: number } | null;
 }
 
 export default async function OpportunitiesPage() {
   let opportunities: Opportunity[] = [];
+  let activeTestsCount = 0;
+
   try {
-    const data = await serverApi<{ opportunities: Opportunity[] }>(
-      "/projects/opportunities",
-    );
-    opportunities = data.opportunities;
+    const [oppData, assignData] = await Promise.all([
+      serverApi<{ opportunities?: Opportunity[] } | Opportunity[]>("/projects/opportunities").catch(() => []),
+      serverApi<{ assignments?: Array<{ status: string }> } | Array<{ status: string }>>("/assignments/me").catch(() => []),
+    ]);
+
+    opportunities = Array.isArray(oppData)
+      ? oppData
+      : Array.isArray(oppData?.opportunities)
+      ? oppData.opportunities
+      : [];
+
+    const assignments = Array.isArray(assignData)
+      ? assignData
+      : Array.isArray(assignData?.assignments)
+      ? assignData.assignments
+      : [];
+
+    activeTestsCount = assignments.filter((a) => a.status === "active").length;
   } catch {
     opportunities = [];
+    activeTestsCount = 0;
   }
 
-  return <AppTestingGrid initialOpportunities={opportunities} />;
+  return (
+    <AppTestingGrid
+      initialOpportunities={opportunities}
+      activeTestsCount={activeTestsCount}
+    />
+  );
 }

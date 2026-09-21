@@ -6,8 +6,13 @@ export const dynamic = "force-dynamic";
 export default async function AdminSupportPage() {
   let tickets: TicketSummary[] = [];
   try {
-    const data = await serverApi<{ tickets: TicketSummary[] }>("/support-tickets");
-    tickets = data.tickets;
+    const data = await serverApi<{ tickets?: TicketSummary[] } | TicketSummary[]>("/support-tickets?limit=100").catch(() => null);
+    tickets =
+      data && typeof data === "object" && "tickets" in data && Array.isArray(data.tickets)
+        ? data.tickets
+        : Array.isArray(data)
+        ? data
+        : [];
   } catch {
     tickets = [];
   }

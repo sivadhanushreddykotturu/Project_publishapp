@@ -40,9 +40,11 @@ describe("projects + payments + workflow activation", () => {
     expect(project.joinState).toBe("closed");
 
     const pkg = PACKAGES.find((p) => p.key === "starter")!;
-    expect(invoice.amountPaise).toBe(pkg.pricePaise);
-    expect(invoice.gstPaise).toBe(Math.round(pkg.pricePaise * 0.18));
-    expect(invoice.totalPaise).toBe(pkg.pricePaise + invoice.gstPaise);
+    const expectedBase = Math.round(pkg.pricePaise / 1.18);
+    const expectedGst = pkg.pricePaise - expectedBase;
+    expect(invoice.amountPaise).toBe(expectedBase);
+    expect(invoice.gstPaise).toBe(expectedGst);
+    expect(invoice.totalPaise).toBe(pkg.pricePaise);
     expect(invoice.status).toBe("pending");
   });
 

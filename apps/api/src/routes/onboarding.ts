@@ -35,10 +35,44 @@ onboardingRouter.post(
     const existing = await User.findOne({ clerkUserId });
     if (existing) {
       if (existing.role !== body.role) {
-        throw conflict(
-          "Role is already set for this account. Contact support to change it.",
-          "ROLE_LOCKED",
-        );
+        existing.role = body.role;
+        if (body.name) existing.name = body.name;
+        await existing.save();
+
+        if (body.role === "client") {
+          const client = await Client.findOne({ userId: existing._id });
+          if (!client) {
+            await Client.create({ userId: existing._id, contactName: existing.name });
+          }
+        } else {
+          const tester = await Tester.findOne({ userId: existing._id });
+          if (!tester) {
+            const devices = body.device
+              ? [
+                  {
+                    platform: "android" as const,
+                    model: body.device.model.trim(),
+                    osVersion: body.device.osVersion.trim(),
+                    fingerprint:
+                      body.device.fingerprint ||
+                      `fp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                  },
+                ]
+              : [];
+            await Tester.create({
+              userId: existing._id,
+              devices,
+              ...(body.upi ? { upi: { vpa: body.upi.trim().toLowerCase() } } : {}),
+            });
+          }
+        }
+
+        if (!env.isTest && env.clerkConfigured) {
+          await setClerkRole(clerkUserId, body.role).catch(() => {});
+        }
+      } else if (body.name && body.name !== existing.name) {
+        existing.name = body.name;
+        await existing.save();
       }
       ok(res, { user: existing });
       return;

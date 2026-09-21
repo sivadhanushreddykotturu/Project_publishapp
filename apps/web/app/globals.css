@@ -59,3 +59,184 @@ body {
   background: var(--color-lime-300);
   color: var(--color-ink-950);
 }
+
+/* ==========================================================================
+   Sleek Dashboard Night Mode (Midnight Slate / Dark Navy - Not pitch black)
+   Scoped strictly to .dashboard-root.dark — Landing page is NOT affected!
+   ========================================================================== */
+.dashboard-root.dark {
+  background-color: #0B0F19 !important;
+  color: #E2E8F0 !important;
+  color-scheme: dark;
+}
+
+/* Sidebar & Header */
+.dashboard-root.dark aside {
+  background-color: #0E1422 !important;
+  border-color: #1F293D !important;
+}
+
+.dashboard-root.dark header {
+  background-color: rgba(14, 20, 34, 0.96) !important;
+  border-color: #1F293D !important;
+}
+
+/* Cards, Panels & Modals */
+.dashboard-root.dark .bg-white {
+  background-color: #111827 !important;
+  border-color: #1F293D !important;
+}
+
+/* Secondary Backgrounds & Containers */
+.dashboard-root.dark .bg-slate-50 {
+  background-color: #151F32 !important;
+  border-color: #243046 !important;
+}
+
+.dashboard-root.dark .bg-slate-100 {
+  background-color: #1A2438 !important;
+}
+
+/* Border overrides */
+.dashboard-root.dark .border-slate-200,
+.dashboard-root.dark .border-slate-200\/80,
+.dashboard-root.dark .border-slate-200\/90,
+.dashboard-root.dark .border-slate-100,
+.dashboard-root.dark .border-slate-100\/80,
+.dashboard-root.dark .border-black\/5 {
+  border-color: #1F293D !important;
+}
+
+/* Typography */
+.dashboard-root.dark .text-slate-900,
+.dashboard-root.dark .text-ink-950 {
+  color: #F8FAFC !important;
+}
+
+.dashboard-root.dark .text-slate-800 {
+  color: #F1F5F9 !important;
+}
+
+.dashboard-root.dark .text-slate-700,
+.dashboard-root.dark .text-ink-600 {
+  color: #E2E8F0 !important;
+}
+
+.dashboard-root.dark .text-slate-600,
+.dashboard-root.dark .text-slate-500,
+.dashboard-root.dark .text-ink-400 {
+  color: #94A3B8 !important;
+}
+
+.dashboard-root.dark .text-slate-400 {
+  color: #64748B !important;
+}
+
+/* Inputs, Textareas, Selects */
+.dashboard-root.dark input[type="text"],
+.dashboard-root.dark input[type="search"],
+.dashboard-root.dark textarea,
+.dashboard-root.dark select {
+  background-color: #151F32 !important;
+  border-color: #243046 !important;
+  color: #F8FAFC !important;
+}
+
+.dashboard-root.dark input::placeholder,
+.dashboard-root.dark textarea::placeholder {
+  color: #64748B !important;
+}
+
+/* Buttons and Filter Pills */
+.dashboard-root.dark button.bg-white,
+.dashboard-root.dark a.bg-white {
+  background-color: #151F32 !important;
+  border-color: #243046 !important;
+  color: #E2E8F0 !important;
+}
+
+.dashboard-root.dark button.bg-white:hover,
+.dashboard-root.dark a.bg-white:hover {
+  background-color: #1C2840 !important;
+}
+
+/* Active primary buttons & links stay high-contrast vibrant */
+.dashboard-root.dark .bg-\[\#4F46E5\] {
+  background-color: #4F46E5 !important;
+  color: #FFFFFF !important;
+}
+
+/* Active navigation item in sidebar */
+.dashboard-root.dark .bg-\[\#EEF2FF\] {
+  background-color: rgba(79, 70, 229, 0.18) !important;
+  border-color: rgba(99, 102, 241, 0.35) !important;
+  color: #A5B4FC !important;
+}
+
+/* Hover navigation item in sidebar */
+.dashboard-root.dark nav button.text-slate-600:hover,
+.dashboard-root.dark nav a.text-slate-600:hover {
+  background-color: #151F32 !important;
+  color: #F8FAFC !important;
+}
+
+/* Emerald Rewards & Verification Status */
+.dashboard-root.dark .bg-emerald-50,
+.dashboard-root.dark .bg-emerald-500\/5,
+.dashboard-root.dark .bg-emerald-500\/10 {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  border-color: rgba(16, 185, 129, 0.28) !important;
+  color: #34D399 !important;
+}
+
+.dashboard-root.dark .text-emerald-700,
+.dashboard-root.dark .text-emerald-800 {
+  color: #34D399 !important;
+}
+
+/* Indigo soft chips */
+.dashboard-root.dark .bg-indigo-50 {
+  background-color: rgba(79, 70, 229, 0.15) !important;
+  color: #A5B4FC !important;
+}
+
+/* Amber queue status */
+.dashboard-root.dark .bg-amber-50,
+.dashboard-root.dark .bg-amber-500\/10 {
+  background-color: rgba(245, 158, 11, 0.12) !important;
+  border-color: rgba(245, 158, 11, 0.28) !important;
+  color: #FBBF24 !important;
+}
+
+.dashboard-root.dark .text-amber-700,
+.dashboard-root.dark .text-amber-600 {
+  color: #FBBF24 !important;
+}
+
+/* Dividers & horizontal rules */
+.dashboard-root.dark hr,
+.dashboard-root.dark .border-t,
+.dashboard-root.dark .border-b {
+  border-color: #1F293D !important;
+}
+
+/* Drawer & Modals */
+.dashboard-root.dark [role="dialog"],
+.dashboard-root.dark .fixed.bg-white {
+  background-color: #0E1422 !important;
+  border-color: #1F293D !important;
+}
+
+/* Dashboard dark mode gradient overrides (Welcome banners, etc.) */
+.dashboard-root.dark [class*="from-indigo-50"],
+.dashboard-root.dark [class*="from-cream-100"] {
+  background-image: linear-gradient(135deg, #131C2E 0%, #111827 50%, #171E30 100%) !important;
+  border-color: #1F293D !important;
+}
+
+.dashboard-root.dark [class*="from-white"] {
+  background-image: linear-gradient(180deg, #111827 0%, #151F32 100%) !important;
+  border-color: #1F293D !important;
+}
+
+

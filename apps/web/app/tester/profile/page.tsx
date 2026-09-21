@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic";
 export default async function TesterProfilePage() {
   let tester: TesterProfileData | null = null;
   try {
-    const data = await serverApi<{ tester: TesterProfileData }>("/testers/me");
-    tester = data.tester;
+    const data = await serverApi<{ tester?: TesterProfileData } | TesterProfileData>("/testers/me");
+    tester = data && typeof data === "object" && "tester" in data && data.tester ? data.tester : (data as TesterProfileData);
   } catch {
     tester = null;
   }

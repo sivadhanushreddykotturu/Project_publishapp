@@ -39,7 +39,11 @@ testersRouter.get(
   ah(async (req, res) => {
     const { clerkUserId } = auth(req);
     const user = await User.findOne({ clerkUserId });
-    const tester = await Tester.findOne({ userId: user?._id }).lean();
+    let tester = user ? await Tester.findOne({ userId: user._id }).lean() : null;
+    if (!tester && user) {
+      const created = await Tester.create({ userId: user._id });
+      tester = created.toObject();
+    }
     if (!tester) throw notFound("Tester profile");
     ok(res, { tester });
   }),
@@ -54,7 +58,10 @@ testersRouter.put(
     const { clerkUserId } = auth(req);
     const body = profileSchema.parse(req.body);
     const user = await User.findOne({ clerkUserId });
-    const tester = await Tester.findOne({ userId: user?._id });
+    let tester = user ? await Tester.findOne({ userId: user._id }) : null;
+    if (!tester && user) {
+      tester = await Tester.create({ userId: user._id });
+    }
     if (!tester) throw notFound("Tester profile");
 
     if (body.devices) tester.devices = body.devices;

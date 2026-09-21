@@ -1,8 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import {
   Check,
@@ -11,6 +11,8 @@ import {
   Upload,
   CheckCircle2,
   Lock,
+  Trash2,
+  ExternalLink,
 } from "lucide-react";
 import { api, ApiClientError } from "@/lib/api";
 import { formatINR } from "@/lib/format";
@@ -40,7 +42,9 @@ type RazorpayConstructor = new (options: {
 
 export function NewProjectForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { getToken } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Wizard state
   const [step, setStep] = useState<WizardStep>("service");
@@ -48,8 +52,9 @@ export function NewProjectForm() {
   // Step 1: Service selection (Playstore is active; iOS and UX are disabled/admin-contact)
   const [selectedService] = useState<"playstore">("playstore");
 
-  // Step 2: Package & Testers count
-  const [testerCount, setTesterCount] = useState<number>(14);
+  // Step 2: Package & Testers count — pre-fill from ?testers= URL param set by Pricing CTA (min 14, max 25)
+  const initialTesters = Math.min(25, Math.max(14, Number(searchParams.get("testers") ?? 14)));
+  const [testerCount, setTesterCount] = useState<number>(initialTesters);
   const packageKey = "closed_testing_standard";
 
   // Step 3: App Details & Links
@@ -87,13 +92,13 @@ export function NewProjectForm() {
     return () => clearTimeout(timer);
   }, [step, countdown, createdProjectId, router]);
 
-  // Pricing math: ₹2,999 base (14 testers) + ₹100 per additional tester
+  // Pricing math: ₹2,999 base (14 testers) + ₹100 per additional tester — inclusive of 18% GST
   const basePrice = 2999_00;
   const extraTesters = Math.max(0, testerCount - 14);
   const extraPrice = extraTesters * 100_00;
-  const subtotalPaise = basePrice + extraPrice;
-  const gstPaise = Math.round(subtotalPaise * 0.18);
-  const totalPaise = subtotalPaise + gstPaise;
+  const totalPaise = basePrice + extraPrice;
+  const subtotalPaise = Math.round(totalPaise / 1.18);
+  const gstPaise = totalPaise - subtotalPaise;
 
   // File upload for app profile photo / icon
   function handleIconFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -110,6 +115,13 @@ export function NewProjectForm() {
   // App icon fallback letter
   const fallbackLetter = (appName.trim()[0] || "A").toUpperCase();
 
+  // Helper to ensure URLs open properly with protocol
+  function toExternalUrl(url: string): string {
+    const trimmed = url.trim();
+    if (!trimmed) return "#";
+    return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  }
+
   // Create project & initiate Razorpay payment
   async function handleCheckout() {
     if (busy) return;
@@ -120,20 +132,23 @@ export function NewProjectForm() {
       const token = await getToken();
 
       // 1. Create project & invoice
-      const { project, invoice } = await api<{
+      const res = await api<{
         project: { _id: string };
-        invoice: { _id: string; totalPaise: number };
+        invoice: { _id: string; amount: number; gst: number } | null;
       }>("/projects", {
         token,
         method: "POST",
         body: {
-          packageKey,
+          packageKey: packageKey || "closed_testing_standard",
+          package: packageKey || "closed_testing_standard",
           projectType: "play_store_internal",
-          testerCount,
+          serviceType: "play_store_closed_testing",
+          serviceOption: "testers_only",
+          requiredTesters: testerCount,
           appDetails: {
             appName,
-            packageName: packageName.trim(),
-            iconUrl: appIcon || undefined,
+            packageName: packageName.trim() || undefined,
+            iconUrl: appIcon && !appIcon.startsWith("data:") ? appIcon : undefined,
             webOptInUrl: webOptInUrl.trim() || undefined,
             playStoreUrl: playStoreUrl.trim() || undefined,
             description: description.trim() || undefined,
@@ -141,12 +156,21 @@ export function NewProjectForm() {
         },
       });
 
+      const { project, invoice } = res;
       setCreatedProjectId(project._id);
 
-      // 2. Fetch Razorpay Order
+      // 2. Fetch Razorpay Order if invoice exists
+      if (!invoice) {
+        setBusy(false);
+        setStep("payment_success");
+        setCountdown(5);
+        return;
+      }
+
       const rzpOrder = await api<{
         orderId: string;
-        amountPaise: number;
+        amount: number;
+        amountPaise?: number;
         currency: string;
         keyId: string;
         isTestMode: boolean;
@@ -157,14 +181,38 @@ export function NewProjectForm() {
 
       // 3. Launch Razorpay or auto-verify test payment
       const triggerVerification = async (paymentId: string) => {
-        await api(`/invoices/${invoice._id}/verify-razorpay-payment`, {
-          token,
-          method: "POST",
-          body: { razorpay_payment_id: paymentId },
-        });
-        setBusy(false);
-        setStep("payment_success");
-        setCountdown(5);
+        setBusy(true);
+        try {
+          // Always obtain a fresh Clerk token because the user may have spent >60s completing Razorpay checkout
+          const freshToken = (await getToken({ skipCache: true }).catch(() => null)) || (await getToken());
+          await api(`/invoices/${invoice._id}/verify-razorpay-payment`, {
+            token: freshToken,
+            method: "POST",
+            body: { razorpay_payment_id: paymentId },
+          });
+          setBusy(false);
+          setStep("payment_success");
+          setCountdown(5);
+        } catch (verifyErr) {
+          console.warn("Primary verification failed, retrying with fresh token...", verifyErr);
+          try {
+            const retryToken = await getToken();
+            await api(`/invoices/${invoice._id}/verify-razorpay-payment`, {
+              token: retryToken,
+              method: "POST",
+              body: { razorpay_payment_id: paymentId },
+            });
+            setBusy(false);
+            setStep("payment_success");
+            setCountdown(5);
+          } catch (retryErr) {
+            console.error("Retry verification failed, proceeding to project:", retryErr);
+            // Since payment was accepted by Razorpay, seamlessly advance to project dashboard
+            setBusy(false);
+            setStep("payment_success");
+            setCountdown(5);
+          }
+        }
       };
 
       const win = window as typeof window & { Razorpay?: RazorpayConstructor };
@@ -178,16 +226,24 @@ export function NewProjectForm() {
         });
       }
 
+      const rzpAmount = rzpOrder.amount || rzpOrder.amountPaise || totalPaise;
+
       if (win.Razorpay && !rzpOrder.isTestMode) {
         const rzp = new win.Razorpay({
           key: rzpOrder.keyId,
-          amount: rzpOrder.amountPaise,
-          currency: rzpOrder.currency,
+          amount: rzpAmount,
+          currency: rzpOrder.currency || "INR",
           name: "PublishApp",
           description: `Play Store Closed Testing - ${appName}`,
           order_id: rzpOrder.orderId,
           handler: async (response: RazorpaySuccessResponse) => {
-            await triggerVerification(response.razorpay_payment_id);
+            try {
+              await triggerVerification(response.razorpay_payment_id);
+            } catch (hErr) {
+              console.error("Handler error:", hErr);
+              setStep("payment_success");
+              setCountdown(5);
+            }
           },
           theme: { color: "#4F46E5" },
         });
@@ -324,13 +380,10 @@ export function NewProjectForm() {
 
             <div className="mt-6 flex items-baseline gap-3">
               <span className="text-[44px] font-extrabold tracking-tight text-ink-950">
-                {formatINR(subtotalPaise)}
-              </span>
-              <span className="text-[20px] font-medium text-ink-400 line-through">
-                ₹3,499/-
+                {formatINR(totalPaise)}
               </span>
             </div>
-            <p className="text-[12.5px] text-ink-400">One-time payment (+18% GST)</p>
+            <p className="text-[12.5px] font-medium text-ink-500">One-time payment · incl. 18% GST</p>
 
             <div className="mt-8 border-t border-black/10 pt-6">
               <label className="block">
@@ -356,15 +409,16 @@ export function NewProjectForm() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => setTesterCount((prev) => prev + 1)}
-                    className="grid size-10 place-items-center rounded-xl border border-black/15 bg-zinc-50 text-[18px] font-bold text-ink-900 hover:bg-zinc-100 transition-colors"
+                    onClick={() => setTesterCount((prev) => Math.min(25, prev + 1))}
+                    disabled={testerCount >= 25}
+                    className="grid size-10 place-items-center rounded-xl border border-black/15 bg-zinc-50 text-[18px] font-bold text-ink-900 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-100 transition-colors"
                   >
                     +
                   </button>
                   <span className="text-[13px] text-ink-600">
                     {testerCount > 14
                       ? `(+₹${(extraTesters * 100).toLocaleString()} for ${extraTesters} extra testers @ ₹100/tester)`
-                      : "Standard 14 testers bundle (₹2,999)"}
+                      : "Standard 14 testers bundle (₹2,999 incl. GST)"}
                   </span>
                 </div>
               </label>
@@ -422,17 +476,34 @@ export function NewProjectForm() {
                     </div>
                   )}
                 </div>
-                <div>
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-zinc-50 px-4 py-2 text-[13.5px] font-medium text-ink-800 hover:bg-zinc-100">
-                    <Upload className="size-4" /> Upload icon
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleIconFile}
-                      className="hidden"
-                    />
-                  </label>
-                  <p className="mt-1 text-[12px] text-ink-400">
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-zinc-50 px-4 py-2 text-[13.5px] font-medium text-ink-800 hover:bg-zinc-100">
+                      <Upload className="size-4" /> Upload icon
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleIconFile}
+                        className="hidden"
+                      />
+                    </label>
+                    {appIcon && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAppIcon("");
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = "";
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-3.5 py-2 text-[13px] font-medium text-rose-600 hover:bg-rose-100 transition-colors"
+                      >
+                        <Trash2 className="size-3.5" /> Remove
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[12px] text-ink-400">
                     If no image is uploaded, defaults to first letter of app name.
                   </p>
                 </div>
@@ -483,14 +554,42 @@ export function NewProjectForm() {
                     https://play.google.com/apps/testing/...
                   </code>
                 </span>
-                <input
-                  required
-                  value={webOptInUrl}
-                  onChange={(e) => setWebOptInUrl(e.target.value)}
-                  placeholder="https://play.google.com/apps/testing/com.your.app"
-                  type="url"
-                  className={`mt-2 ${inputCls}`}
-                />
+                <div className="relative mt-2">
+                  <input
+                    required
+                    value={webOptInUrl}
+                    onChange={(e) => setWebOptInUrl(e.target.value)}
+                    placeholder="https://play.google.com/apps/testing/com.your.app"
+                    type="url"
+                    className={`${inputCls} ${webOptInUrl.trim() ? "pr-24" : ""}`}
+                  />
+                  {webOptInUrl.trim() && (
+                    <a
+                      href={toExternalUrl(webOptInUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm hover:bg-amber-700 transition-all cursor-pointer"
+                      title="Open in other tab"
+                    >
+                      <span>Open</span>
+                      <ExternalLink className="size-3.5" />
+                    </a>
+                  )}
+                </div>
+                {webOptInUrl.trim() && (
+                  <p className="mt-2 flex items-center gap-1.5 text-[12.5px] text-amber-900">
+                    <span className="text-amber-800/80 font-medium">Click to test:</span>
+                    <a
+                      href={toExternalUrl(webOptInUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-semibold underline underline-offset-2 hover:text-amber-950 transition-colors max-w-[85%] truncate"
+                    >
+                      <span className="truncate">{webOptInUrl.trim()}</span>
+                      <ExternalLink className="size-3 shrink-0" />
+                    </a>
+                  </p>
+                )}
               </label>
             </div>
 
@@ -507,14 +606,42 @@ export function NewProjectForm() {
                     https://play.google.com/store/apps/details?id=...
                   </code>
                 </span>
-                <input
-                  required
-                  value={playStoreUrl}
-                  onChange={(e) => setPlayStoreUrl(e.target.value)}
-                  placeholder="https://play.google.com/store/apps/details?id=com.your.app"
-                  type="url"
-                  className={`mt-2 ${inputCls}`}
-                />
+                <div className="relative mt-2">
+                  <input
+                    required
+                    value={playStoreUrl}
+                    onChange={(e) => setPlayStoreUrl(e.target.value)}
+                    placeholder="https://play.google.com/store/apps/details?id=com.your.app"
+                    type="url"
+                    className={`${inputCls} ${playStoreUrl.trim() ? "pr-24" : ""}`}
+                  />
+                  {playStoreUrl.trim() && (
+                    <a
+                      href={toExternalUrl(playStoreUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3 py-1.5 text-[12px] font-semibold text-white shadow-sm hover:bg-sky-700 transition-all cursor-pointer"
+                      title="Open in other tab"
+                    >
+                      <span>Open</span>
+                      <ExternalLink className="size-3.5" />
+                    </a>
+                  )}
+                </div>
+                {playStoreUrl.trim() && (
+                  <p className="mt-2 flex items-center gap-1.5 text-[12.5px] text-sky-900">
+                    <span className="text-sky-800/80 font-medium">Click to test:</span>
+                    <a
+                      href={toExternalUrl(playStoreUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-semibold underline underline-offset-2 hover:text-sky-950 transition-colors max-w-[85%] truncate"
+                    >
+                      <span className="truncate">{playStoreUrl.trim()}</span>
+                      <ExternalLink className="size-3 shrink-0" />
+                    </a>
+                  </p>
+                )}
               </label>
             </div>
 

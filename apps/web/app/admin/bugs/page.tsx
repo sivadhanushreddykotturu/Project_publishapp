@@ -19,8 +19,9 @@ export default async function AdminBugsPage({
 
   let projects: ProjectOption[] = [];
   try {
-    const data = await serverApi<{ projects: ProjectOption[] }>("/projects");
-    projects = data.projects;
+    // Backend: GET /projects returns flat array (api.ts unwraps { data: [] }).
+    const data = await serverApi<ProjectOption[]>("/projects?limit=100");
+    projects = Array.isArray(data) ? data : [];
   } catch {
     projects = [];
   }
@@ -29,10 +30,11 @@ export default async function AdminBugsPage({
   let bugs: AdminBug[] = [];
   if (selectedId) {
     try {
-      const data = await serverApi<{ bugs: AdminBug[] }>(
-        `/projects/${selectedId}/bug-reports`,
+      // Backend: returns flat array (api.ts unwraps { data: [] }).
+      const data = await serverApi<AdminBug[]>(
+        `/projects/${selectedId}/bug-reports?limit=100`,
       );
-      bugs = data.bugs;
+      bugs = Array.isArray(data) ? data : [];
     } catch {
       bugs = [];
     }

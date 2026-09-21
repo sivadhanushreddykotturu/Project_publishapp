@@ -7,6 +7,7 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig: NextConfig = {
   transpilePackages: ["@defineux/types"],
   turbopack: { root: path.resolve(dirname, "../..") },
+  devIndicators: false,
 };
 
 export default nextConfig;

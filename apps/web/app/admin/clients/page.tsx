@@ -20,8 +20,9 @@ interface AdminClientRow {
 export default async function AdminClientsPage() {
   let clients: AdminClientRow[] = [];
   try {
-    const data = await serverApi<{ clients: AdminClientRow[] }>("/admin/clients");
-    clients = data.clients;
+    // Backend returns flat array at /clients (api.ts unwraps { data: [] }).
+    const data = await serverApi<AdminClientRow[]>("/clients?limit=100");
+    clients = Array.isArray(data) ? data : [];
   } catch {
     clients = [];
   }

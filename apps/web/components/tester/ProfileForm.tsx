@@ -9,27 +9,47 @@ import { getDeviceFingerprint } from "@/lib/fingerprint";
 
 export interface TesterProfileData {
   devices: Array<{
-    platform: "android" | "ios";
+    platform?: "android" | "ios";
     model: string;
-    osVersion: string;
-    fingerprint: string;
+    osVersion?: string;
+    androidVersion?: string;
+    fingerprint?: string;
   }>;
-  experienceLevel: string;
-  upi: { vpa?: string; qrImageUrl?: string };
-  walletBalance: number;
-  ratingAvg: number;
-  ratingCount: number;
-  status: string;
+  experienceLevel?: string;
+  upi?: { vpa?: string; qrImageUrl?: string };
+  walletBalance?: number;
+  ratingAvg?: number;
+  ratingCount?: number;
+  status?: string;
 }
+
+const ANDROID_VERSIONS = [
+  "Android 17",
+  "Android 16",
+  "Android 15",
+  "Android 14",
+  "Android 13",
+  "Android 12",
+  "Android 11",
+  "Android 10",
+  "Android 9",
+  "Android 8",
+];
 
 export function ProfileForm({ initial }: { initial: TesterProfileData | null }) {
   const router = useRouter();
   const { getToken } = useAuth();
-  const [devices, setDevices] = useState(
-    initial?.devices?.length
-      ? initial.devices
-      : [{ platform: "android" as const, model: "", osVersion: "", fingerprint: "" }],
-  );
+
+  const initialDevices = initial?.devices?.length
+    ? initial.devices.map((d) => ({
+        platform: d.platform || ("android" as const),
+        model: d.model || "",
+        osVersion: d.osVersion || d.androidVersion || "Android 14",
+        fingerprint: d.fingerprint || "",
+      }))
+    : [{ platform: "android" as const, model: "", osVersion: "Android 14", fingerprint: "" }];
+
+  const [devices, setDevices] = useState(initialDevices);
   const [experienceLevel, setExperienceLevel] = useState(
     initial?.experienceLevel ?? "beginner",
   );
@@ -44,13 +64,20 @@ export function ProfileForm({ initial }: { initial: TesterProfileData | null }) 
     setSaved(false);
     try {
       const cleanDevices = devices
-        .filter((d) => d.model.trim() && d.osVersion.trim())
+        .filter((d) => d.model.trim())
         .map((d) => ({
-          platform: d.platform,
+          platform: "android" as const,
           model: d.model.trim(),
-          osVersion: d.osVersion.trim(),
+          osVersion: (d.osVersion || "Android 14").trim(),
           fingerprint: d.fingerprint || getDeviceFingerprint(),
         }));
+
+      if (cleanDevices.length === 0) {
+        setError("Please add at least one device model.");
+        setBusy(false);
+        return;
+      }
+
       const token = await getToken();
       await api("/testers/me", {
         token,
@@ -91,10 +118,10 @@ export function ProfileForm({ initial }: { initial: TesterProfileData | null }) 
                     ds.map((x, j) => (j === i ? { ...x, model: e.target.value } : x)),
                   )
                 }
-                placeholder="e.g. Pixel 8a or Galaxy S23"
+                placeholder="e.g. Redmi Note 13 or Galaxy S24"
                 className="min-w-[140px] flex-1 rounded-2xl border border-black/10 px-4 py-3 text-[14px] outline-none placeholder:text-ink-400 focus:border-ink-950"
               />
-              <input
+              <select
                 value={d.osVersion}
                 onChange={(e) =>
                   setDevices((ds) =>
@@ -103,9 +130,14 @@ export function ProfileForm({ initial }: { initial: TesterProfileData | null }) 
                     ),
                   )
                 }
-                placeholder="e.g. Android 14"
-                className="w-[130px] rounded-2xl border border-black/10 px-4 py-3 text-[14px] outline-none placeholder:text-ink-400 focus:border-ink-950"
-              />
+                className="w-[140px] rounded-2xl border border-black/10 bg-white px-4 py-3 text-[14px] font-medium outline-none cursor-pointer focus:border-ink-950"
+              >
+                {ANDROID_VERSIONS.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 aria-label="Remove device"
@@ -123,7 +155,7 @@ export function ProfileForm({ initial }: { initial: TesterProfileData | null }) 
             onClick={() =>
               setDevices((ds) => [
                 ...ds,
-                { platform: "android", model: "", osVersion: "", fingerprint: "" },
+                { platform: "android", model: "", osVersion: "Android 14", fingerprint: "" },
               ])
             }
             className="mt-4 inline-flex items-center gap-2 text-[13.5px] font-semibold text-ink-800 hover:text-orange-500"
@@ -179,9 +211,9 @@ export function ProfileForm({ initial }: { initial: TesterProfileData | null }) 
       <button
         onClick={save}
         disabled={busy}
-        className="w-full rounded-full bg-ink-950 py-4 text-[15px] font-semibold text-white transition-all enabled:hover:scale-[1.01] disabled:opacity-40"
+        className="w-full rounded-full bg-ink-950 py-4 text-[15.5px] font-semibold text-white shadow-md transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
       >
-        {busy ? "Saving…" : "Save profile"}
+        {busy ? "Saving..." : "Save profile"}
       </button>
     </div>
   );

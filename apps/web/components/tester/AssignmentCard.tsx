@@ -150,7 +150,7 @@ export function AssignmentCard({ assignment }: { assignment: TesterAssignment })
           </div>
 
           <p className="text-[12.5px] font-semibold uppercase tracking-[0.1em] text-orange-500">
-            Step {step.order} of 5 · {STEP_LABELS[step.type] ?? step.type}
+            Step {step.order} of {project.steps?.length || 3} · {STEP_LABELS[step.type] ?? step.type}
           </p>
           <p className="mt-2 max-w-xl text-[14.5px] leading-relaxed text-ink-600">
             {step.config.instructions}

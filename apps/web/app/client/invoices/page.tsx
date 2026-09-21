@@ -8,19 +8,37 @@ export const dynamic = "force-dynamic";
 
 interface InvoiceRow {
   _id: string;
-  packageKey: string;
-  amountPaise: number;
-  gstPaise: number;
-  totalPaise: number;
+  packageKey?: string;
+  package?: string;
+  amountPaise?: number;
+  amount?: number;
+  gstPaise?: number;
+  gst?: number;
+  totalPaise?: number;
   status: string;
   createdAt: string;
+  projectId?: { _id?: string; appDetails?: { appName?: string } } | string;
 }
+
+const PACKAGE_NAMES: Record<string, string> = {
+  closed_testing_standard: "Play Store Closed Testing",
+  starter: "Starter Track",
+  growth: "Growth Track",
+  scale: "Scale Track",
+};
 
 export default async function ClientInvoices() {
   let invoices: InvoiceRow[] = [];
   try {
-    const data = await serverApi<{ invoices: InvoiceRow[] }>("/invoices/me");
-    invoices = data.invoices;
+    const data = await serverApi<{ invoices?: InvoiceRow[] } | InvoiceRow[]>("/invoices/me").catch(
+      () => serverApi<{ invoices?: InvoiceRow[] } | InvoiceRow[]>("/invoices?limit=100"),
+    );
+    invoices =
+      data && typeof data === "object" && "invoices" in data && Array.isArray(data.invoices)
+        ? data.invoices
+        : Array.isArray(data)
+        ? data
+        : [];
   } catch {
     invoices = [];
   }
@@ -41,37 +59,52 @@ export default async function ClientInvoices() {
         <thead>
           <tr className="border-b border-black/5 text-[12px] uppercase tracking-[0.08em] text-ink-400">
             <th className="px-6 py-4 font-semibold">Invoice</th>
-            <th className="px-6 py-4 font-semibold">Package</th>
+            <th className="px-6 py-4 font-semibold">Package / App</th>
             <th className="px-6 py-4 font-semibold">Amount</th>
-            <th className="px-6 py-4 font-semibold">GST</th>
+            <th className="px-6 py-4 font-semibold">GST (18%)</th>
             <th className="px-6 py-4 font-semibold">Total</th>
             <th className="px-6 py-4 font-semibold">Status</th>
           </tr>
         </thead>
         <tbody>
-          {invoices.map((inv) => (
-            <tr key={inv._id} className="border-b border-black/5 last:border-0">
-              <td className="px-6 py-4">
-                <span className="font-mono text-[12.5px] text-ink-500">
-                  {inv._id.slice(-8)}
-                </span>
-                <span className="block text-[12.5px] text-ink-400">
-                  {formatDate(inv.createdAt)}
-                </span>
-              </td>
-              <td className="px-6 py-4 font-medium capitalize text-ink-950">
-                {inv.packageKey}
-              </td>
-              <td className="px-6 py-4 text-ink-600">{formatINR(inv.amountPaise)}</td>
-              <td className="px-6 py-4 text-ink-600">{formatINR(inv.gstPaise)}</td>
-              <td className="px-6 py-4 font-semibold text-ink-950">
-                {formatINR(inv.totalPaise)}
-              </td>
-              <td className="px-6 py-4">
-                <StatusPill status={inv.status} />
-              </td>
-            </tr>
-          ))}
+          {invoices.map((inv) => {
+            const rawAmount = inv.amountPaise ?? inv.amount ?? 0;
+            const rawGst = inv.gstPaise ?? inv.gst ?? Math.round(rawAmount * 0.18);
+            const rawTotal = inv.totalPaise ?? rawAmount + rawGst;
+            const pkgKey = inv.packageKey ?? inv.package ?? "closed_testing_standard";
+            const pkgName = PACKAGE_NAMES[pkgKey] ?? pkgKey;
+            const appName =
+              typeof inv.projectId === "object" && inv.projectId?.appDetails?.appName
+                ? inv.projectId.appDetails.appName
+                : null;
+
+            return (
+              <tr key={inv._id} className="border-b border-black/5 last:border-0 hover:bg-zinc-50/50 transition-colors">
+                <td className="px-6 py-4">
+                  <span className="font-mono text-[12.5px] font-semibold text-ink-700">
+                    #{inv._id.slice(-8).toUpperCase()}
+                  </span>
+                  <span className="block text-[12px] text-ink-400">
+                    {formatDate(inv.createdAt)}
+                  </span>
+                </td>
+                <td className="px-6 py-4">
+                  <span className="font-medium text-ink-950 block">{pkgName}</span>
+                  {appName && (
+                    <span className="text-[12px] text-ink-400 block">{appName}</span>
+                  )}
+                </td>
+                <td className="px-6 py-4 text-ink-600 font-medium">{formatINR(rawAmount)}</td>
+                <td className="px-6 py-4 text-ink-600">{formatINR(rawGst)}</td>
+                <td className="px-6 py-4 font-bold text-ink-950">
+                  {formatINR(rawTotal)}
+                </td>
+                <td className="px-6 py-4">
+                  <StatusPill status={inv.status} />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

@@ -6,7 +6,7 @@ import { Minus, Plus } from "lucide-react";
 const FAQS = [
   {
     q: "Why does Google Play require 14 testers for 14 days?",
-    a: "Google requires new personal developer accounts to run a closed test with at least 14 opted-in testers for 14 continuous days before applying for production access. DefineUX coordinates the entire test with real Android testers so you pass Google's review.",
+    a: "Google requires new personal developer accounts to run a closed test with at least 14 opted-in testers for 14 continuous days before applying for production access. UXOS coordinates the entire test with real Android testers so you pass Google's review.",
   },
   {
     q: "Do you support iOS or UX testing?",
@@ -40,10 +40,10 @@ export function Faq() {
             Something else on your mind? Write to us — a human replies.
           </p>
           <a
-            href="mailto:hello@defineux.app"
+            href="mailto:support@uxos.in"
             className="mt-3 inline-block text-[15px] font-medium text-orange-500 underline-offset-4 hover:underline"
           >
-            hello@defineux.app
+            support@uxos.in
           </a>
         </div>
 

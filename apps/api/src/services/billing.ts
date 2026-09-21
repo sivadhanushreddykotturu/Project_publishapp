@@ -5,7 +5,7 @@ import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { writeAudit } from "./audit.js";
 import { activateProject, publishOpportunity } from "./workflow.js";
 
-/** Invoice math lives in exactly one place. Amounts in paise, GST 18%. */
+/** Invoice math lives in exactly one place. Prices are inclusive of 18% GST. */
 export function priceForPackage(
   packageKey: string,
   testerCount?: number,
@@ -15,19 +15,22 @@ export function priceForPackage(
   totalPaise: number;
 } {
   const pkg = PACKAGES.find((p) => p.key === packageKey) ?? PACKAGES[0];
-  let baseAmountPaise = pkg.pricePaise;
+  let targetTotalPaise = pkg.pricePaise;
 
   // If client selected custom testers above the minimum 14
   if (testerCount && testerCount > pkg.requiredTesters) {
     const extraTesters = testerCount - pkg.requiredTesters;
-    baseAmountPaise += extraTesters * 100_00; // ₹100 per additional tester
+    targetTotalPaise += extraTesters * 100_00; // ₹100 per additional tester
   }
 
-  const gstPaise = Math.round(baseAmountPaise * GST_RATE);
+  // Inclusive of 18% GST: Base = Total / 1.18, GST = Total - Base
+  const baseAmountPaise = Math.round(targetTotalPaise / (1 + GST_RATE));
+  const gstPaise = targetTotalPaise - baseAmountPaise;
+
   return {
     amountPaise: baseAmountPaise,
     gstPaise,
-    totalPaise: baseAmountPaise + gstPaise,
+    totalPaise: targetTotalPaise,
   };
 }
 

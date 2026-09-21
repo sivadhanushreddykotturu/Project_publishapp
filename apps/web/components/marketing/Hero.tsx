@@ -19,16 +19,13 @@ export function Hero() {
           Fourteen testers.
           <br />
           Fourteen days.
-          <span className="relative ml-3 inline-block animate-float align-middle">
-            <AppGridTile />
-          </span>
           <br />
           Zero spreadsheets.
         </h1>
 
         <p className="mx-auto mt-7 max-w-2xl text-[17px] leading-relaxed text-ink-600 md:text-[19px]">
           Google Play requires 14 opted-in testers engaged for 14 continuous days
-          before publishing to production. DefineUX takes care of the entire Android
+          before publishing to production. UXOS takes care of the entire Android
           testing cycle — tester recruitment, daily check-ins, bug reports, and the
           completion proof for Play Console.
         </p>
@@ -54,20 +51,5 @@ export function Hero() {
         </p>
       </div>
     </section>
-  );
-}
-
-function AppGridTile() {
-  const cells = [
-    "bg-emerald-400", "bg-amber-300", "bg-orange-400",
-    "bg-rose-400", "bg-ink-300", "bg-pink-400",
-    "bg-violet-400", "bg-sky-400", "bg-teal-300",
-  ];
-  return (
-    <span className="grid grid-cols-3 gap-[6px] rounded-[26%] border border-black/5 bg-white p-3 shadow-xl shadow-ink-950/10">
-      {cells.map((c, i) => (
-        <span key={i} className={`size-[clamp(10px,1.6vw,18px)] rounded-[30%] ${c}`} />
-      ))}
-    </span>
   );
 }

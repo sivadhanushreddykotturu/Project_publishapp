@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, useClerk } from "@clerk/nextjs";
@@ -20,7 +20,11 @@ import {
   Gauge,
   LogOut,
   Sun,
+  Moon,
   Search,
+  Smartphone,
+  UserCircle,
+  User,
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/marketing/LogoMark";
@@ -45,7 +49,9 @@ const NAV_BY_ROLE: Record<DashRole, NavItem[]> = {
   tester: [
     { href: "/tester", label: "Dashboard", icon: LayoutDashboard },
     { href: "/tester/opportunities", label: "App Testing", icon: Activity },
+    { href: "/tester/tests", label: "My Apps", icon: Smartphone },
     { href: "/tester/wallet", label: "Earnings", icon: CreditCard },
+    { href: "/tester/profile", label: "Profile", icon: UserCircle },
     { href: "/tester/support", label: "Support", icon: Headphones },
   ],
   admin: [
@@ -96,14 +102,36 @@ const TITLES_BY_ROLE: Record<DashRole, Record<string, string>> = {
 
 export function DashboardShell({
   role,
+  initialDevice,
   children,
 }: {
   role: DashRole;
+  initialDevice?: { model: string; osVersion?: string; androidVersion?: string } | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const { signOut } = useClerk();
-  const [lightMode, setLightMode] = useState(true);
+  const [isNightMode, setIsNightMode] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("publishapp_night_mode");
+      if (stored !== null) {
+        setIsNightMode(stored === "true");
+      }
+    } catch {}
+  }, []);
+
+  const toggleNightMode = () => {
+    setIsNightMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("publishapp_night_mode", String(next));
+      } catch {}
+      return next;
+    });
+  };
+
   const nav = NAV_BY_ROLE[role];
   const title =
     Object.entries(TITLES_BY_ROLE[role])
@@ -113,24 +141,28 @@ export function DashboardShell({
   const isTester = role === "tester";
 
   return (
-    <div className="flex min-h-screen bg-[#F8F9FA]">
+    <div
+      className={`dashboard-root flex min-h-screen transition-colors duration-300 ${
+        isNightMode ? "dark bg-[#0B0F19]" : "bg-[#F8F9FA]"
+      }`}
+    >
       {/* sidebar — desktop */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[250px] flex-col border-r border-slate-200/80 bg-white md:flex select-none">
         <div className="px-6 py-6">
           <Link href="/">
-            <Logo />
+            <Logo dark={isNightMode} />
           </Link>
         </div>
 
-        <nav className="flex-1 space-y-1.5 overflow-y-auto px-4 pb-6">
+        <nav suppressHydrationWarning className="flex-1 space-y-1.5 overflow-y-auto px-4 pb-6">
           {nav.map((item) => (
             <NavLink key={item.href} item={item} pathname={pathname} role={role} />
           ))}
         </nav>
 
-        {/* Sidebar bottom matching Figma: Logout & Light mode */}
+        {/* Sidebar bottom: Logout & Night mode with extra clearance for dev overlays */}
         {isTester ? (
-          <div className="border-t border-slate-100 px-6 py-5 space-y-4">
+          <div className="border-t border-slate-100 px-6 py-5 pb-8 space-y-4">
             <button
               type="button"
               onClick={() => signOut({ redirectUrl: "/" })}
@@ -141,32 +173,64 @@ export function DashboardShell({
             </button>
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-2 text-[13.5px] font-medium text-slate-600">
-                <Sun className="size-4 text-slate-400" />
-                <span>Light mode</span>
+                {isNightMode ? (
+                  <Moon className="size-4 text-[#818CF8]" />
+                ) : (
+                  <Sun className="size-4 text-slate-400" />
+                )}
+                <span>Night mode</span>
               </div>
               <button
                 type="button"
-                onClick={() => setLightMode(!lightMode)}
-                aria-label="Toggle mode"
+                onClick={toggleNightMode}
+                aria-label="Toggle night mode"
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  lightMode ? "bg-[#4F46E5]" : "bg-slate-300"
+                  isNightMode ? "bg-[#4F46E5]" : "bg-slate-300"
                 }`}
               >
                 <span
-                  className={`inline-flex size-5 transform items-center justify-center rounded-full bg-white transition-transform ${
-                    lightMode ? "translate-x-5" : "translate-x-1"
+                  className={`inline-flex size-5 transform items-center justify-center rounded-full bg-white shadow-xs transition-transform ${
+                    isNightMode ? "translate-x-5" : "translate-x-1"
                   }`}
                 >
-                  <Sun className="size-3 text-[#4F46E5]" />
+                  {isNightMode ? (
+                    <Moon className="size-3 text-[#4F46E5]" />
+                  ) : (
+                    <Sun className="size-3 text-amber-500" />
+                  )}
                 </span>
               </button>
             </div>
           </div>
         ) : (
-          <div className="border-t border-black/5 px-6 py-4">
+          <div className="border-t border-black/5 px-6 py-4 pb-8 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-[13px] font-medium text-slate-500">
+                {isNightMode ? (
+                  <Moon className="size-3.5 text-[#818CF8]" />
+                ) : (
+                  <Sun className="size-3.5 text-slate-400" />
+                )}
+                <span>Night mode</span>
+              </div>
+              <button
+                type="button"
+                onClick={toggleNightMode}
+                aria-label="Toggle night mode"
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  isNightMode ? "bg-[#4F46E5]" : "bg-slate-300"
+                }`}
+              >
+                <span
+                  className={`inline-flex size-4 transform items-center justify-center rounded-full bg-white shadow-xs transition-transform ${
+                    isNightMode ? "translate-x-4" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
+            </div>
             <Link
               href="/"
-              className="text-[13px] font-medium text-ink-400 transition-colors hover:text-orange-500"
+              className="block text-[13px] font-medium text-ink-400 transition-colors hover:text-orange-500"
             >
               ← Back to site
             </Link>
@@ -201,9 +265,27 @@ export function DashboardShell({
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <TesterDeviceBadge />
+                  <TesterDeviceBadge initialDevice={initialDevice} />
                   <NotificationBell variant="purple" />
-                  <UserButton />
+                  <UserButton>
+                    <UserButton.MenuItems>
+                      <UserButton.Link
+                        label="Tester Profile"
+                        href="/tester/profile"
+                        labelIcon={<User className="size-4" />}
+                      />
+                      <UserButton.Link
+                        label="My Apps"
+                        href="/tester/tests"
+                        labelIcon={<Smartphone className="size-4" />}
+                      />
+                      <UserButton.Link
+                        label="Earnings & UPI"
+                        href="/tester/wallet"
+                        labelIcon={<CreditCard className="size-4" />}
+                      />
+                    </UserButton.MenuItems>
+                  </UserButton>
                 </div>
               </div>
             ) : (
@@ -225,7 +307,7 @@ export function DashboardShell({
           </div>
 
           {/* mobile nav */}
-          <nav className="flex gap-2 overflow-x-auto px-4 pb-3 md:hidden">
+          <nav suppressHydrationWarning className="flex gap-2 overflow-x-auto px-4 pb-3 md:hidden">
             {nav.map((item) => {
               const active =
                 item.href.split("/").filter(Boolean).length <= 2

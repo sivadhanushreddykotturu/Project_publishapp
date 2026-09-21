@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
+import { AlertCircle, ArrowRight, Radar, Smartphone } from "lucide-react";
 import { api } from "@/lib/api";
 
 export interface OpportunityItem {
@@ -24,87 +25,12 @@ export interface OpportunityItem {
   testerRank?: number;
   userQueueRank?: number;
   realProjectId?: string;
+  payoutINR?: number;
 }
-
-const DEFAULT_OPPORTUNITIES: OpportunityItem[] = [
-  {
-    id: "kanma",
-    name: "Kanma",
-    iconBg: "bg-[#7F0E1E]",
-    iconColor: "text-white",
-    iconSvg: "crown",
-    statusText: "Active - Aug 20",
-    statusType: "active",
-    description:
-      "After the training, you will be our core UX Testing panel, which will be involved in the actual mobile app testing projects we receive.",
-    testersJoined: 10,
-    totalTesters: 15,
-    userState: "not_joined",
-  },
-  {
-    id: "deloitte",
-    name: "Deloitte",
-    iconBg: "bg-black",
-    iconColor: "text-white",
-    iconSvg: "deloitte",
-    statusText: "Wait in line - Aug 20",
-    statusType: "wait",
-    description:
-      "this our business right now so I will say the nature of the business and i WILL tell you the exactly the market that we want to build upon so here we go in this process like this - first I will explain the what business we are and I will tell you the how we want to position it.",
-    testersJoined: 7,
-    totalTesters: 15,
-    userState: "joined_tester",
-    testerRank: 7,
-  },
-  {
-    id: "blinkit",
-    name: "Blinkit",
-    iconBg: "bg-[#F7D02C]",
-    iconColor: "text-slate-950",
-    iconSvg: "blinkit",
-    statusText: "Filling up - Aug 20",
-    statusType: "filling",
-    description:
-      "The people selected for this panel will be expected to remain active, responsive and consistent when testing projects are assigned.",
-    testersJoined: 13,
-    totalTesters: 15,
-    userState: "not_joined",
-  },
-  {
-    id: "swiggy",
-    name: "Swiggy",
-    iconBg: "bg-[#FC8019]",
-    iconColor: "text-white",
-    iconSvg: "swiggy",
-    statusText: "Wait in line - Aug 20",
-    statusType: "wait",
-    description:
-      "If you are genuinely interested and ready to commit 2 hours a day for 1 week, complete the payment and send the screenshot here. Once verified, you will receive the group access and further training instructions.",
-    testersJoined: 15,
-    totalTesters: 15,
-    queueCount: 12,
-    userState: "queue_available",
-  },
-  {
-    id: "facebook",
-    name: "Facebook",
-    iconBg: "bg-[#1877F2]",
-    iconColor: "text-white",
-    iconSvg: "facebook",
-    statusText: "Wait in line - Aug 20",
-    statusType: "wait",
-    description:
-      "We are starting this as the foundation for a much bigger plan. The goal is to build a reliable UX testing team, work on real client applications, and gradually take this service to a much larger level.",
-    testersJoined: 15,
-    totalTesters: 15,
-    queueCount: 14,
-    userState: "joined_queue",
-    userQueueRank: 14,
-  },
-];
 
 export function AppTestingGrid({
   initialOpportunities,
+  activeTestsCount = 0,
 }: {
   initialOpportunities?: Array<{
     _id: string;
@@ -114,14 +40,20 @@ export function AppTestingGrid({
     waitlistCount: number;
     joinState: string;
     appDetails: { appName: string; packageName: string; description?: string };
+    payoutINR?: number;
     myAssignment: { status: string; queuePosition?: number } | null;
   }>;
+  activeTestsCount?: number;
 }) {
   const router = useRouter();
   const { getToken } = useAuth();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [deviceAlert, setDeviceAlert] = useState(false);
+  const isLimitReached = activeTestsCount >= 3;
+
   const [items, setItems] = useState<OpportunityItem[]>(() => {
     if (initialOpportunities && initialOpportunities.length > 0) {
-      const realItems: OpportunityItem[] = initialOpportunities.map((op, idx) => {
+      return initialOpportunities.map((op, idx) => {
         let userState: OpportunityItem["userState"] = "not_joined";
         if (op.myAssignment) {
           userState =
@@ -131,14 +63,26 @@ export function AppTestingGrid({
         }
 
         const bgColors = ["bg-[#7F0E1E]", "bg-black", "bg-[#F7D02C]", "bg-[#FC8019]", "bg-[#1877F2]"];
+        const lower = op.appDetails.appName.toLowerCase();
+        const iconSvg = lower.includes("blinkit")
+          ? ("blinkit" as const)
+          : lower.includes("swiggy")
+          ? ("swiggy" as const)
+          : lower.includes("deloitte")
+          ? ("deloitte" as const)
+          : lower.includes("kanma")
+          ? ("crown" as const)
+          : undefined;
+
         return {
           id: op._id,
           name: op.appDetails.appName,
           packageName: op.appDetails.packageName,
           iconBg: bgColors[idx % bgColors.length],
           iconColor: idx % bgColors.length === 2 ? "text-slate-950" : "text-white",
+          iconSvg,
           iconText: op.appDetails.appName.slice(0, 2).toUpperCase(),
-          statusText: op.joinState === "open" ? "Active - Aug 20" : "Filling up - Aug 20",
+          statusText: op.joinState === "open" ? "Active Now" : "Filling up fast",
           statusType: op.joinState === "open" ? "active" : "filling",
           description:
             op.appDetails.description ||
@@ -150,34 +94,22 @@ export function AppTestingGrid({
           testerRank: op.myAssignment?.queuePosition,
           userQueueRank: op.myAssignment?.queuePosition,
           realProjectId: op._id,
+          payoutINR: op.payoutINR ?? 100,
         };
       });
-
-      // Also append default showcase items so all 5 Figma items are accessible
-      const existingNames = new Set(realItems.map((r) => r.name.toLowerCase()));
-      const combined = [
-        ...realItems,
-        ...DEFAULT_OPPORTUNITIES.filter((d) => !existingNames.has(d.name.toLowerCase())),
-      ];
-      return combined;
     }
-    return DEFAULT_OPPORTUNITIES;
+    return [];
   });
 
   const [busyId, setBusyId] = useState<string | null>(null);
 
   async function handleAction(item: OpportunityItem) {
     setBusyId(item.id);
+    setErrorMessage(null);
+    setDeviceAlert(false);
 
-    try {
-      if (item.realProjectId) {
-        const token = await getToken();
-        await api(`/projects/${item.realProjectId}/join`, { token, method: "POST" });
-      }
-    } catch {
-      // Allow seamless UI state change
-    }
-
+    // Optimistic UI state transition
+    const prevItems = items;
     setItems((prev) =>
       prev.map((it) => {
         if (it.id !== item.id) return it;
@@ -192,19 +124,108 @@ export function AppTestingGrid({
           return {
             ...it,
             userState: "joined_queue",
-            queueCount: (it.queueCount ?? 12) + 1,
-            userQueueRank: (it.queueCount ?? 12) + 1,
+            queueCount: (it.queueCount ?? 0) + 1,
+            userQueueRank: (it.queueCount ?? 0) + 1,
           };
         }
         return it;
       }),
     );
 
-    setBusyId(null);
+    try {
+      if (item.realProjectId) {
+        const token = await getToken();
+        await api(`/projects/${item.realProjectId}/join`, { token, method: "POST" });
+        router.refresh();
+      }
+    } catch (err: unknown) {
+      // Rollback optimistic state on error
+      setItems(prevItems);
+      const msg = err instanceof Error ? err.message : "Could not join project.";
+      setErrorMessage(msg);
+      if (
+        msg.toLowerCase().includes("android") ||
+        msg.toLowerCase().includes("device") ||
+        msg.toLowerCase().includes("platform")
+      ) {
+        setDeviceAlert(true);
+      }
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
     <div className="space-y-6">
+      {deviceAlert ? (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50/90 p-5 text-amber-900 shadow-xs">
+          <div className="flex items-start gap-3">
+            <Smartphone className="size-5 shrink-0 text-amber-600 mt-0.5" />
+            <div>
+              <p className="text-[14px] font-semibold text-amber-950">
+                Android device required to join this test
+              </p>
+              <p className="text-[13px] text-amber-800 mt-0.5">
+                Please register your Android phone model and version in your Profile before joining closed testing tracks.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/tester/profile"
+            className="shrink-0 rounded-xl bg-[#4F46E5] px-5 py-2.5 text-[13.5px] font-semibold text-white shadow-xs hover:bg-[#4338CA] transition-all flex items-center gap-1.5"
+          >
+            Go to Profile
+            <ArrowRight className="size-3.5" />
+          </Link>
+        </div>
+      ) : errorMessage ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-[13.5px] text-rose-800">
+          <AlertCircle className="size-4 shrink-0 text-rose-600" />
+          <span>{errorMessage}</span>
+        </div>
+      ) : null}
+
+      {/* Active Slots Tracker Bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="flex size-9 items-center justify-center rounded-xl bg-indigo-50 text-[#4F46E5] font-bold text-[13px]">
+            {activeTestsCount}/3
+          </div>
+          <div>
+            <p className="text-[13.5px] font-bold text-slate-900 leading-tight">
+              Active Testing Slots: {activeTestsCount} of 3 Used
+            </p>
+            <p className="text-[12px] text-slate-500 mt-0.5">
+              {isLimitReached
+                ? "Maximum active testing limit reached. Complete an ongoing test to free up slots for new tracks."
+                : `You can actively participate in up to ${3 - activeTestsCount} more testing track${3 - activeTestsCount > 1 ? "s" : ""}.`}
+            </p>
+          </div>
+        </div>
+
+        {isLimitReached && (
+          <Link
+            href="/tester/tests"
+            className="shrink-0 rounded-xl bg-[#4F46E5] px-4 py-2 text-[12.5px] font-semibold text-white hover:bg-[#4338CA] transition-all"
+          >
+            My Active Tests →
+          </Link>
+        )}
+      </div>
+
+      {items.length === 0 && (
+        <div className="rounded-[24px] border border-slate-200/80 bg-white p-12 text-center shadow-xs">
+          <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-indigo-50 text-[#4F46E5]">
+            <Radar className="size-7" />
+          </div>
+          <h3 className="mt-4 text-[18px] font-bold text-slate-900">
+            No testing opportunities available right now
+          </h3>
+          <p className="mt-2 text-[14px] text-slate-500 max-w-md mx-auto">
+            New Google Play closed testing tracks appear here as developers submit apps. Check back shortly.
+          </p>
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {items.map((item) => {
           const isBusy = busyId === item.id;
@@ -225,9 +246,14 @@ export function AppTestingGrid({
 
                   {/* App Info */}
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-[17px] font-bold tracking-tight text-slate-900 leading-tight">
-                      {item.name}
-                    </h3>
+                    <div className="flex items-start justify-between gap-1.5">
+                      <h3 className="text-[17px] font-bold tracking-tight text-slate-900 leading-tight truncate">
+                        {item.name}
+                      </h3>
+                      <span className="shrink-0 rounded-full bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+                        Earn ₹{item.payoutINR ?? 100}
+                      </span>
+                    </div>
                     <p className="text-[12px] font-medium text-slate-400 mt-0.5">
                       Playstore closed Testing
                     </p>
@@ -285,14 +311,25 @@ export function AppTestingGrid({
                         Testers Joined
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      disabled={isBusy}
-                      onClick={() => handleAction(item)}
-                      className="rounded-xl bg-[#4F46E5] px-6 py-2.5 text-[13.5px] font-semibold text-white shadow-sm hover:bg-[#4338CA] transition-all disabled:opacity-50 active:scale-95"
-                    >
-                      {isBusy ? "Joining…" : "Join Testing"}
-                    </button>
+                    {isLimitReached ? (
+                      <button
+                        type="button"
+                        disabled
+                        title="Maximum 3 active tests reached. Complete an ongoing test to join new tracks."
+                        className="rounded-xl bg-slate-100 border border-slate-200 px-5 py-2.5 text-[12.5px] font-semibold text-slate-400 cursor-not-allowed shadow-none"
+                      >
+                        Limit 3/3 Reached
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => handleAction(item)}
+                        className="rounded-xl bg-[#4F46E5] px-6 py-2.5 text-[13.5px] font-semibold text-white shadow-sm hover:bg-[#4338CA] transition-all disabled:opacity-50 active:scale-95 cursor-pointer"
+                      >
+                        {isBusy ? "Joining…" : "Join Testing"}
+                      </button>
+                    )}
                   </>
                 )}
 

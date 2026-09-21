@@ -8,8 +8,9 @@ export const dynamic = "force-dynamic";
 export default async function AdminProjects() {
   let projects: AdminProjectRow[] = [];
   try {
-    const data = await serverApi<{ projects: AdminProjectRow[] }>("/projects");
-    projects = data.projects;
+    // Backend returns flat array (api.ts unwraps { data: [] }).
+    const data = await serverApi<AdminProjectRow[]>("/projects?limit=100");
+    projects = Array.isArray(data) ? data : [];
   } catch {
     projects = [];
   }

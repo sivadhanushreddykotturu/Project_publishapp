@@ -37,19 +37,32 @@ projectsRouter.get("/packages", (_req, res) => {
 // --------------------------------------------------------------------------
 // client
 // --------------------------------------------------------------------------
-const createSchema = z.object({
-  packageKey: z.string().min(1),
-  projectType: z.enum(["play_store_internal", "ios_testflight"]).optional(),
-  testerCount: z.number().int().min(14).max(100).optional(),
-  appDetails: z.object({
-    appName: z.string().min(1).max(120),
-    packageName: z.string().max(200).optional().default(""),
-    description: z.string().max(2000).optional(),
-    iconUrl: z.string().max(1000).optional(),
-    webOptInUrl: z.string().url().optional().or(z.literal("")),
-    playStoreUrl: z.string().url().optional().or(z.literal("")),
-  }),
-});
+const createSchema = z
+  .object({
+    packageKey: z.string().optional(),
+    package: z.string().optional(),
+    projectType: z.enum(["play_store_internal", "ios_testflight"]).optional(),
+    testerCount: z.number().int().min(14).max(100).optional(),
+    appDetails: z.object({
+      appName: z.string().min(1).max(120),
+      packageName: z.string().max(200).optional().default(""),
+      description: z.string().max(2000).optional(),
+      iconUrl: z.string().optional(),
+      webOptInUrl: z.string().url().optional().or(z.literal("")),
+      playStoreUrl: z.string().url().optional().or(z.literal("")),
+    }),
+  })
+  .transform((data) => ({
+    ...data,
+    packageKey: data.packageKey || data.package || "starter",
+    appDetails: {
+      ...data.appDetails,
+      iconUrl:
+        data.appDetails.iconUrl && !data.appDetails.iconUrl.startsWith("data:")
+          ? data.appDetails.iconUrl.slice(0, 1000)
+          : undefined,
+    },
+  }));
 
 projectsRouter.post(
   "/",
@@ -123,8 +136,12 @@ projectsRouter.get(
     const tester = await Tester.findOne({ userId: user?._id });
     if (!tester) throw notFound("Tester profile");
 
-    // only show projects the tester's registered devices can actually test
-    const platforms = new Set(tester.devices.map((d) => d.platform));
+    // only show projects the tester's registered devices can actually test (default to android if no device registered yet)
+    const platforms = new Set(
+      tester.devices?.length
+        ? tester.devices.map((d) => d.platform)
+        : ["android"],
+    );
     const eligibleTypes = PROJECT_TYPES.filter((t) =>
       platforms.has(PROJECT_TYPE_PLATFORM[t]),
     );
@@ -134,7 +151,7 @@ projectsRouter.get(
       joinState: { $in: ["open", "full"] },
       projectType: { $in: eligibleTypes },
     })
-      .select("appDetails packageKey projectType requiredTesters activeTesterCount waitlistCount joinState createdAt")
+      .select("appDetails packageKey projectType requiredTesters activeTesterCount waitlistCount joinState createdAt steps.config.payoutPaise")
       .sort({ opportunityPublishedAt: -1 })
       .lean();
 
@@ -147,10 +164,18 @@ projectsRouter.get(
     const byProject = new Map(mine.map((a) => [String(a.projectId), a]));
 
     ok(res, {
-      opportunities: projects.map((p) => ({
-        ...p,
-        myAssignment: byProject.get(String(p._id)) ?? null,
-      })),
+      opportunities: projects.map((p) => {
+        const totalPaise = (p.steps || []).reduce(
+          (sum: number, s: any) => sum + (s.config?.payoutPaise || 0),
+          0,
+        );
+        const payoutINR = totalPaise > 0 ? Math.round(totalPaise / 100) : 100;
+        return {
+          ...p,
+          payoutINR,
+          myAssignment: byProject.get(String(p._id)) ?? null,
+        };
+      }),
     });
   }),
 );
@@ -539,8 +564,22 @@ projectsRouter.post(
 projectsRouter.get(
   "/",
   requireAuth,
-  requireRole("admin"),
+  requireRole("admin", "client"),
   ah(async (req, res) => {
+    const { clerkUserId, role } = auth(req);
+
+    if (role === "client") {
+      const user = await User.findOne({ clerkUserId });
+      const client = await Client.findOne({ userId: user?._id });
+      if (!client) throw notFound("Client profile");
+      const projects = await Project.find({ clientId: client._id })
+        .sort({ createdAt: -1 })
+        .lean();
+      const invoices = await Invoice.find({ clientId: client._id }).lean();
+      ok(res, { projects, invoices });
+      return;
+    }
+
     const status = z.string().optional().parse(req.query.status);
     const filter = status ? { status } : {};
     const projects = await Project.find(filter)
