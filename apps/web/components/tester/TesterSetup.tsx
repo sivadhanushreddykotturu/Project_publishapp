@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { ArrowLeft, ArrowRight, Check, Plus, Smartphone, Trash2, Wallet } from "lucide-react";
 import { api, ApiClientError } from "@/lib/api";
@@ -31,7 +30,6 @@ const ANDROID_VERSIONS = [
  * unlocks. Everything here stays editable later in Profile.
  */
 export function TesterSetup() {
-  const router = useRouter();
   const { getToken } = useAuth();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [devices, setDevices] = useState<DeviceRow[]>([
@@ -68,6 +66,17 @@ export function TesterSetup() {
           upi: { vpa: vpa.trim().toLowerCase() },
         },
       });
+      const first = clean[0];
+      if (first) {
+        const devObj = {
+          model: first.model,
+          androidVersion: first.osVersion || "Android 14",
+        };
+        try {
+          localStorage.setItem("uxos_tester_device", JSON.stringify(devObj));
+        } catch {}
+        window.dispatchEvent(new Event("uxos_tester_device_updated"));
+      }
       setStep(3);
     } catch (e) {
       setError(e instanceof ApiClientError ? e.message : "Could not save — try again");
@@ -252,7 +261,9 @@ export function TesterSetup() {
             are first come, first served.
           </p>
           <button
-            onClick={() => router.refresh()}
+            onClick={() => {
+              window.location.href = "/tester/opportunities";
+            }}
             className="mt-8 rounded-full bg-ink-950 px-8 py-4 text-[15px] font-semibold text-white transition-transform hover:scale-[1.02]"
           >
             Start testing

@@ -88,6 +88,16 @@ export function ProfileForm({ initial }: { initial: TesterProfileData | null }) 
           ...(vpa.trim() ? { upi: { vpa: vpa.trim().toLowerCase() } } : {}),
         },
       });
+      if (cleanDevices[0]) {
+        const devObj = {
+          model: cleanDevices[0].model,
+          androidVersion: cleanDevices[0].osVersion || "Android 14",
+        };
+        try {
+          localStorage.setItem("uxos_tester_device", JSON.stringify(devObj));
+        } catch {}
+        window.dispatchEvent(new Event("uxos_tester_device_updated"));
+      }
       setSaved(true);
       router.refresh();
     } catch (e) {

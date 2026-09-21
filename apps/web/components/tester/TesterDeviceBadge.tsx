@@ -34,14 +34,48 @@ export function TesterDeviceBadge({
   });
 
   useEffect(() => {
+    if (initialDevice?.model) {
+      const devObj = {
+        model: initialDevice.model,
+        androidVersion: initialDevice.osVersion || initialDevice.androidVersion || "Android 14",
+      };
+      setDevice(devObj);
+      try {
+        localStorage.setItem("uxos_tester_device", JSON.stringify(devObj));
+      } catch {}
+    }
+  }, [initialDevice]);
+
+  useEffect(() => {
+    function onDeviceUpdated() {
+      try {
+        const cached = localStorage.getItem("uxos_tester_device");
+        if (cached) {
+          setDevice(JSON.parse(cached));
+        }
+      } catch {}
+    }
+    window.addEventListener("uxos_tester_device_updated", onDeviceUpdated);
+    window.addEventListener("storage", onDeviceUpdated);
+    return () => {
+      window.removeEventListener("uxos_tester_device_updated", onDeviceUpdated);
+      window.removeEventListener("storage", onDeviceUpdated);
+    };
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
     async function loadDevice() {
       try {
         const token = await getToken();
-        const data = await api<{ tester?: { devices?: Array<{ model: string; osVersion?: string; androidVersion?: string }> } }>("/testers/me", { token });
-        const profile = data && "tester" in data && data.tester ? data.tester : (data as unknown as { devices?: Array<{ model: string; osVersion?: string; androidVersion?: string }> });
+        if (!token) return;
+        const data = await api<{
+          tester?: { devices?: Array<{ model: string; osVersion?: string; androidVersion?: string }> };
+          devices?: Array<{ model: string; osVersion?: string; androidVersion?: string }>;
+        }>("/testers/me", { token });
+        const profile = data && "tester" in data && data.tester ? data.tester : data;
         const firstDevice = profile?.devices?.[0];
-        if (mounted && firstDevice) {
+        if (mounted && firstDevice?.model) {
           const devObj = {
             model: firstDevice.model,
             androidVersion: firstDevice.osVersion || firstDevice.androidVersion || "Android 14",
