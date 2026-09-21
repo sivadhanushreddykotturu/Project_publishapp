@@ -1,7 +1,6 @@
 import { Gauge } from "lucide-react";
 import { serverApi } from "@/lib/server-api";
 import { EmptySection, StatCard } from "@/components/dash/EmptySection";
-import { formatINR } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 

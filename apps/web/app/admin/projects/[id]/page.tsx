@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink, Users, Smartphone, ShieldCheck, Play } from "lucide-react";
+import { ExternalLink, Smartphone } from "lucide-react";
 import { serverApi } from "@/lib/server-api";
 import { StatusPill } from "@/components/dash/StatusPill";
 import { ActionButton } from "@/components/admin/ActionButton";

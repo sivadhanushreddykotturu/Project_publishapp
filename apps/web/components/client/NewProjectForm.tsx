@@ -49,9 +49,6 @@ export function NewProjectForm() {
   // Wizard state
   const [step, setStep] = useState<WizardStep>("service");
 
-  // Step 1: Service selection (Playstore is active; iOS and UX are disabled/admin-contact)
-  const [selectedService] = useState<"playstore">("playstore");
-
   // Step 2: Package & Testers count — pre-fill from ?testers= URL param set by Pricing CTA (min 14, max 25)
   const initialTesters = Math.min(25, Math.max(14, Number(searchParams.get("testers") ?? 14)));
   const [testerCount, setTesterCount] = useState<number>(initialTesters);
@@ -97,8 +94,6 @@ export function NewProjectForm() {
   const extraTesters = Math.max(0, testerCount - 14);
   const extraPrice = extraTesters * 100_00;
   const totalPaise = basePrice + extraPrice;
-  const subtotalPaise = Math.round(totalPaise / 1.18);
-  const gstPaise = totalPaise - subtotalPaise;
 
   // File upload for app profile photo / icon
   function handleIconFile(e: React.ChangeEvent<HTMLInputElement>) {

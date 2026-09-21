@@ -10,7 +10,7 @@ export default async function ClientSupportPage() {
   try {
     const [ticketsRes, projectsRes] = await Promise.all([
       serverApi<{ tickets?: TicketSummary[] } | TicketSummary[]>("/support-tickets?limit=100").catch(() => null),
-      serverApi<{ projects?: any[] } | any[]>("/projects/me").catch(() => null),
+      serverApi<{ projects?: Array<{ _id: string; appDetails?: { appName?: string; packageName?: string } }> } | Array<{ _id: string; appDetails?: { appName?: string; packageName?: string } }>>("/projects/me").catch(() => null),
     ]);
 
     tickets =

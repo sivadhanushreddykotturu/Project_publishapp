@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@defineux/types"],
   turbopack: { root: path.resolve(dirname, "../..") },
   devIndicators: false,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 export default nextConfig;

@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, ArrowRight, CheckCircle2, Clock, Play, DollarSign } from "lucide-react";
+import { Search, ArrowRight } from "lucide-react";
 import { StatusPill } from "@/components/dash/StatusPill";
 import { ActionButton } from "@/components/admin/ActionButton";
-import { formatDate, formatINR } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 
 export interface AdminProjectRow {
   _id: string;

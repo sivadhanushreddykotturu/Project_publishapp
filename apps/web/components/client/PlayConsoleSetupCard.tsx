@@ -28,8 +28,6 @@ interface TesterEmailsData {
 
 export function PlayConsoleSetupCard({
   projectId,
-  webOptInUrl,
-  playStoreUrl,
   onAdvanced,
 }: {
   projectId: string;
@@ -109,7 +107,6 @@ export function PlayConsoleSetupCard({
   if (!data) return null;
 
   const isStep2Active = data.step2Active || data.step1Verified;
-  const isReadyToProceed = data.isReady && !isStep2Active;
 
   return (
     <div className="rounded-[24px] border-2 border-[#4F46E5]/20 bg-gradient-to-b from-white to-[#F8FAFC] p-7 shadow-sm space-y-6">

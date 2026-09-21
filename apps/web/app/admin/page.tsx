@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, FolderKanban, UsersRound, ShieldCheck, Bug, Wallet, Receipt } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { serverApi } from "@/lib/server-api";
 import { StatCard } from "@/components/dash/EmptySection";
 
