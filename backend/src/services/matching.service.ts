@@ -33,7 +33,10 @@ export async function joinProject(
   const tester = await Tester.findById(testerId);
   if (!tester) throw ApiError.notFound("Tester not found");
   const activeProjectCount = await Assignment.countDocuments({ testerId, status: "active" });
-  if (activeProjectCount >= 3 && !shouldReactivate) {
+  // Enforce the same workload cap for self-joins and admin reactivations.
+  // A removed assignment is not included in activeProjectCount, so it is safe to
+  // reactivate only while the tester currently has fewer than three active projects.
+  if (activeProjectCount >= 3) {
     throw ApiError.conflict("A tester can participate in a maximum of 3 active projects");
   }
   const requiredDevices = project.requiredDeviceModels ?? [];
