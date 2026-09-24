@@ -98,7 +98,7 @@ export async function submitEmailsForReview(projectId: Types.ObjectId, adminId: 
   return project;
 }
 
-async function verifyEmailReviewStep(project: IProject, source: "admin" | "auto") {
+async function verifyEmailReviewStep(project: IProject, source: "admin" | "auto" | "client_confirmation") {
   const emailReview = findStep(project, "google_email_review");
   if (!emailReview || emailReview.state === "verified") return;
 
@@ -191,8 +191,15 @@ export async function markTestersInvited(params: {
   if (!project) throw ApiError.notFound("Project not found");
 
   const emailReview = findStep(project, "google_email_review");
-  if (!emailReview || emailReview.state !== "verified") {
-    throw ApiError.badRequest("Email review has not been confirmed yet");
+  if (!emailReview || !["submitted", "verified"].includes(emailReview.state)) {
+    throw ApiError.badRequest("Email review is not ready: confirm that tester emails were added to Google Play before sharing the testing link");
+  }
+  // In the manual client flow, submitting the real Google Play opt-in URL is the
+  // client's confirmation that the tester list was accepted and the link exists.
+  // Promote the review gate here so the client does not have to wait for a duplicate
+  // admin action before enrolled testers can receive their links.
+  if (emailReview.state === "submitted") {
+    await verifyEmailReviewStep(project, "client_confirmation");
   }
 
   const playStoreInvite = findStep(project, "play_store_invite");
@@ -234,7 +241,7 @@ export async function distributeTestingLinks(projectId: Types.ObjectId) {
       type: "testing_link",
       channel: "email",
       relatedId: `${assignment._id.toString()}:${notificationBatch}`,
-      payload: { redirectUrl, projectId: projectId.toString() },
+      payload: { redirectUrl, projectId: projectId.toString(), appName: project.appDetails.appName, optInUrl: project.playIntegration.optInUrl },
     });
   }
 }

@@ -56,7 +56,7 @@ async function makeVerifiedTesterAssignment(project: InstanceType<typeof Project
   });
   await submitProof({ assignmentId: assignment._id, step: 1, fileUrl: "r2://proofs/v.png" });
   await verifyProof({ assignmentId: assignment._id, step: 1, approve: true, adminId });
-  return { tester, assignment };
+  return { testerUser: user, tester, assignment };
 }
 
 beforeAll(async () => {
@@ -135,6 +135,26 @@ describe("email review milestone", () => {
     await expect(
       markTestersInvited({ projectId: project._id, optInUrl: "https://play.google.com/apps/testing/x", adminId: admin._id })
     ).rejects.toThrow(/email review/i);
+  });
+
+  it("lets the client-confirmed manual flow save the testing link and notify verified testers", async () => {
+    const project = await makeProject();
+    const admin = await makeAdmin();
+    const { testerUser } = await makeVerifiedTesterAssignment(project, admin._id);
+    await submitEmailsForReview(project._id, admin._id);
+
+    await markTestersInvited({
+      projectId: project._id,
+      optInUrl: "https://play.google.com/apps/testing/com.example.app",
+      adminId: admin._id,
+    });
+
+    const refreshed = await Project.findById(project._id);
+    expect(refreshed!.steps.find((step) => step.type === "google_email_review")!.state).toBe("verified");
+    expect(refreshed!.playIntegration.optInUrl).toBe("https://play.google.com/apps/testing/com.example.app");
+    const notification = await Notification.findOne({ recipientId: testerUser._id, type: "testing_link" });
+    expect(notification).not.toBeNull();
+    expect(notification!.payload).toMatchObject({ appName: "Test App", projectId: project._id.toString() });
   });
 });
 

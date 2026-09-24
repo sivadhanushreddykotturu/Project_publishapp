@@ -818,7 +818,7 @@ export default function ClientAppDashboard({
                     {emailWorkflowMessage && <p className="mt-3 text-xs font-semibold text-slate-500">{emailWorkflowMessage}</p>}
                   </div>
 
-                  <p className="mb-3 text-xs font-semibold text-slate-500">After Google approves the email list, paste the closed-testing opt-in URL below.</p>
+                  <p className="mb-3 text-xs font-semibold text-slate-500">After adding the approved tester emails in Google Play, paste the closed-testing opt-in URL below. Saving it immediately notifies eligible testers.</p>
                   <form className="flex flex-col gap-3 md:flex-row" onSubmit={async (event) => {
                     event.preventDefault();
                     if (!selectedApp || !testingLink.trim()) return;
@@ -835,9 +835,9 @@ export default function ClientAppDashboard({
                     }
                   }}>
                     <input type="url" required value={testingLink} onChange={(event) => setTestingLink(event.target.value)} placeholder="https://play.google.com/apps/testing/com.example.app" className={`min-w-0 flex-1 rounded-2xl border px-4 py-3 text-sm outline-none focus:border-[#4F37FE] ${isDarkMode ? 'border-white/10 bg-[#181926] text-white' : 'border-slate-200 bg-white text-slate-900'}`} />
-                    <button disabled={testingLinkSaving || !testingLink.trim() || emailReviewStep?.state !== 'verified'} className="rounded-2xl bg-[#4F37FE] px-6 py-3 text-sm font-bold text-white disabled:opacity-50">{testingLinkSaving ? 'Sharing...' : selectedProjectModel?.optInUrl ? 'Update & Resend' : 'Save & Notify Testers'}</button>
+                    <button disabled={testingLinkSaving || !testingLink.trim() || !['submitted', 'verified'].includes(emailReviewStep?.state ?? '')} className="rounded-2xl bg-[#4F37FE] px-6 py-3 text-sm font-bold text-white disabled:opacity-50">{testingLinkSaving ? 'Sharing...' : selectedProjectModel?.optInUrl ? 'Update & Resend' : 'Save & Notify Testers'}</button>
                   </form>
-                  {emailReviewStep?.state !== 'verified' && <p className="mt-3 text-xs text-amber-600">This action unlocks when the admin confirms Google approved the tester email list.</p>}
+                  {!['submitted', 'verified'].includes(emailReviewStep?.state ?? '') && <p className="mt-3 text-xs text-amber-600">First copy all 14 approved emails and click “I Added These Emails to Play Console”.</p>}
                   {testingLinkMessage && <p className={`mt-3 text-xs font-semibold ${testingLinkMessage.startsWith('Testing link saved') ? 'text-emerald-600' : 'text-red-500'}`}>{testingLinkMessage}</p>}
                 </div>
 
