@@ -737,12 +737,13 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     setDashboardLoading(true);
     setCurrentTab('home');
     setInitialSubTab('');
-    if (typeof window !== 'undefined') {
-      window.location.href = '/';
-    }
 
     try {
       await onSignOut?.();
+      // Navigate only after sign-out finishes; leaving earlier can cancel the request and keep the session alive.
+      if (typeof window !== 'undefined') {
+        window.location.href = '/';
+      }
     } catch (error) {
       setDashboardError(error instanceof Error ? error.message : 'Could not sign out. Please try again.');
     }
