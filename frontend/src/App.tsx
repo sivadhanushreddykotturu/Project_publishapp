@@ -142,16 +142,23 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   }, []);
 
   const handleSetTab = (tab: string, subtab?: string) => {
+    if (tab === 'home') {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('launchops_current_tab');
+        window.location.href = '/';
+      }
+      return;
+    }
     setCurrentTab(tab);
     setInitialSubTab(subtab || '');
     if (typeof window !== 'undefined') {
-      if (tab === 'home' || tab === 'solutions' || tab === 'pricing' || tab === 'resources' || tab === 'company') {
+      if (tab === 'solutions' || tab === 'pricing' || tab === 'resources' || tab === 'company') {
         localStorage.removeItem('launchops_current_tab');
       } else {
         localStorage.setItem('launchops_current_tab', tab);
       }
       
-      const targetPath = '/' + (tab === 'home' ? '' : tab) + (subtab ? '/' + subtab : '');
+      const targetPath = '/' + tab + (subtab ? '/' + subtab : '');
       if (window.location.pathname !== targetPath) {
         window.history.pushState(null, '', targetPath);
       }
@@ -730,7 +737,9 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     setDashboardLoading(true);
     setCurrentTab('home');
     setInitialSubTab('');
-    window.history.replaceState(null, '', '/');
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
 
     try {
       await onSignOut?.();
