@@ -59,7 +59,11 @@ export default function TestingStepInstructions({ isDarkMode, appName = 'Testing
 
       <section className={`lg:col-span-5 rounded-3xl p-8 border space-y-5 ${isDarkMode ? 'bg-[#0F1017] border-white/5' : 'bg-white border-slate-200'}`}>
         <div className="text-center"><h3 className="text-xl font-extrabold">Submit proof</h3><p className="text-xs text-slate-400 mt-1">JPEG, PNG, WebP or PDF</p></div>
-        {step === 1 && <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Google Play Gmail address" className="w-full rounded-2xl border border-slate-200 bg-transparent px-4 py-3 text-sm outline-none dark:border-white/10" />}
+        {step === 1 && <label className="block space-y-2">
+          <span className="block text-sm font-bold">Google Play Store email address</span>
+          <span className="block text-xs text-slate-400">Enter the Gmail address currently signed in to the Play Store and Chrome profile you will use for testing.</span>
+          <textarea rows={3} value={email} onChange={e => setEmail(e.target.value)} placeholder="example@gmail.com" className="w-full resize-none rounded-2xl border border-slate-200 bg-transparent px-4 py-3 text-sm outline-none focus:border-[#4F37FE] dark:border-white/10" />
+        </label>}
         <div onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); setFile(e.dataTransfer.files?.[0] || null); }} onClick={() => inputRef.current?.click()} className="border-2 border-dashed border-[#7E69FF]/60 rounded-3xl py-12 px-6 flex flex-col items-center cursor-pointer bg-[#FAFAFF] dark:bg-[#121320]">
           <input type="file" ref={inputRef} onChange={e => setFile(e.target.files?.[0] || null)} className="hidden" accept="image/png,image/jpeg,image/webp,application/pdf" /><FolderClosed className="w-12 h-12 text-[#4F37FE] mb-3" /><p className="text-sm text-slate-500">{file?.name || 'Drag and drop proof, or click to select'}</p>
         </div>
