@@ -6,8 +6,8 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { getPagination, buildPageMeta } from "../utils/pagination";
 
 const updateSchema = z.object({
-  companyName: z.string().optional(),
-  contactName: z.string().optional(),
+  companyName: z.string().trim().min(1).optional(),
+  contactName: z.string().trim().min(1).optional(),
   billingInfo: z.object({ gstin: z.string().optional(), billingAddress: z.string().optional() }).optional(),
 });
 

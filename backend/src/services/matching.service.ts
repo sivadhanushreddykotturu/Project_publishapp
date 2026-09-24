@@ -32,6 +32,10 @@ export async function joinProject(
   if (project.joinState === "closed") throw ApiError.conflict("Enrollment is closed: all 14 tester slots and 3 waitlist spots are filled");
   const tester = await Tester.findById(testerId);
   if (!tester) throw ApiError.notFound("Tester not found");
+  const activeProjectCount = await Assignment.countDocuments({ testerId, status: "active" });
+  if (activeProjectCount >= 3 && !shouldReactivate) {
+    throw ApiError.conflict("A tester can participate in a maximum of 3 active projects");
+  }
   const requiredDevices = project.requiredDeviceModels ?? [];
   if (requiredDevices.length > 0 && !tester.devices.some((device) => requiredDevices.includes(device.model))) {
     throw ApiError.forbidden("This project requires a registered matching device");
@@ -138,8 +142,13 @@ export async function promoteFromQueue(projectId: Types.ObjectId) {
   );
   if (!claimedProject) return null;
 
+  const saturatedTesterIds = await Assignment.aggregate<{ _id: Types.ObjectId }>([
+    { $match: { status: "active" } },
+    { $group: { _id: "$testerId", count: { $sum: 1 } } },
+    { $match: { count: { $gte: 3 } } },
+  ]).then((rows) => rows.map((row) => row._id));
   const promoted = await Assignment.findOneAndUpdate(
-    { projectId, status: "queued" },
+    { projectId, status: "queued", testerId: { $nin: saturatedTesterIds } },
     { $set: { status: "active", assignedAt: new Date(), lastActivityAt: new Date() }, $unset: { queuePosition: 1 } },
     { sort: { queuePosition: 1 }, new: true }
   );
@@ -171,6 +180,9 @@ export async function promoteFromQueue(projectId: Types.ObjectId) {
 export async function promoteSpecificQueuedAssignment(assignmentId: Types.ObjectId) {
   const queued = await Assignment.findOne({ _id: assignmentId, status: "queued" });
   if (!queued) throw ApiError.badRequest("This tester is not currently queued");
+  if (await Assignment.countDocuments({ testerId: queued.testerId, status: "active" }) >= 3) {
+    throw ApiError.conflict("This tester already has the maximum of 3 active projects");
+  }
 
   const project = await Project.findOneAndUpdate(
     { _id: queued.projectId, $expr: { $lt: ["$activeTesterCount", "$requiredTesters"] } },

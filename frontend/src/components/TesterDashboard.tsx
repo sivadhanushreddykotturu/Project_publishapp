@@ -27,7 +27,7 @@ interface TesterDashboardProps {
   onJoinProject: (projectId: string) => Promise<void>;
   onSubmitStep1Email: (assignmentId: string, email: string, screenshotUrl?: string) => void | Promise<void>;
   onClickStep3Link: (assignmentId: string, screenshotUrl?: string) => void;
-  onLogStep4CheckIn: (assignmentId: string) => void;
+  onLogStep4CheckIn: (assignmentId: string, screenshotUrl: string) => void | Promise<void>;
   onUploadProof: (file: File) => Promise<string>;
   onSubmitBugReport: (bugReport: Omit<BugReport, 'id' | 'createdAt' | 'testerName' | 'testerAvatar' | 'screenshot'> & { screenshot?: string }) => void | Promise<void>;
   onRequestWithdrawal: (amount: number, upiId: string) => { success: boolean; error?: string } | Promise<{ success: boolean; error?: string }>;
@@ -297,6 +297,22 @@ export default function TesterDashboard({
 
         {/* Page Views */}
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+          {assignments.filter((assignment) => assignment.status === 'active' && assignment.currentStep === 4).map((assignment) => (
+            <section key={assignment.id} className={`mb-6 rounded-2xl border p-5 ${isDarkMode ? 'border-white/10 bg-[#0F1017]' : 'border-slate-200 bg-white'}`}>
+              <h2 className="text-sm font-black">48-hour testing screenshot · {assignment.appName}</h2>
+              <p className="mt-1 text-xs text-slate-500">Upload one current testing screenshot. The next upload unlocks 48 hours after this submission.</p>
+              <label className="mt-4 inline-flex cursor-pointer rounded-xl bg-[#4F37FE] px-4 py-2 text-xs font-bold text-white">
+                Upload screenshot
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  const key = await onUploadProof(file);
+                  await onLogStep4CheckIn(assignment.id, key);
+                  event.target.value = '';
+                }} />
+              </label>
+            </section>
+          ))}
           {activeTab === 'explore' && (
             <AppTestingExplore
               isDarkMode={isDarkMode}

@@ -916,7 +916,7 @@ export default function AdminConsole({
                                       </span>
 
                                       <div className="flex items-center gap-1.5">
-                                        {hasPendingStep1 && ass.testerEmail && ass.step1Screenshot && (
+                                        {hasPendingStep1 && ass.testerEmail && (
                                           <div className="flex items-center gap-1">
                                             <button
                                               onClick={(event) => {

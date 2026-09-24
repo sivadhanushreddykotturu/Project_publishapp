@@ -34,7 +34,7 @@ import {
   submitClientVerification, submitProjectBugReport, updateMyTesterProfile, verifyAssignment,
   updateAdminTesterStatus, promoteQueuedAssignment, resendAdminNotification, getProjectCompletionReport,
   updateProjectPlayIntegration, syncProjectPlayIntegration,
-  listAdminClients, createAdminProject,
+  listAdminClients, createAdminProject, getMyClientProfile, updateMyClientProfile, listProjectArtifacts,
   type BackendInvoice, type BackendNotification, type BackendTesterProfile, type BackendProjectFile, type BackendClient, type LaunchOpsUser, type AdminDashboardSummary, type BackendSupportTicket,
 } from './lib/launchops-api';
 import {
@@ -185,6 +185,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [notifications, setNotifications] = useState<BackendNotification[]>([]);
   const [currentUser, setCurrentUser] = useState<LaunchOpsUser | null>(null);
+  const [currentClient, setCurrentClient] = useState<BackendClient | null>(null);
 
   // Tester Flow Data States
   const [activeTester, setActiveTester] = useState<Tester>(emptyTester);
@@ -234,10 +235,11 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
 
   const refreshClientData = async () => {
     const token = await getTokenOrThrow();
-    const [me, projectResponse, invoiceResponse, notificationResponse, supportResponse] = await Promise.all([
-      getCurrentLaunchOpsUser(token), listProjects(token), listInvoices(token), listMyNotifications(token), listMySupportTickets(token),
+    const [me, clientResponse, projectResponse, invoiceResponse, notificationResponse, supportResponse] = await Promise.all([
+      getCurrentLaunchOpsUser(token), getMyClientProfile(token), listProjects(token), listInvoices(token), listMyNotifications(token), listMySupportTickets(token),
     ]);
     setCurrentUser(me.data.user);
+    setCurrentClient(clientResponse.data);
     const projectBugs = await Promise.all(projectResponse.data.map((project) => listProjectBugReports(project._id, token)));
     const clientTester = { ...emptyTester, name: 'Verified tester' };
     const allBugs = projectBugs.flatMap((response) => response.data.map((report) => mapBugReport(report, clientTester)));
@@ -776,7 +778,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     if (!screenshotUrl) { window.open(`${API_BASE_URL}/t/${assignmentId}`, '_blank', 'noopener,noreferrer'); return; }
     await submitAssignmentProof(assignmentId, { step: 3, fileUrl: screenshotUrl }, await getTokenOrThrow()); await refreshTesterData();
   };
-  const apiSubmitStep4 = async (assignmentId: string) => { await submitAssignmentProof(assignmentId, { step: 4, fileUrl: `check-in:${new Date().toISOString()}` }, await getTokenOrThrow()); await refreshTesterData(); };
+  const apiSubmitStep4 = async (assignmentId: string, screenshotUrl: string) => { await submitAssignmentProof(assignmentId, { step: 4, fileUrl: screenshotUrl }, await getTokenOrThrow()); await refreshTesterData(); };
   const apiUploadTesterProof = async (file: File) => uploadTesterProofFile(file, await getTokenOrThrow());
   const apiSubmitBug = async (bug: Omit<BugReport, 'id' | 'createdAt' | 'testerName' | 'testerAvatar' | 'screenshot'> & { screenshot?: string }) => {
     await submitProjectBugReport(bug.appId, { title: bug.title, description: bug.title, category: 'functional', severity: bug.severity.toLowerCase() as 'low' | 'medium' | 'high' | 'critical', device: bug.device, appVersion: bug.osVersion, expectedResult: 'Expected behavior without this issue', actualResult: bug.title, stepsToReproduce: bug.reproductionSteps, attachments: bug.screenshot ? [bug.screenshot] : [] }, await getTokenOrThrow());
@@ -893,6 +895,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   };
 
   const apiDownloadClientProjectFile = async (key: string) => {
+    if (/^https?:\/\//i.test(key)) { window.open(key, '_blank', 'noopener,noreferrer'); return; }
     const response = await getProjectFileDownload(key, await getTokenOrThrow());
     window.open(response.data.downloadUrl, '_blank', 'noopener,noreferrer');
   };
@@ -910,7 +913,14 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     await createSupportTicket({ ...input, projectId }, await getTokenOrThrow());
     await refreshClientData();
   };
-  const apiListAdminProjectFiles = async (projectId: string) => (await listProjectFiles(projectId, await getTokenOrThrow())).data;
+  const apiListAdminProjectFiles = async (projectId: string) => {
+    const artifacts = (await listProjectArtifacts(projectId, await getTokenOrThrow())).data;
+    const proofFiles: BackendProjectFile[] = artifacts.testerProofs
+      .filter((proof) => proof.key && !proof.key.startsWith('check-in:') && !proof.key.includes('@'))
+      .map((proof) => ({ name: `Tester proof - step ${proof.step}`, key: proof.key, contentType: 'application/octet-stream', size: 0, uploadedAt: proof.submittedAt }));
+    const bugFiles: BackendProjectFile[] = artifacts.bugAttachments.map((file) => ({ name: `Bug attachment - ${file.title}`, key: file.key, contentType: 'application/octet-stream', size: 0, uploadedAt: file.uploadedAt }));
+    return [...artifacts.clientFiles, ...proofFiles, ...bugFiles];
+  };
   const apiClearAdminProjectFiles = async (projectId: string) => (await clearAdminProjectFiles(projectId, await getTokenOrThrow())).data.deleted;
 
   const apiReviewVerification = async (projectId: string, approve: boolean, customAmount?: number) => { await reviewProjectVerification(projectId, approve, await getTokenOrThrow(), customAmount); await refreshAdminData(); };
@@ -926,9 +936,12 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     const response = await updateCurrentLaunchOpsUser(input, await getTokenOrThrow());
     setCurrentUser(response.data.user);
   };
-  const apiUpdateClientProfile = async (input: { name?: string; phone?: string }) => {
-    const response = await updateCurrentLaunchOpsUser(input, await getTokenOrThrow());
+  const apiUpdateClientProfile = async (input: { name?: string; phone?: string; companyName?: string; contactName?: string }) => {
+    const token = await getTokenOrThrow();
+    const response = await updateCurrentLaunchOpsUser(input, token);
+    const clientResponse = await updateMyClientProfile({ companyName: input.companyName, contactName: input.contactName ?? input.name }, token);
     setCurrentUser(response.data.user);
+    setCurrentClient(clientResponse.data);
   };
   const apiUpdateTesterStatus = async (testerId: string, status: BackendTesterProfile['status']) => { await updateAdminTesterStatus(testerId, status, await getTokenOrThrow()); await refreshAdminData(); };
   const apiPromoteQueuedTester = async (assignmentId: string) => { await promoteQueuedAssignment(assignmentId, await getTokenOrThrow()); await refreshAdminData(); };
@@ -1085,6 +1098,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 onCreateProject={apiCreateProject}
                 onGetVerifiedTesterEmails={apiGetVerifiedTesterEmails}
                 currentUser={currentUser}
+                currentClient={currentClient}
                 notifications={notifications}
                 onLoadProjectDetails={apiLoadClientProjectDetails}
                 onDownloadProjectFile={apiDownloadClientProjectFile}

@@ -82,6 +82,12 @@ export type BackendClient = {
   projects: string[];
 };
 
+export type BackendProjectArtifacts = {
+  clientFiles: BackendProjectFile[];
+  testerProofs: Array<{ assignmentId: string; testerId: unknown; step: number; key: string; status: string; submittedAt: string }>;
+  bugAttachments: Array<{ bugReportId: string; testerId: unknown; title: string; key: string; uploadedAt: string }>;
+};
+
 export type PublicTesterProfile = {
   _id: string;
   userId: { _id: string; name: string };
@@ -402,6 +408,14 @@ export function listAdminClients(token: string) {
   return apiRequest<ApiEnvelope<BackendClient[]>>("/api/v1/clients?limit=100", { token });
 }
 
+export function getMyClientProfile(token: string) {
+  return apiRequest<ApiEnvelope<BackendClient>>("/api/v1/clients/me", { token });
+}
+
+export function updateMyClientProfile(input: { companyName?: string; contactName?: string }, token: string) {
+  return apiRequest<ApiEnvelope<BackendClient>>("/api/v1/clients/me", { method: "PATCH", token, body: input });
+}
+
 export function createAdminProject(input: {
   clientId: string;
   package: BackendProject["package"];
@@ -462,6 +476,10 @@ export function listClientProjectAssignments(projectId: string, token: string) {
 
 export function listProjectFiles(projectId: string, token: string) {
   return apiRequest<ApiEnvelope<BackendProjectFile[]>>(`/api/v1/projects/${projectId}/files`, { token });
+}
+
+export function listProjectArtifacts(projectId: string, token: string) {
+  return apiRequest<ApiEnvelope<BackendProjectArtifacts>>(`/api/v1/projects/${projectId}/artifacts`, { token });
 }
 
 export function clearAdminProjectFiles(projectId: string, token: string) {

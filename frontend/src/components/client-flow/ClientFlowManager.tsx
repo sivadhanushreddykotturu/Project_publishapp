@@ -13,7 +13,7 @@ import ClientContactFlow from './ClientContactFlow';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Headphones, Sparkles, Plus, ArrowRight, ShieldCheck } from 'lucide-react';
 import type { TestApp } from '../../types';
-import type { BackendAssignment, BackendNotification, BackendProjectFile, BackendSupportTicket, LaunchOpsUser } from '../../lib/launchops-api';
+import type { BackendAssignment, BackendClient, BackendNotification, BackendProjectFile, BackendSupportTicket, LaunchOpsUser } from '../../lib/launchops-api';
 
 interface ClientFlowManagerProps {
   isDarkMode: boolean;
@@ -27,6 +27,7 @@ interface ClientFlowManagerProps {
   onCreateProject: (project: Omit<TestApp, 'id' | 'testersCount' | 'bugsFound' | 'progress' | 'status'>) => Promise<TestApp>;
   onGetVerifiedTesterEmails: (projectId: string) => Promise<{ emails: string[]; count: number }>;
   currentUser: LaunchOpsUser | null;
+  currentClient: BackendClient | null;
   notifications: BackendNotification[];
   onLoadProjectDetails: (projectId: string) => Promise<{ assignments: BackendAssignment[]; files: BackendProjectFile[] }>;
   onDownloadProjectFile: (key: string) => Promise<void>;
@@ -38,7 +39,7 @@ interface ClientFlowManagerProps {
   onReplyToSupport: (ticketId: string, body: string) => Promise<void>;
   onLogout: () => void;
   onReadNotification: (notificationId: string) => void;
-  onUpdateProfile: (input: { name?: string; phone?: string }) => Promise<void>;
+  onUpdateProfile: (input: { name?: string; phone?: string; companyName?: string; contactName?: string }) => Promise<void>;
   onDownloadCompletionReport: (projectId: string) => Promise<void>;
 }
 
@@ -54,6 +55,7 @@ export default function ClientFlowManager({
   onCreateProject,
   onGetVerifiedTesterEmails,
   currentUser,
+  currentClient,
   notifications,
   onLoadProjectDetails,
   onDownloadProjectFile,
@@ -100,12 +102,12 @@ export default function ClientFlowManager({
   const [supportSent, setSupportSent] = useState(false);
 
   useEffect(() => {
-    if (isLoading || initialView === 'wizard' || projects.length === 0) return;
-    setViewMode('dashboard');
-    localStorage.setItem('launchops_client_has_published', 'true');
-    if (!window.location.pathname.includes('/client/dashboard')) {
-      window.history.replaceState(null, '', '/client/dashboard');
-    }
+    if (isLoading) return;
+    const hasProjects = projects.length > 0;
+    setViewMode(hasProjects ? 'dashboard' : 'wizard');
+    if (hasProjects) localStorage.setItem('launchops_client_has_published', 'true');
+    const target = hasProjects ? '/client/dashboard' : '/client/new-app';
+    if (window.location.pathname !== target) window.history.replaceState(null, '', target);
   }, [initialView, isLoading, projects.length]);
 
   // Step 1: Service selection completion
@@ -201,6 +203,7 @@ export default function ClientFlowManager({
         isLoading={isLoading}
         error={error}
         currentUser={currentUser}
+        currentClient={currentClient}
         notifications={notifications}
         onLoadProjectDetails={onLoadProjectDetails}
         onDownloadProjectFile={onDownloadProjectFile}
@@ -240,7 +243,14 @@ export default function ClientFlowManager({
                   selectedService={selectedService}
                   onSelectService={setSelectedService}
                   onNext={handleStep1Next}
-                  onBack={onBackToHome}
+                  onBack={() => {
+                    if (projects.length > 0) {
+                      setViewMode('dashboard');
+                      window.history.pushState(null, '', '/client/dashboard');
+                    } else {
+                      onBackToHome();
+                    }
+                  }}
                 />
               </motion.div>
             )}

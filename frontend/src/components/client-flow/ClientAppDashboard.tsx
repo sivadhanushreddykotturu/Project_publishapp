@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { TestApp } from '../../types';
-import type { BackendAssignment, BackendNotification, BackendProjectFile, BackendSupportTicket, LaunchOpsUser } from '../../lib/launchops-api';
+import type { BackendAssignment, BackendClient, BackendNotification, BackendProjectFile, BackendSupportTicket, LaunchOpsUser } from '../../lib/launchops-api';
 import UXOSBrandLogo from '../ui/UXOSBrandLogo';
 
 export interface ClientAppItem {
@@ -94,6 +94,7 @@ interface ClientAppDashboardProps {
   isLoading?: boolean;
   error?: string;
   currentUser: LaunchOpsUser | null;
+  currentClient: BackendClient | null;
   notifications: BackendNotification[];
   onLoadProjectDetails: (projectId: string) => Promise<{ assignments: BackendAssignment[]; files: BackendProjectFile[] }>;
   onDownloadProjectFile: (key: string) => Promise<void>;
@@ -105,7 +106,7 @@ interface ClientAppDashboardProps {
   supportTickets: BackendSupportTicket[];
   onReplyToSupport: (ticketId: string, body: string) => Promise<void>;
   onReadNotification: (notificationId: string) => void;
-  onUpdateProfile: (input: { name?: string; phone?: string }) => Promise<void>;
+  onUpdateProfile: (input: { name?: string; phone?: string; companyName?: string; contactName?: string }) => Promise<void>;
   onDownloadCompletionReport: (projectId: string) => Promise<void>;
   newRegisteredApp?: {
     appName: string;
@@ -127,6 +128,7 @@ export default function ClientAppDashboard({
   isLoading = false,
   error = '',
   currentUser,
+  currentClient,
   notifications,
   onLoadProjectDetails,
   onDownloadProjectFile,
@@ -154,6 +156,7 @@ export default function ClientAppDashboard({
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [profileName, setProfileName] = useState(currentUser?.name ?? '');
+  const [profileCompany, setProfileCompany] = useState(currentClient?.companyName ?? '');
   const [profilePhone, setProfilePhone] = useState(currentUser?.phone ?? '');
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMessage, setProfileMessage] = useState('');
@@ -170,6 +173,12 @@ export default function ClientAppDashboard({
   const [emailWorkflowBusy, setEmailWorkflowBusy] = useState(false);
   const [emailWorkflowMessage, setEmailWorkflowMessage] = useState('');
   const [supportReplies, setSupportReplies] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setProfileName(currentClient?.contactName || currentUser?.name || '');
+    setProfileCompany(currentClient?.companyName || '');
+    setProfilePhone(currentUser?.phone || '');
+  }, [currentClient?.companyName, currentClient?.contactName, currentUser?.name, currentUser?.phone]);
 
   const apps: ClientAppItem[] = projects
     .filter((project) => activeFilterTab !== 'active' || project.status === 'Testing')
@@ -447,7 +456,7 @@ export default function ClientAppDashboard({
               onClick={() => setProfileOpen((open) => !open)}
             >
               <div className="text-[15px] font-black text-slate-900 dark:text-white">
-                {currentUser?.name || 'Client'}
+                {currentClient?.companyName || currentUser?.name || 'Client'}
               </div>
               <div className="flex items-center gap-1.5 text-[12px] font-bold text-slate-400 justify-end">
                 <span>Active Testing</span>
@@ -466,13 +475,14 @@ export default function ClientAppDashboard({
             </div>}
 
             <div onMouseEnter={() => setProfileOpen(true)} onClick={() => setProfileOpen((open) => !open)} className="w-10 h-10 rounded-full bg-[#4F37FE] text-white flex items-center justify-center border-2 border-white dark:border-slate-800 shadow-sm font-black cursor-pointer">
-              {(currentUser?.name || currentUser?.email || 'C').charAt(0).toUpperCase()}
+              {(currentClient?.companyName || currentUser?.name || currentUser?.email || 'C').charAt(0).toUpperCase()}
             </div>
             {profileOpen && (
-              <form onSubmit={async (event) => { event.preventDefault(); setProfileSaving(true); setProfileMessage(''); try { await onUpdateProfile({ name: profileName.trim(), phone: profilePhone.trim() }); setProfileMessage('Profile updated.'); } catch (profileError) { setProfileMessage(profileError instanceof Error ? profileError.message : 'Could not update profile.'); } finally { setProfileSaving(false); } }} onMouseLeave={() => setProfileOpen(false)} className={`absolute right-0 top-12 z-50 w-72 rounded-2xl border p-4 shadow-xl ${isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200'}`}>
+              <form onSubmit={async (event) => { event.preventDefault(); setProfileSaving(true); setProfileMessage(''); try { await onUpdateProfile({ name: profileName.trim(), contactName: profileName.trim(), companyName: profileCompany.trim(), phone: profilePhone.trim() }); setProfileMessage('Profile updated.'); } catch (profileError) { setProfileMessage(profileError instanceof Error ? profileError.message : 'Could not update profile.'); } finally { setProfileSaving(false); } }} onMouseLeave={() => setProfileOpen(false)} className={`absolute right-0 top-12 z-50 w-72 rounded-2xl border p-4 shadow-xl ${isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200'}`}>
                 <p className="font-black">Client profile</p>
                 <p className="mt-1 text-sm text-slate-500 break-all">{currentUser?.email || 'No email available'}</p>
-                <input value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Name" className={`mt-3 w-full rounded-xl border px-3 py-2 text-xs ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-slate-200'}`} />
+                <input required value={profileCompany} onChange={(event) => setProfileCompany(event.target.value)} placeholder="Company name" className={`mt-3 w-full rounded-xl border px-3 py-2 text-xs ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-slate-200'}`} />
+                <input required value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Contact name" className={`mt-2 w-full rounded-xl border px-3 py-2 text-xs ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-slate-200'}`} />
                 <input value={profilePhone} onChange={(event) => setProfilePhone(event.target.value)} placeholder="Phone" className={`mt-2 w-full rounded-xl border px-3 py-2 text-xs ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-slate-200'}`} />
                 {profileMessage && <p className="mt-2 text-[10px] font-semibold text-slate-500">{profileMessage}</p>}
                 <button disabled={profileSaving} className="mt-3 w-full rounded-xl border-0 bg-[#4F37FE] py-2 text-xs font-bold text-white disabled:opacity-50">{profileSaving ? 'Saving...' : 'Save profile'}</button>
@@ -801,10 +811,10 @@ export default function ClientAppDashboard({
                   <div className={`mb-6 rounded-2xl border p-5 ${isDarkMode ? 'border-white/10 bg-[#181926]' : 'border-slate-200 bg-slate-50'}`}>
                     <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
                       <div><p className="text-sm font-bold">Verified tester emails ({verifiedEmails.length}/{selectedProjectModel?.testersRequired ?? 0})</p><p className="mt-1 text-xs text-slate-400">Copy these addresses into the Google Play closed-testing email list.</p></div>
-                      <button type="button" disabled={!verifiedEmails.length} onClick={async () => { await navigator.clipboard.writeText(verifiedEmails.join(', ')); setEmailWorkflowMessage(`${verifiedEmails.length} emails copied.`); }} className="rounded-xl bg-[#4F37FE] px-5 py-2.5 text-xs font-bold text-white disabled:opacity-40">Copy comma-separated</button>
+                      <button type="button" disabled={verifiedEmails.length < 14} title={verifiedEmails.length < 14 ? `${14 - verifiedEmails.length} more approved testers required` : undefined} onClick={async () => { await navigator.clipboard.writeText(verifiedEmails.join(', ')); setEmailWorkflowMessage(`${verifiedEmails.length} emails copied.`); }} className="rounded-xl bg-[#4F37FE] px-5 py-2.5 text-xs font-bold text-white disabled:opacity-40">Copy comma-separated</button>
                     </div>
                     <div className="mt-3 max-h-32 overflow-y-auto whitespace-pre-wrap rounded-xl bg-black/5 p-3 font-mono text-xs dark:bg-black/20">{verifiedEmails.length ? verifiedEmails.join(',\n') : 'No verified emails yet.'}</div>
-                    <button type="button" disabled={emailWorkflowBusy || !verifiedEmails.length || emailReviewStep?.state === 'submitted' || emailReviewStep?.state === 'verified'} onClick={async () => { if (!selectedApp) return; setEmailWorkflowBusy(true); setEmailWorkflowMessage(''); try { await onConfirmEmailsAdded(selectedApp.id); setEmailWorkflowMessage('Confirmed. The admin has been notified and Google email review is pending.'); } catch (confirmError) { setEmailWorkflowMessage(confirmError instanceof Error ? confirmError.message : 'Could not confirm the email list.'); } finally { setEmailWorkflowBusy(false); } }} className="mt-4 rounded-xl border border-[#4F37FE] bg-transparent px-5 py-2.5 text-xs font-bold text-[#4F37FE] disabled:opacity-40">{emailReviewStep?.state === 'submitted' ? 'Google Review Pending' : emailReviewStep?.state === 'verified' ? 'Email Review Approved' : emailWorkflowBusy ? 'Confirming...' : 'I Added These Emails to Play Console'}</button>
+                    <button type="button" disabled={emailWorkflowBusy || verifiedEmails.length < 14 || emailReviewStep?.state === 'submitted' || emailReviewStep?.state === 'verified'} onClick={async () => { if (!selectedApp) return; setEmailWorkflowBusy(true); setEmailWorkflowMessage(''); try { await onConfirmEmailsAdded(selectedApp.id); setEmailWorkflowMessage('Confirmed. The admin has been notified and Google email review is pending.'); } catch (confirmError) { setEmailWorkflowMessage(confirmError instanceof Error ? confirmError.message : 'Could not confirm the email list.'); } finally { setEmailWorkflowBusy(false); } }} className="mt-4 rounded-xl border border-[#4F37FE] bg-transparent px-5 py-2.5 text-xs font-bold text-[#4F37FE] disabled:opacity-40">{emailReviewStep?.state === 'submitted' ? 'Google Review Pending' : emailReviewStep?.state === 'verified' ? 'Email Review Approved' : emailWorkflowBusy ? 'Confirming...' : 'I Added These Emails to Play Console'}</button>
                     {emailWorkflowMessage && <p className="mt-3 text-xs font-semibold text-slate-500">{emailWorkflowMessage}</p>}
                   </div>
 

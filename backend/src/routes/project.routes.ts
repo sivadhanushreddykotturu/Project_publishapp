@@ -21,6 +21,7 @@ import {
   getCompletionReport,
   listClientProjectAssignments,
   listProjectFiles,
+  listProjectArtifacts,
   addProjectFile,
   clearProjectFiles,
 } from "../controllers/project.controller";
@@ -113,6 +114,7 @@ router.get("/opportunities", requireAuth(), requireRole("tester"), listTesterOpp
 router.get("/:id", requireAuth(), requireRole("client", "admin"), getProjectById);
 router.get("/:id/client-assignments", requireAuth(), requireRole("client"), listClientProjectAssignments);
 router.get("/:id/files", requireAuth(), requireRole("client", "admin"), listProjectFiles);
+router.get("/:id/artifacts", requireAuth(), requireRole("client", "admin"), listProjectArtifacts);
 router.post("/:id/files", requireAuth(), requireRole("client"), addProjectFile);
 router.delete("/:id/files", requireAuth(), requireRole("admin"), clearProjectFiles);
 

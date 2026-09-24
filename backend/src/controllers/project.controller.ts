@@ -55,6 +55,9 @@ export const createProject = asyncHandler(async (req: Request, res: Response) =>
   const body = createProjectSchema.parse(req.body);
   const client = await Client.findOne({ userId: req.dbUser!._id });
   if (!client) throw ApiError.notFound("Client profile not found");
+  if (!client.companyName?.trim() || !client.contactName?.trim()) {
+    throw ApiError.badRequest("Complete your company name and contact name before creating a project");
+  }
 
   const requiredTesters = body.requiredTesters ?? 14;
   const project = await Project.create({
@@ -180,6 +183,9 @@ async function loadVisibleProject(req: Request) {
   }
   const client = await Client.findOne({ userId: req.dbUser!._id });
   if (!client) throw ApiError.notFound("Client profile not found");
+  if (!client.companyName?.trim() || !client.contactName?.trim()) {
+    throw ApiError.badRequest("Complete your client profile before accessing project details");
+  }
   const project = await Project.findOne({ _id: req.params.id, clientId: client._id });
   if (!project) throw ApiError.notFound("Project not found");
   return project;
@@ -203,6 +209,34 @@ const projectFileSchema = z.object({
 export const listProjectFiles = asyncHandler(async (req: Request, res: Response) => {
   const project = await loadVisibleProject(req);
   res.status(200).json({ data: project.clientFiles });
+});
+
+/** All project-scoped uploads visible to the owning client and admins. */
+export const listProjectArtifacts = asyncHandler(async (req: Request, res: Response) => {
+  const project = await loadVisibleProject(req);
+  const [assignments, reports] = await Promise.all([
+    Assignment.find({ projectId: project._id })
+      .select("testerId proofs")
+      .populate({ path: "testerId", populate: { path: "userId", select: "name email" } })
+      .lean(),
+    BugReport.find({ projectId: project._id }).select("testerId title attachments createdAt").lean(),
+  ]);
+  const testerProofs = assignments.flatMap((assignment) => assignment.proofs.map((proof) => ({
+    assignmentId: assignment._id,
+    testerId: assignment.testerId,
+    step: proof.step,
+    key: proof.fileUrl,
+    status: proof.status,
+    submittedAt: proof.submittedAt,
+  })));
+  const bugAttachments = reports.flatMap((report) => report.attachments.map((key) => ({
+    bugReportId: report._id,
+    testerId: report.testerId,
+    title: report.title,
+    key,
+    uploadedAt: report.createdAt,
+  })));
+  res.status(200).json({ data: { clientFiles: project.clientFiles, testerProofs, bugAttachments } });
 });
 
 export const addProjectFile = asyncHandler(async (req: Request, res: Response) => {
@@ -261,6 +295,9 @@ export const getProjectById = asyncHandler(async (req: Request, res: Response) =
 export const joinProjectAsTester = asyncHandler(async (req: Request, res: Response) => {
   const tester = await Tester.findOne({ userId: req.dbUser!._id });
   if (!tester) throw ApiError.badRequest("Complete your tester profile before joining a project");
+  if (!tester.country?.trim() || !tester.specialty?.trim() || !tester.upi?.vpa?.trim() || tester.devices.length === 0) {
+    throw ApiError.badRequest("Complete your tester profile, device, specialty, country and UPI details before joining a project");
+  }
 
   const assignment = await joinProject(new Types.ObjectId(req.params.id), tester._id);
   res.status(201).json({ data: assignment });
@@ -272,6 +309,9 @@ export const assignTesterToProject = asyncHandler(async (req: Request, res: Resp
   const { testerId } = adminAssignTesterSchema.parse(req.body);
   const tester = await Tester.findById(testerId);
   if (!tester) throw ApiError.notFound("Tester not found");
+  if (!tester.country?.trim() || !tester.specialty?.trim() || !tester.upi?.vpa?.trim() || tester.devices.length === 0) {
+    throw ApiError.badRequest("The tester must complete their profile before allocation");
+  }
   const assignment = await joinProject(new Types.ObjectId(req.params.id), tester._id, { reactivateRemoved: true });
   res.status(201).json({ data: assignment });
 });
@@ -331,7 +371,12 @@ export const getVerifiedEmails = asyncHandler(async (req: Request, res: Response
 
 /** Admin confirms verified tester emails were copied into Play Console and submitted for review. */
 export const submitProjectEmailsForReview = asyncHandler(async (req: Request, res: Response) => {
-  await loadVisibleProject(req);
+  const visibleProject = await loadVisibleProject(req);
+  const emails = await getVerifiedTesterEmails(new Types.ObjectId(req.params.id));
+  const requiredEmailCount = Math.min(visibleProject.requiredTesters, 14);
+  if (emails.length < requiredEmailCount) {
+    throw ApiError.badRequest(`At least ${requiredEmailCount} approved tester emails are required (${emails.length}/${requiredEmailCount} ready)`);
+  }
   const project = await submitEmailsForReview(new Types.ObjectId(req.params.id), req.dbUser!._id);
   res.status(200).json({ data: project });
 });

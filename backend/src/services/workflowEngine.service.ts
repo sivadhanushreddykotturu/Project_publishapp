@@ -104,9 +104,15 @@ export async function submitProof(params: {
     throw ApiError.badRequest(`Tester is on step ${assignment.currentStep}, not ${params.step}`);
   }
   if (params.step === 4) {
-    const today = new Date().toISOString().slice(0, 10);
-    const alreadyCheckedInToday = assignment.proofs.some((proof) => proof.step === 4 && proof.submittedAt.toISOString().slice(0, 10) === today);
-    if (alreadyCheckedInToday) throw ApiError.badRequest("Today's testing check-in is already recorded");
+    if (params.fileUrl.startsWith("check-in:")) {
+      throw ApiError.badRequest("Upload a testing screenshot for the 48-hour check-in");
+    }
+    const latestCheckIn = [...assignment.proofs]
+      .filter((proof) => proof.step === 4)
+      .sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime())[0];
+    if (latestCheckIn && Date.now() - latestCheckIn.submittedAt.getTime() < 48 * 3_600_000) {
+      throw ApiError.badRequest("A testing screenshot can only be uploaded once every 48 hours");
+    }
   }
 
   assignment.proofs.push({
@@ -302,6 +308,9 @@ export async function activateProject(projectId: Types.ObjectId) {
   await MetricEvent.create({ type: "opportunity_published", projectId: project._id, meta: {} });
 
   const testerFilter: Record<string, unknown> = { status: "active" };
+  if (project.serviceType === "user_experience_testing") {
+    testerFilter.specialty = { $regex: /(?:ux|user experience).*test/i };
+  }
   const requiredDeviceModels = project.requiredDeviceModels ?? [];
   if (requiredDeviceModels.length > 0) testerFilter["devices.model"] = { $in: requiredDeviceModels };
   const eligibleTesters = await Tester.find(testerFilter);

@@ -52,7 +52,7 @@ export const syncUser = asyncHandler(async (req: Request, res: Response) => {
 
     user = await User.create({ clerkUserId: userId, ...body, email: normalizedEmail });
     if (body.role === "client") {
-      await Client.create({ userId: user._id, contactName: body.name });
+      await Client.create({ userId: user._id, contactName: body.name, companyName: body.name });
     } else {
       await Tester.create({ userId: user._id });
     }
