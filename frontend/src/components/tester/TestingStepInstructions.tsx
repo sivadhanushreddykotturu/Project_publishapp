@@ -53,7 +53,21 @@ export default function TestingStepInstructions({ isDarkMode, appName = 'Testing
         <h2 className="text-2xl font-black mb-6">Step {step} - Instructions</h2>
         {!!project?.clientFiles?.length && <div className="mb-6 space-y-3">{project.clientFiles.map(item => <div key={item.key} className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-[#181926] border-white/5' : 'bg-[#FAFAFC] border-slate-200'}`}><p className="font-bold">{item.name}</p><p className="text-xs text-slate-400">{(item.size / 1024).toFixed(1)} KB · Client file</p></div>)}</div>}
         <div className={`text-sm leading-7 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-          {project?.instructions?.trim() ? <p className="whitespace-pre-wrap">{project.instructions}</p> : step === 1 ? <><p>Register the Google Play Gmail address you will use for <strong>{appName}</strong>.</p><ol className="list-decimal pl-5 mt-3"><li>Use the Gmail account connected to your Play Store.</li><li>Upload a screenshot as proof.</li><li>Wait for approval before installing the app.</li></ol></> : step === 2 ? <p>Your Gmail address and proof are under admin review. The invitation unlocks after approval.</p> : <p>Open the client-provided testing link with your approved Google account, then upload installation proof.</p>}
+          {step === 1 ? <div className="space-y-4">
+            <p>The first step is to join as a tester for <strong>{appName}</strong>.</p>
+            <p className="font-bold">Please follow these instructions carefully:</p>
+            <ol className="list-decimal space-y-1 pl-5">
+              <li>Open the tester invitation link.</li>
+              <li>Make sure you open the link using the Chrome profile that is logged in with the same Gmail account you submitted to us.</li>
+              <li>Click on <strong>Join as a tester</strong>.</li>
+            </ol>
+            <div><p className="font-bold text-amber-500">⚠️ Important:</p><p>Do NOT install the app yet. We will share Step 2 and installation instructions once everyone has successfully joined as a tester.</p></div>
+            <div><p className="font-bold text-emerald-500">✅ After joining as a tester, please reply in the group with:</p><p className="my-2 border-l-2 border-slate-300 pl-4 italic dark:border-slate-700">“I have joined as a tester, name: ”</p><p>and attach a screenshot as proof.</p></div>
+            <p>This helps us track who has completed the process.</p>
+            <p>If you face any issues or have any questions, please ask directly in the group so everyone can benefit from the answer.</p>
+            <p>By Tomorrow EOD everyone must complete it and send in group.</p>
+            <p className="font-bold">Let&apos;s complete Step 1 first. Once everyone has joined, we&apos;ll move to the next step. 👍</p>
+          </div> : step === 2 ? <p>Your submitted Gmail address and screenshot are under admin review. The next step unlocks after approval.</p> : <p>Open the testing link with your approved Google account, then upload the requested proof.</p>}
         </div>
       </section>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { TestApp, TesterAssignment } from '../../types';
 
@@ -178,18 +178,11 @@ export default function AppTestingExplore({
                         {app.subtitle}
                       </p>
 
-                      {/* Avatars Pile & Status Dot */}
+                      {/* Backend tester count & status */}
                       <div className="flex items-center gap-2.5 mt-2.5">
-                        <div className="flex items-center -space-x-2">
-                          <div className="w-5 h-5 rounded-full overflow-hidden ring-2 ring-white dark:ring-[#0F1017]">
-                            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=50&auto=format&fit=crop&q=80" alt="avatar" className="w-full h-full object-cover" />
-                          </div>
-                          <div className="w-5 h-5 rounded-full overflow-hidden ring-2 ring-white dark:ring-[#0F1017]">
-                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=50&auto=format&fit=crop&q=80" alt="avatar" className="w-full h-full object-cover" />
-                          </div>
-                          <div className="w-6 h-5 rounded-full bg-[#4F37FE] text-white text-[10px] font-black flex items-center justify-center ring-2 ring-white dark:ring-[#0F1017]">
-                            4+
-                          </div>
+                        <div className={`flex items-center gap-1 text-[11px] font-bold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`} title="Current testers joined">
+                          <Users className="h-4 w-4 text-[#4F37FE]" />
+                          <span>{app.joinedTesters ?? 0}/{app.totalTesters ?? 14}</span>
                         </div>
 
                         <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
@@ -258,7 +251,7 @@ export default function AppTestingExplore({
                         onClick={() => handleAction(app)}
                         className="px-6 py-2.5 bg-white dark:bg-[#0F1017] border-2 border-[#4F37FE] text-[#4F37FE] text-[13px] font-black rounded-xl hover:bg-[#4F37FE]/5 transition-all cursor-pointer"
                       >
-                        Joined Testing
+                        Open Project
                       </button>
                     )}
 
