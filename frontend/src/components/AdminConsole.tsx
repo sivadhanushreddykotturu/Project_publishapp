@@ -923,7 +923,7 @@ export default function AdminConsole({
                                                 event.stopPropagation();
                                                 onApproveTesterStep1(proj.id, ass.testerId);
                                               }}
-                                              className="rounded-lg border-0 bg-emerald-600 px-2.5 py-1.5 text-[9px] font-extrabold uppercase text-white"
+                                              className="cursor-pointer rounded-lg border-0 bg-emerald-600 px-2.5 py-1.5 text-[9px] font-extrabold uppercase text-white transition hover:bg-emerald-700 hover:shadow-md active:scale-95"
                                             >
                                               Approve Step 1
                                             </button>
@@ -933,13 +933,13 @@ export default function AdminConsole({
                                                 const reason = window.prompt('Reason for rejecting Step 1');
                                                 if (reason) void onVerifyTesterProof(ass.id, 1, false, reason);
                                               }}
-                                              className="rounded-lg border-0 bg-red-600 px-2 py-1.5 text-[9px] font-extrabold uppercase text-white"
+                                              className="cursor-pointer rounded-lg border-0 bg-red-600 px-2 py-1.5 text-[9px] font-extrabold uppercase text-white transition hover:bg-red-700 active:scale-95"
                                             >
                                               Reject
                                             </button>
                                           </div>
                                         )}
-                                        {ass.pendingProofSteps?.filter((step) => step !== 1 && (step !== 4 || ass.step4CheckInsCompleted >= 14)).map((step) => <div key={step} className="flex items-center gap-1"><button onClick={(event) => { event.stopPropagation(); void onVerifyTesterProof(ass.id, step, true); }} className="rounded-lg border-0 bg-emerald-600 px-2.5 py-1.5 text-[9px] font-extrabold uppercase text-white">Approve Step {step}</button><button onClick={(event) => { event.stopPropagation(); const reason = window.prompt(`Reason for rejecting Step ${step}`); if (reason) void onVerifyTesterProof(ass.id, step, false, reason); }} className="rounded-lg border-0 bg-red-600 px-2 py-1.5 text-[9px] font-extrabold uppercase text-white">Reject</button></div>)}
+                                        {ass.pendingProofSteps?.filter((step) => step !== 1 && (step !== 4 || ass.step4CheckInsCompleted >= 14)).map((step) => <div key={step} className="flex items-center gap-1"><button onClick={(event) => { event.stopPropagation(); void onVerifyTesterProof(ass.id, step, true); }} className="cursor-pointer rounded-lg border-0 bg-emerald-600 px-2.5 py-1.5 text-[9px] font-extrabold uppercase text-white transition hover:bg-emerald-700 hover:shadow-md active:scale-95">Approve Step {step}</button><button onClick={(event) => { event.stopPropagation(); const reason = window.prompt(`Reason for rejecting Step ${step}`); if (reason) void onVerifyTesterProof(ass.id, step, false, reason); }} className="cursor-pointer rounded-lg border-0 bg-red-600 px-2 py-1.5 text-[9px] font-extrabold uppercase text-white transition hover:bg-red-700 active:scale-95">Reject</button></div>)}
 
                                         {ass.inactivityFlag && (
                                           <button

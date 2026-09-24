@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Wallet, Bell, LogOut, Compass, Smartphone, Headphones
 } from 'lucide-react';
@@ -64,16 +64,37 @@ export default function TesterDashboard({
   initialTab,
   onTabChange
 }: TesterDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'explore' | 'my-apps' | 'instructions' | 'wallet' | 'support'>('explore');
-  const [selectedAppId, setSelectedAppId] = useState<string>('blinkit');
+  const initialProjectId = initialTab?.startsWith('projects/') ? initialTab.slice('projects/'.length) : '';
+  const [activeTab, setActiveTab] = useState<'explore' | 'my-apps' | 'instructions' | 'wallet' | 'support'>(() => initialProjectId ? 'instructions' : initialTab === 'wallet' ? 'wallet' : initialTab === 'support' ? 'support' : 'explore');
+  const [selectedAppId, setSelectedAppId] = useState<string>(initialProjectId);
   const [selectedStep, setSelectedStep] = useState<1 | 2 | 3>(1);
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (initialTab?.startsWith('projects/')) {
+      const projectId = initialTab.slice('projects/'.length);
+      const assignmentStep = assignments.find((assignment) => assignment.projectId === projectId)?.currentStep ?? 1;
+      setSelectedAppId(projectId);
+      setSelectedStep(Math.min(3, assignmentStep) as 1 | 2 | 3);
+      setActiveTab('instructions');
+    } else if (initialTab === 'projects') {
+      setActiveTab('explore');
+    }
+  }, [assignments, initialTab]);
 
   const handleTabSelect = (tab: 'explore' | 'my-apps' | 'instructions' | 'wallet' | 'support') => {
     setActiveTab(tab);
     if (onTabChange) {
       onTabChange(tab === 'explore' || tab === 'my-apps' ? 'projects' : tab);
     }
+  };
+
+  const openProject = (appId: string, requestedStep?: number) => {
+    const assignmentStep = assignments.find((assignment) => assignment.projectId === appId)?.currentStep ?? 1;
+    setSelectedAppId(appId);
+    setSelectedStep(Math.min(3, requestedStep ?? assignmentStep) as 1 | 2 | 3);
+    setActiveTab('instructions');
+    onTabChange?.(`projects/${appId}`);
   };
 
   // Sidebar nav items
@@ -320,8 +341,7 @@ export default function TesterDashboard({
               assignments={assignments}
               onOpenMyApps={() => handleTabSelect('my-apps')}
               onSelectApp={(appId) => {
-                setSelectedAppId(appId);
-                setActiveTab('instructions');
+                openProject(appId);
               }}
               onJoinTesting={async (appId) => {
                 await onJoinProject(appId);
@@ -339,9 +359,7 @@ export default function TesterDashboard({
               assignments={assignments}
               onBack={() => handleTabSelect('explore')}
               onOpenAppTesting={(appId, step) => {
-                setSelectedAppId(appId);
-                setSelectedStep((step as any) || 1);
-                setActiveTab('instructions');
+                openProject(appId, step);
               }}
             />
           )}
