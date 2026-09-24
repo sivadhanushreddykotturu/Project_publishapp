@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { motion } from 'framer-motion';
+import type { TestApp, TesterAssignment } from '../../types';
 
 export interface AppTestingCardData {
   id: string;
@@ -25,6 +26,8 @@ export interface AppTestingCardData {
 
 interface AppTestingExploreProps {
   isDarkMode: boolean;
+  projects?: TestApp[];
+  assignments?: TesterAssignment[];
   onOpenMyApps: () => void;
   onSelectApp: (appId: string) => void;
   onJoinTesting: (appId: string) => void;
@@ -35,13 +38,52 @@ export const DEFAULT_EXPLORE_APPS: AppTestingCardData[] = [];
 
 export default function AppTestingExplore({
   isDarkMode,
+  projects = [],
+  assignments = [],
   onOpenMyApps,
   onSelectApp,
   onJoinTesting,
   onJoinQueue
 }: AppTestingExploreProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [apps, setApps] = useState<AppTestingCardData[]>(DEFAULT_EXPLORE_APPS);
+  const apps = useMemo<AppTestingCardData[]>(() => projects.map((project) => {
+    const assignment = assignments.find((item) => item.projectId === project.id);
+    const required = project.testersRequired ?? 14;
+    const isQueued = assignment?.status === 'queued';
+    const isJoined = assignment?.status === 'active' || assignment?.status === 'completed';
+    const isFull = project.joinState === 'full' || project.testersCount >= required;
+    const userState: AppTestingCardData['userState'] = isQueued
+      ? 'joined_queue'
+      : isJoined
+        ? 'joined_testing'
+        : isFull
+          ? 'can_queue'
+          : 'can_join';
+
+    return {
+      id: project.id,
+      name: project.name,
+      subtitle: project.category,
+      category: project.serviceType,
+      iconBg: '#4F37FE',
+      iconContent: <span className="text-2xl font-black text-white">{project.name.charAt(0).toUpperCase()}</span>,
+      statusText: isQueued ? `Queue #${assignment?.queuePosition ?? '-'}` : project.status,
+      statusDotColor: project.status === 'Testing' ? (isFull ? 'orange' : 'green') : 'yellow',
+      description: project.instructions || project.releaseNotes || (
+        project.devices.length > 0
+          ? `Testing campaign for ${project.name}. Required devices: ${project.devices.join(', ')}.`
+          : `Testing campaign for ${project.name}. No device restriction.`
+      ),
+      userState,
+      testerStat: isQueued
+        ? { highlight: `Queue ${assignment?.queuePosition ?? '-'}`, sublabel: 'You are in queue' }
+        : isJoined
+          ? { highlight: `Step ${assignment?.currentStep ?? 1} of 6`, sublabel: assignment?.status === 'completed' ? 'Testing completed' : 'Continue testing' }
+          : { highlight: `${project.testersCount}/${required}`, sublabel: isFull ? 'Testers joined; queue available' : 'Testers joined' },
+      joinedTesters: project.testersCount,
+      totalTesters: required,
+    };
+  }), [assignments, projects]);
 
   const filteredApps = apps.filter(app => 
     app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -51,12 +93,10 @@ export default function AppTestingExplore({
   const handleAction = (app: AppTestingCardData) => {
     if (app.userState === 'can_join') {
       onJoinTesting(app.id);
-      setApps(prev => prev.map(a => a.id === app.id ? { ...a, userState: 'joined_testing', testerStat: { highlight: '11th Tester', sublabel: 'You are tester now' } } : a));
     } else if (app.userState === 'joined_testing') {
       onSelectApp(app.id);
     } else if (app.userState === 'can_queue') {
       onJoinQueue(app.id);
-      setApps(prev => prev.map(a => a.id === app.id ? { ...a, userState: 'joined_queue', testerStat: { highlight: 'UQL 13', sublabel: 'You are in Queue' } } : a));
     } else if (app.userState === 'joined_queue') {
       onOpenMyApps();
     }

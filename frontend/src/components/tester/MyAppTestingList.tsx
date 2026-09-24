@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import type { TestApp, TesterAssignment } from '../../types';
 
 export type MyAppFilter = 'all' | 'active' | 'queued';
 
@@ -26,6 +27,8 @@ export interface MyAppItem {
 
 interface MyAppTestingListProps {
   isDarkMode: boolean;
+  projects?: TestApp[];
+  assignments?: TesterAssignment[];
   onBack: () => void;
   onOpenAppTesting: (appId: string, step?: number) => void;
 }
@@ -34,12 +37,38 @@ export const DEFAULT_MY_APPS: MyAppItem[] = [];
 
 export default function MyAppTestingList({
   isDarkMode,
+  projects = [],
+  assignments = [],
   onBack,
   onOpenAppTesting
 }: MyAppTestingListProps) {
   const [filter, setFilter] = useState<MyAppFilter>('all');
 
-  const filteredApps = DEFAULT_MY_APPS.filter((app) => {
+  const apps = useMemo<MyAppItem[]>(() => assignments.map((assignment) => {
+    const project = projects.find((item) => item.id === assignment.projectId);
+    const name = project?.name || assignment.appName;
+    const queued = assignment.status === 'queued';
+    const completed = assignment.status === 'completed';
+    return {
+      id: assignment.projectId,
+      name,
+      subtitle: project?.category || 'Testing campaign',
+      category: queued ? 'queued' : 'active',
+      iconBg: '#4F37FE',
+      iconContent: <span className="text-2xl font-black text-white">{name.charAt(0).toUpperCase()}</span>,
+      statusText: queued ? `Queue #${assignment.queuePosition ?? '-'}` : completed ? 'Completed' : 'Active',
+      statusDotColor: queued ? 'yellow' : completed ? 'green' : 'green',
+      description: project?.instructions || project?.releaseNotes || `Testing workflow for ${name}.`,
+      buttonLabel: queued ? 'Waiting in queue' : completed ? 'View Testing' : 'Open Testing',
+      buttonVariant: queued ? 'disabled' : 'primary',
+      testerStat: queued
+        ? { highlight: `#${assignment.queuePosition ?? '-'}`, sublabel: 'Queue position' }
+        : { highlight: `Step ${assignment.currentStep}/6`, sublabel: completed ? 'Completed' : 'Current progress' },
+      step: Math.min(3, assignment.currentStep) as 1 | 2 | 3,
+    };
+  }), [assignments, projects]);
+
+  const filteredApps = apps.filter((app) => {
     if (filter === 'all') return true;
     if (filter === 'active') return app.category === 'active' && app.buttonLabel !== 'Replaced you are inactive' && app.buttonLabel !== 'Wait Other to Join';
     if (filter === 'queued') return app.category === 'queued';

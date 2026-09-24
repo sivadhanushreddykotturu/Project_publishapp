@@ -316,6 +316,8 @@ export default function TesterDashboard({
           {activeTab === 'explore' && (
             <AppTestingExplore
               isDarkMode={isDarkMode}
+              projects={projects}
+              assignments={assignments}
               onOpenMyApps={() => handleTabSelect('my-apps')}
               onSelectApp={(appId) => {
                 setSelectedAppId(appId);
@@ -333,6 +335,8 @@ export default function TesterDashboard({
           {activeTab === 'my-apps' && (
             <MyAppTestingList
               isDarkMode={isDarkMode}
+              projects={projects}
+              assignments={assignments}
               onBack={() => handleTabSelect('explore')}
               onOpenAppTesting={(appId, step) => {
                 setSelectedAppId(appId);
@@ -346,12 +350,11 @@ export default function TesterDashboard({
             <TestingStepInstructions
               isDarkMode={isDarkMode}
               appName={
-                selectedAppId === 'kanma' ? 'Kanma' :
-                selectedAppId === 'blinkit' ? 'Blinkit' :
-                selectedAppId === 'swiggy' ? 'Swiggy' :
-                selectedAppId === 'deloitte' ? 'Deloitte' : 'Blinkit'
+                projects.find((project) => project.id === selectedAppId)?.name ||
+                assignments.find((assignment) => assignment.projectId === selectedAppId)?.appName ||
+                'Testing project'
               }
-              appSubtitle="Playstore closed Testing"
+              appSubtitle={projects.find((project) => project.id === selectedAppId)?.category || 'Testing campaign'}
               initialStep={selectedStep}
               onBack={() => handleTabSelect('my-apps')}
               onOpenSupport={() => handleTabSelect('support')}
