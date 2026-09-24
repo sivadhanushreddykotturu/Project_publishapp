@@ -8,6 +8,7 @@ export interface IUser extends Document {
   name: string;
   email: string;
   phone?: string;
+  profileCompletedAt?: Date;
   status: "active" | "suspended";
   createdAt: Date;
   updatedAt: Date;
@@ -20,6 +21,7 @@ const userSchema = new Schema<IUser>(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, lowercase: true, trim: true, unique: true, index: true },
     phone: { type: String, trim: true },
+    profileCompletedAt: { type: Date },
     status: { type: String, enum: ["active", "suspended"], default: "active" },
   },
   { timestamps: true }

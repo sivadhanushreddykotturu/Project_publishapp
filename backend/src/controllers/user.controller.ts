@@ -79,7 +79,8 @@ export const getMe = asyncHandler(async (req: Request, res: Response) => {
 
 const updateMeSchema = z.object({
   name: z.string().trim().min(1).max(100).optional(),
-  phone: z.string().trim().max(30).optional(),
+  phone: z.string().trim().min(7).max(30).optional(),
+  profileCompleted: z.literal(true).optional(),
 });
 
 export const updateMe = asyncHandler(async (req: Request, res: Response) => {
@@ -87,6 +88,7 @@ export const updateMe = asyncHandler(async (req: Request, res: Response) => {
   const body = updateMeSchema.parse(req.body);
   if (body.name !== undefined) req.dbUser.name = body.name;
   if (body.phone !== undefined) req.dbUser.phone = body.phone || undefined;
+  if (body.profileCompleted) req.dbUser.profileCompletedAt = new Date();
   await req.dbUser.save();
   res.status(200).json({ data: { user: req.dbUser, profile: null } });
 });

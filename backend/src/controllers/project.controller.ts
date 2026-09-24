@@ -296,7 +296,7 @@ export const joinProjectAsTester = asyncHandler(async (req: Request, res: Respon
   const tester = await Tester.findOne({ userId: req.dbUser!._id });
   if (!tester) throw ApiError.badRequest("Complete your tester profile before joining a project");
   if (!tester.country?.trim() || !tester.specialty?.trim() || !tester.upi?.vpa?.trim() || tester.devices.length === 0) {
-    throw ApiError.badRequest("Complete your tester profile, device, specialty, country and UPI details before joining a project");
+    throw ApiError.badRequest("Complete your device, specialty, country and UPI details before joining a project");
   }
 
   const assignment = await joinProject(new Types.ObjectId(req.params.id), tester._id);

@@ -9,6 +9,7 @@ export type LaunchOpsUser = {
   name: string;
   email: string;
   phone?: string;
+  profileCompletedAt?: string;
   status: "active" | "suspended";
   createdAt: string;
   updatedAt: string;
@@ -78,6 +79,7 @@ export type BackendClient = {
   userId: LaunchOpsUser;
   companyName?: string;
   contactName: string;
+  billingInfo?: { gstin?: string; billingAddress?: string };
   activePackage?: BackendProject["package"];
   projects: string[];
 };
@@ -412,7 +414,7 @@ export function getMyClientProfile(token: string) {
   return apiRequest<ApiEnvelope<BackendClient>>("/api/v1/clients/me", { token });
 }
 
-export function updateMyClientProfile(input: { companyName?: string; contactName?: string }, token: string) {
+export function updateMyClientProfile(input: { companyName?: string; contactName?: string; billingInfo?: { gstin?: string; billingAddress?: string } }, token: string) {
   return apiRequest<ApiEnvelope<BackendClient>>("/api/v1/clients/me", { method: "PATCH", token, body: input });
 }
 
@@ -430,7 +432,7 @@ export function createAdminProject(input: {
   return apiRequest<ApiEnvelope<{ project: BackendProject; invoice: BackendInvoice | null }>>("/api/v1/projects/admin", { method: "POST", token, body: input });
 }
 
-export function updateCurrentLaunchOpsUser(input: { name?: string; phone?: string }, token: string) {
+export function updateCurrentLaunchOpsUser(input: { name?: string; phone?: string; profileCompleted?: true }, token: string) {
   return apiRequest<ApiEnvelope<CurrentUserResponse>>("/api/v1/users/me", { method: "PATCH", token, body: input });
 }
 

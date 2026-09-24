@@ -1,9 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { SignInButton, SignOutButton, SignUpButton, UserButton, useAuth, useUser } from "@clerk/nextjs";
 import { CheckCircle2, Loader2, LogOut, UserPlus } from "lucide-react";
-import { syncLaunchOpsUser, type LaunchOpsUser } from "../lib/launchops-api";
+import {
+  getCurrentLaunchOpsUser,
+  syncLaunchOpsUser,
+  updateCurrentLaunchOpsUser,
+  updateMyClientProfile,
+  updateMyTesterProfile,
+  type BackendClient,
+  type BackendTesterProfile,
+  type LaunchOpsUser,
+} from "../lib/launchops-api";
 
 type ClerkAuthScreenProps = {
   isDarkMode: boolean;
@@ -13,6 +22,19 @@ type ClerkAuthScreenProps = {
 };
 
 type SyncState = "idle" | "syncing" | "synced" | "error";
+type RegistrationDetails = {
+  phone: string;
+  companyName: string;
+  contactName: string;
+  billingAddress: string;
+  gstin: string;
+  country: string;
+  specialty: string;
+  experienceLevel: "beginner" | "intermediate" | "expert";
+  deviceModel: string;
+  androidVersion: string;
+  upiVpa: string;
+};
 const intendedRoleKey = "launchops_intended_role";
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
@@ -34,6 +56,13 @@ export default function ClerkAuthScreen({ isDarkMode, initialRole = "tester", on
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [syncError, setSyncError] = useState<string>("");
   const [launchOpsUser, setLaunchOpsUser] = useState<LaunchOpsUser | null>(null);
+  const [needsProfile, setNeedsProfile] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [details, setDetails] = useState<RegistrationDetails>({
+    phone: "", companyName: "", contactName: "", billingAddress: "", gstin: "",
+    country: "India", specialty: "", experienceLevel: "beginner", deviceModel: "", androidVersion: "", upiVpa: "",
+  });
   const [syncAttempt, setSyncAttempt] = useState(0);
   const [selectedRole, setSelectedRole] = useState<"tester" | "client">(() => {
     if (typeof window === "undefined") return initialRole;
@@ -101,7 +130,38 @@ export default function ClerkAuthScreen({ isDarkMode, initialRole = "tester", on
         setLaunchOpsUser(response.data);
         setSyncState("synced");
         sessionStorage.removeItem(intendedRoleKey);
-        onLoginSuccessRef.current(response.data.name, response.data.role);
+        if (response.data.role === "admin") {
+          onLoginSuccessRef.current(response.data.name, response.data.role);
+          return;
+        }
+        const current = await getCurrentLaunchOpsUser(token);
+        if (cancelled) return;
+        const profile = current.data.profile as BackendClient | BackendTesterProfile | null;
+        const clientProfile = response.data.role === "client" ? profile as BackendClient | null : null;
+        const testerProfile = response.data.role === "tester" ? profile as BackendTesterProfile | null : null;
+        const hasRequiredDetails = response.data.role === "client"
+          ? Boolean(response.data.phone?.trim() && clientProfile?.companyName?.trim() && clientProfile?.contactName?.trim())
+          : Boolean(response.data.phone?.trim() && testerProfile?.country?.trim() && testerProfile?.specialty?.trim() && testerProfile?.devices?.length && testerProfile?.upi?.vpa?.trim());
+        const isComplete = Boolean(response.data.profileCompletedAt && hasRequiredDetails);
+        if (isComplete) {
+          onLoginSuccessRef.current(response.data.name, response.data.role);
+          return;
+        }
+        setDetails((value) => ({
+          ...value,
+          phone: response.data.phone ?? "",
+          companyName: clientProfile?.companyName ?? "",
+          contactName: clientProfile?.contactName ?? response.data.name,
+          billingAddress: clientProfile?.billingInfo?.billingAddress ?? "",
+          gstin: clientProfile?.billingInfo?.gstin ?? "",
+          country: testerProfile?.country ?? "India",
+          specialty: testerProfile?.specialty ?? "",
+          experienceLevel: testerProfile?.experienceLevel ?? "beginner",
+          deviceModel: testerProfile?.devices?.[0]?.model ?? "",
+          androidVersion: testerProfile?.devices?.[0]?.androidVersion ?? "",
+          upiVpa: testerProfile?.upi?.vpa ?? "",
+        }));
+        setNeedsProfile(true);
       } catch (error) {
         if (cancelled) return;
         syncStartedRef.current = false;
@@ -117,6 +177,51 @@ export default function ClerkAuthScreen({ isDarkMode, initialRole = "tester", on
       syncStartedRef.current = false;
     };
   }, [displayName, email, isLoaded, isSignedIn, isUserLoaded, selectedRole, syncAttempt, userId]);
+
+  const completeRegistration = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!launchOpsUser || launchOpsUser.role === "admin") return;
+    setProfileSaving(true);
+    setProfileError("");
+    try {
+      const token = await getTokenRef.current();
+      if (!token) throw new Error("Missing Clerk session token");
+      await updateCurrentLaunchOpsUser({ name: launchOpsUser.role === "client" ? details.contactName.trim() : launchOpsUser.name, phone: details.phone.trim(), profileCompleted: true }, token);
+      if (launchOpsUser.role === "client") {
+        await updateMyClientProfile({
+          companyName: details.companyName.trim(),
+          contactName: details.contactName.trim(),
+          billingInfo: {
+            billingAddress: details.billingAddress.trim() || undefined,
+            gstin: details.gstin.trim() || undefined,
+          },
+        }, token);
+      } else {
+        const fingerprintKey = "launchops_device_fingerprint";
+        let fingerprint = localStorage.getItem(fingerprintKey);
+        if (!fingerprint) {
+          fingerprint = crypto.randomUUID();
+          localStorage.setItem(fingerprintKey, fingerprint);
+        }
+        await updateMyTesterProfile({
+          devices: [{ model: details.deviceModel.trim(), androidVersion: details.androidVersion.trim(), fingerprint }],
+          experienceLevel: details.experienceLevel,
+          country: details.country.trim(),
+          specialty: details.specialty.trim(),
+          upi: { vpa: details.upiVpa.trim() },
+        }, token);
+      }
+      setNeedsProfile(false);
+      onLoginSuccessRef.current(
+        launchOpsUser.role === "client" ? details.contactName.trim() : launchOpsUser.name,
+        launchOpsUser.role,
+      );
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : "Could not save registration details");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   return (
     <div
@@ -222,21 +327,54 @@ export default function ClerkAuthScreen({ isDarkMode, initialRole = "tester", on
                 </div>
               </div>
 
-              {syncState === "syncing" && (
+              {needsProfile && launchOpsUser && launchOpsUser.role !== "admin" && (
+                <form onSubmit={completeRegistration} className="space-y-3">
+                  <div>
+                    <h3 className={`text-base font-black ${isDarkMode ? "text-white" : "text-slate-900"}`}>Complete your {launchOpsUser.role} profile</h3>
+                    <p className="mt-1 text-xs text-slate-500">These details are required before you can continue.</p>
+                  </div>
+                  {launchOpsUser.role === "client" ? (
+                    <>
+                      <input required value={details.companyName} onChange={(event) => setDetails((value) => ({ ...value, companyName: event.target.value }))} placeholder="Company name" className={`w-full rounded-xl border px-3 py-2.5 text-sm ${isDarkMode ? "border-white/10 bg-white/5 text-white" : "border-slate-200"}`} />
+                      <input required value={details.contactName} onChange={(event) => setDetails((value) => ({ ...value, contactName: event.target.value }))} placeholder="Contact person" className={`w-full rounded-xl border px-3 py-2.5 text-sm ${isDarkMode ? "border-white/10 bg-white/5 text-white" : "border-slate-200"}`} />
+                      <input value={details.billingAddress} onChange={(event) => setDetails((value) => ({ ...value, billingAddress: event.target.value }))} placeholder="Billing address (optional)" className={`w-full rounded-xl border px-3 py-2.5 text-sm ${isDarkMode ? "border-white/10 bg-white/5 text-white" : "border-slate-200"}`} />
+                      <input value={details.gstin} onChange={(event) => setDetails((value) => ({ ...value, gstin: event.target.value }))} placeholder="GSTIN (optional)" className={`w-full rounded-xl border px-3 py-2.5 text-sm ${isDarkMode ? "border-white/10 bg-white/5 text-white" : "border-slate-200"}`} />
+                    </>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <input required value={details.country} onChange={(event) => setDetails((value) => ({ ...value, country: event.target.value }))} placeholder="Country" className={`rounded-xl border px-3 py-2.5 text-sm ${isDarkMode ? "border-white/10 bg-white/5 text-white" : "border-slate-200"}`} />
+                        <select required value={details.experienceLevel} onChange={(event) => setDetails((value) => ({ ...value, experienceLevel: event.target.value as RegistrationDetails["experienceLevel"] }))} className={`rounded-xl border px-3 py-2.5 text-sm ${isDarkMode ? "border-white/10 bg-[#121218] text-white" : "border-slate-200 bg-white"}`}><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="expert">Expert</option></select>
+                      </div>
+                      <select required value={details.specialty} onChange={(event) => setDetails((value) => ({ ...value, specialty: event.target.value }))} className={`w-full rounded-xl border px-3 py-2.5 text-sm ${isDarkMode ? "border-white/10 bg-[#121218] text-white" : "border-slate-200 bg-white"}`}><option value="">Select testing specialty</option><option value="Android Testing">Android Testing</option><option value="UX Testing">UX Testing</option><option value="Functional Testing">Functional Testing</option><option value="Performance Testing">Performance Testing</option><option value="Security Testing">Security Testing</option></select>
+                      <div className="grid grid-cols-2 gap-3">
+                        <input required value={details.deviceModel} onChange={(event) => setDetails((value) => ({ ...value, deviceModel: event.target.value }))} placeholder="Device model" className={`rounded-xl border px-3 py-2.5 text-sm ${isDarkMode ? "border-white/10 bg-white/5 text-white" : "border-slate-200"}`} />
+                        <input required value={details.androidVersion} onChange={(event) => setDetails((value) => ({ ...value, androidVersion: event.target.value }))} placeholder="Android version" className={`rounded-xl border px-3 py-2.5 text-sm ${isDarkMode ? "border-white/10 bg-white/5 text-white" : "border-slate-200"}`} />
+                      </div>
+                      <input required pattern=".+@.+" value={details.upiVpa} onChange={(event) => setDetails((value) => ({ ...value, upiVpa: event.target.value }))} placeholder="UPI ID (example@bank)" className={`w-full rounded-xl border px-3 py-2.5 text-sm ${isDarkMode ? "border-white/10 bg-white/5 text-white" : "border-slate-200"}`} />
+                    </>
+                  )}
+                  <input required value={details.phone} onChange={(event) => setDetails((value) => ({ ...value, phone: event.target.value }))} placeholder="Phone number" className={`w-full rounded-xl border px-3 py-2.5 text-sm ${isDarkMode ? "border-white/10 bg-white/5 text-white" : "border-slate-200"}`} />
+                  {profileError && <p className="text-xs font-semibold text-red-500">{profileError}</p>}
+                  <button disabled={profileSaving} className="w-full rounded-xl border-0 bg-indigo-600 py-3 text-sm font-bold text-white disabled:opacity-50">{profileSaving ? "Saving details..." : "Complete Registration"}</button>
+                </form>
+              )}
+
+              {!needsProfile && syncState === "syncing" && (
                 <div className={`flex items-center gap-2 text-sm font-bold ${isDarkMode ? "text-indigo-300" : "text-indigo-700"}`}>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Connecting to UXOS
                 </div>
               )}
 
-              {syncState === "synced" && (
+              {!needsProfile && syncState === "synced" && (
                 <div className={`flex items-center gap-2 text-sm font-bold ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>
                   <CheckCircle2 className="w-4 h-4" />
                   {launchOpsUser?.name || "Account"} is ready
                 </div>
               )}
 
-              {syncState === "error" && (
+              {!needsProfile && syncState === "error" && (
                 <div className="space-y-4">
                   <p className="text-sm font-semibold text-red-500">{syncError}</p>
                   <button
