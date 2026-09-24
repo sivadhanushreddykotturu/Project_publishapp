@@ -815,7 +815,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
       const startCheckout = () => {
         const Razorpay = (window as typeof window & { Razorpay?: new (options: unknown) => { open: () => void } }).Razorpay;
         if (!Razorpay) { reject(new Error('Razorpay checkout failed to load.')); return; }
-        new Razorpay({ key: checkout.data.keyId, order_id: checkout.data.order.id, amount: checkout.data.order.amount, currency: checkout.data.order.currency, name: 'LaunchOps', handler: () => { void refreshClientData().then(resolve); }, modal: { ondismiss: resolve } }).open();
+        new Razorpay({ key: checkout.data.keyId, order_id: checkout.data.order.id, amount: checkout.data.order.amount, currency: checkout.data.order.currency, name: 'UXOS', handler: () => { void refreshClientData().then(resolve); }, modal: { ondismiss: resolve } }).open();
       };
       const existing = document.querySelector<HTMLScriptElement>('script[data-razorpay-checkout]');
       if (existing) { startCheckout(); return; }
@@ -854,7 +854,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
           order_id: checkout.data.order.id,
           amount: checkout.data.order.amount,
           currency: checkout.data.order.currency,
-          name: 'LaunchOps',
+          name: 'UXOS',
           handler: async (payment: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
             try { const result = await verifyOnboardingPayment(payment, token); resolve(result.data.verified); }
             catch (error) { reject(error); }
@@ -964,7 +964,9 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
       {/* Main Screen Router */}
       <main className="relative min-h-screen">
         {dashboardError && isDashboard && (
-          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] rounded-xl border border-red-500/30 bg-red-950 px-4 py-3 text-sm font-semibold text-red-100 shadow-xl">
+          <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] rounded-xl border px-4 py-3 text-sm font-semibold shadow-xl transition-colors ${
+            isDarkMode ? 'border-red-500/30 bg-red-950 text-red-100' : 'border-red-200 bg-red-50 text-red-700'
+          }`}>
             {dashboardError}
           </div>
         )}
@@ -1073,6 +1075,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
             >
               <ClientFlowManager
                 isDarkMode={isDarkMode}
+                onToggleDarkMode={toggleDarkMode}
                 onBackToHome={() => handleSetTab('home')}
                 initialView={initialSubTab === 'dashboard' ? 'dashboard' : ['wizard', 'new-app'].includes(initialSubTab) ? 'wizard' : undefined}
                 onCheckoutTier={apiCheckoutOnboardingTier}
@@ -1111,6 +1114,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 <DashboardLoadingScreen isDarkMode={isDarkMode} />
               ) : <AdminConsole
                 isDarkMode={isDarkMode}
+                onToggleDarkMode={toggleDarkMode}
                 projects={apps}
                 bugs={bugs}
                 assignments={assignments}
@@ -1206,7 +1210,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                     ? 'border-indigo-500/20 bg-indigo-950/40 text-indigo-400' 
                     : 'border-indigo-150 bg-indigo-50 text-indigo-600'
                 }`}>
-                  Meet LaunchOps
+                  Meet UXOS
                 </span>
                 <h1 className={`text-4xl font-black mb-6 tracking-tight ${
                   isDarkMode ? 'text-white' : 'text-slate-900'

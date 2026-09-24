@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react';
 import { 
   Shield, Check, X, AlertTriangle, Plus, Smartphone, Bug, 
   Clock, DollarSign, Users, Award, CornerDownRight, ListFilter, Trash2, ArrowRight, ExternalLink, LogOut, 
-  ChevronDown, ChevronUp, UserPlus, Calendar, Bell, Settings, BarChart2, Activity, FileText, AlertCircle, Sparkles, Landmark, RefreshCw, Search
+  ChevronDown, ChevronUp, UserPlus, Calendar, Bell, Settings, BarChart2, Activity, FileText, AlertCircle, Sparkles, Landmark, RefreshCw, Search, Headphones
 } from 'lucide-react';
 import { TestApp, BugReport, TesterAssignment, Tester, WithdrawalRequest } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { AdminDashboardSummary, BackendClient, BackendNotification, BackendProjectFile, BackendSupportTicket, LaunchOpsUser } from '../lib/launchops-api';
+import UXOSBrandLogo from './ui/UXOSBrandLogo';
 
 interface AdminConsoleProps {
   isDarkMode: boolean;
+  onToggleDarkMode?: () => void;
   projects: TestApp[];
   bugs: BugReport[];
   assignments: TesterAssignment[];
@@ -53,6 +55,7 @@ interface AdminConsoleProps {
 
 export default function AdminConsole({
   isDarkMode,
+  onToggleDarkMode,
   projects,
   bugs,
   assignments,
@@ -257,49 +260,110 @@ export default function AdminConsole({
   const activeTesterCount = dashboardSummary?.testers.active ?? testers.filter((tester) => tester.status === 'Online').length;
   const activeTesterPercent = totalTesterCount ? Math.round((activeTesterCount / totalTesterCount) * 100) : 0;
 
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   return (
-    <div className={`h-screen overflow-hidden flex ${isDarkMode ? 'bg-[#09090B] text-slate-105' : 'bg-slate-50 text-slate-900'}`}>
+    <div className={`min-h-screen md:h-screen md:overflow-hidden flex ${isDarkMode ? 'bg-[#090A0F] text-slate-100' : 'bg-[#F4F5F8] text-slate-900'}`}>
       
-      {/* ================= LEFT SIDEBAR (THEME AWARE LIKE TESTER/CLIENT DASHBOARDS) ================= */}
-      <aside className={`hidden md:flex w-[260px] border-r shrink-0 flex-col justify-between p-6 sticky top-0 h-screen z-20 ${
-        isDarkMode ? 'bg-[#09090B] border-zinc-800' : 'bg-white border-slate-200'
+      {/* ================= LEFT SIDEBAR (COLLAPSIBLE, MATCHING TESTER DASHBOARD) ================= */}
+      <aside className={`hidden md:flex shrink-0 flex-col justify-between py-7 border-r transition-all duration-300 ${
+        isCollapsed ? 'w-20 px-3 items-center' : 'w-64 px-4'
+      } ${
+        isDarkMode ? 'bg-[#0F1017] border-white/5' : 'bg-white border-slate-200/80 shadow-xs'
       }`}>
-        <div className="space-y-8">
-          {/* Logo */}
-          <div className="flex items-center gap-2 px-2">
-            <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center transform rotate-12 shadow-md shadow-indigo-600/30">
-              <span className="text-white font-extrabold italic text-sm">LO</span>
+        <div className="w-full">
+          {/* Platform Logo & Collapse Toggle */}
+          <div 
+            onClick={() => setIsCollapsed(!isCollapsed)} 
+            className={`flex items-center mb-8 cursor-pointer select-none ${isCollapsed ? 'justify-center' : 'px-2 justify-between'}`}
+            title="Click to collapse/expand sidebar"
+          >
+            <div className="flex items-center gap-3">
+              <img src="/launchops-logo.png" alt="UXOS Logo" className="w-8 h-8 object-contain shrink-0" />
+              {!isCollapsed && (
+                <span className={`text-[22px] font-black tracking-tight font-sans ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                  UXOS
+                </span>
+              )}
             </div>
-            <span className="font-black tracking-wider text-lg uppercase font-display">
-              Launch<span className="text-indigo-600">Ops</span>
-            </span>
           </div>
 
           {/* Navigation Menu */}
-          <nav className="space-y-1.5">
+          <nav className="space-y-2.5 w-full">
             {[
-              { id: 'dashboard', label: 'Dashboard', icon: <Activity className="w-4 h-4" /> },
-              { id: 'projects', label: 'Projects', icon: <Smartphone className="w-4 h-4" /> },
-              { id: 'testers', label: 'Testers', icon: <Users className="w-4 h-4" /> },
-              { id: 'bugs', label: 'Bug Reports', icon: <Bug className="w-4 h-4" /> },
-              { id: 'support', label: 'Support Inbox', icon: <FileText className="w-4 h-4" /> },
-              { id: 'cashouts', label: 'Payouts & Wallets', icon: <Landmark className="w-4 h-4" /> }
+              { 
+                id: 'dashboard', 
+                label: 'Dashboard', 
+                icon: (
+                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                    <rect x="3" y="3" width="8" height="8" rx="2" />
+                    <rect x="13" y="3" width="8" height="8" rx="2" />
+                    <rect x="3" y="13" width="8" height="8" rx="2" />
+                    <rect x="13" y="13" width="8" height="8" rx="2" />
+                  </svg>
+                ) 
+              },
+              { 
+                id: 'projects', 
+                label: 'Projects', 
+                icon: (
+                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                    <path d="M4 3h16c1.1 0 2 .9 2 2v10c0 1.1-.9 2-2 2h-5v2h2c.55 0 1 .45 1 1s-.45 1-1 1H7c-.55 0-1-.45-1-1s.45-1 1-1h2v-2H4c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2zm2 4v6h12V7H6zm2.5 3.5l1.5-1.5 2 3 2-3 1.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                  </svg>
+                ) 
+              },
+              { 
+                id: 'testers', 
+                label: 'Testers', 
+                icon: <Users className="w-5 h-5" /> 
+              },
+              { 
+                id: 'bugs', 
+                label: 'Bug Reports', 
+                icon: <Bug className="w-5 h-5" /> 
+              },
+              { 
+                id: 'support', 
+                label: 'Support', 
+                icon: (
+                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                    <path d="M12 3a9 9 0 0 0-9 9v6c0 1.66 1.34 3 3 3h1a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H5v-2a7 7 0 0 1 14 0v2h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h1c1.66 0 3-1.34 3-3v-6a9 9 0 0 0-9-9z" />
+                  </svg>
+                ) 
+              },
+              { 
+                id: 'cashouts', 
+                label: 'Payouts', 
+                icon: (
+                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                    <path d="M20 7H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm-2 6h-3c-.55 0-1-.45-1-1s.45-1 1-1h3v2zM4 4h14c.55 0 1 .45 1 1s-.45 1-1 1H4C3.45 6 3 5.55 3 5s.45-1 1-1z" />
+                  </svg>
+                ) 
+              }
             ].map((link) => {
               const isActive = activeTab === link.id;
               return (
                 <button
                   key={link.id}
                   onClick={() => handleTabSelect(link.id as any)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all border-none cursor-pointer text-left ${
+                  className={`relative w-full flex items-center ${isCollapsed ? 'justify-center py-3.5 px-0' : 'gap-3.5 px-4 py-3.5'} rounded-2xl text-[15px] font-bold transition-all duration-150 cursor-pointer border-0 ${
                     isActive 
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' 
+                      ? 'bg-[#3B82F6] text-white shadow-lg shadow-blue-500/20' 
                       : isDarkMode
-                        ? 'text-slate-400 hover:text-white hover:bg-zinc-800/30 bg-transparent'
-                        : 'text-slate-650 hover:text-slate-900 hover:bg-indigo-50/30 bg-transparent'
+                        ? 'text-slate-400 hover:text-white hover:bg-white/5 bg-transparent'
+                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100 bg-transparent'
                   }`}
+                  title={isCollapsed ? link.label : undefined}
                 >
-                  {link.icon}
-                  <span>{link.label}</span>
+                  {/* Left Pill Indicator for Active Tab */}
+                  {isActive && (
+                    <motion.div 
+                      layoutId="adminSidebarActiveIndicator"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-white rounded-r-full" 
+                    />
+                  )}
+                  <span className="shrink-0">{link.icon}</span>
+                  {!isCollapsed && <span>{link.label}</span>}
                 </button>
               );
             })}
@@ -307,82 +371,128 @@ export default function AdminConsole({
         </div>
 
         {/* Profile and Logout Footer */}
-        <div className={`pt-6 border-t ${isDarkMode ? 'border-zinc-800' : 'border-slate-100'}`}>
-          <div className="relative flex items-center justify-between">
+        <div className={`pt-6 border-t ${isDarkMode ? 'border-white/5' : 'border-slate-100'} w-full`}>
+          <div className={`relative flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
             <button type="button" onClick={() => setProfileOpen((open) => !open)} className="flex items-center gap-3 border-0 bg-transparent p-0 text-left cursor-pointer">
-              <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center font-black text-indigo-600 font-display">
+              <div className="w-9 h-9 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center font-black text-blue-500 font-sans shrink-0">
                 {adminInitials}
               </div>
-              <div className="hidden sm:block text-left text-xs leading-none">
-                <span className={`font-bold block ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{currentUser?.name ?? 'Admin'}</span>
-                <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-1 mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {currentUser?.role ?? 'admin'}
-                </span>
-              </div>
+              {!isCollapsed && (
+                <div className="text-left text-xs leading-none">
+                  <span className={`font-bold block ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{currentUser?.name ?? 'Admin'}</span>
+                  <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-1 mt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {currentUser?.role ?? 'admin'}
+                  </span>
+                </div>
+              )}
             </button>
-            <button 
-              onClick={onLogout}
-              className={`p-2 rounded-xl border-none cursor-pointer bg-transparent transition-colors ${
-                isDarkMode ? 'text-slate-400 hover:text-red-450 hover:bg-zinc-800/30' : 'text-slate-500 hover:text-red-600 hover:bg-red-50/50'
-              }`}
-              title="Logout"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+            {!isCollapsed && (
+              <button 
+                onClick={onLogout}
+                className={`p-2 rounded-xl border-none cursor-pointer bg-transparent transition-colors ${
+                  isDarkMode ? 'text-slate-400 hover:text-red-400 hover:bg-white/5' : 'text-slate-500 hover:text-red-600 hover:bg-red-50/50'
+                }`}
+                title="Logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
             {profileOpen && (
               <form onSubmit={async (event) => {
                 event.preventDefault(); setProfileSaving(true); setProfileError('');
                 try { await onUpdateProfile({ name: profileName, phone: profilePhone }); setProfileOpen(false); }
                 catch (error) { setProfileError(error instanceof Error ? error.message : 'Could not update profile.'); }
                 finally { setProfileSaving(false); }
-              }} className={`absolute bottom-12 left-0 z-50 w-72 space-y-3 rounded-2xl border p-4 shadow-xl ${isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-slate-200'}`}>
+              }} className={`absolute bottom-12 ${isCollapsed ? 'left-12' : 'left-0'} z-50 w-72 space-y-3 rounded-2xl border p-4 shadow-xl ${isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200'}`}>
                 <p className="text-[10px] font-black uppercase text-slate-500">Admin profile</p>
                 <input value={profileName} onChange={(event) => setProfileName(event.target.value)} placeholder="Name" className={`w-full rounded-lg border px-3 py-2 text-xs ${isDarkMode ? 'bg-black border-zinc-700 text-white' : 'border-slate-200'}`} />
                 <input value={currentUser?.email ?? ''} readOnly className={`w-full rounded-lg border px-3 py-2 text-xs opacity-70 ${isDarkMode ? 'bg-black border-zinc-700 text-white' : 'border-slate-200'}`} />
                 <input value={profilePhone} onChange={(event) => setProfilePhone(event.target.value)} placeholder="Phone" className={`w-full rounded-lg border px-3 py-2 text-xs ${isDarkMode ? 'bg-black border-zinc-700 text-white' : 'border-slate-200'}`} />
                 <p className="text-[10px] text-slate-500">Status: {currentUser?.status ?? 'active'} · Role: {currentUser?.role ?? 'admin'}</p>
                 {profileError && <p className="text-[10px] font-bold text-red-500">{profileError}</p>}
-                <button disabled={profileSaving} className="w-full rounded-lg border-0 bg-indigo-600 px-3 py-2 text-xs font-black text-white disabled:opacity-50">{profileSaving ? 'Saving...' : 'Save profile'}</button>
+                <button disabled={profileSaving} className="w-full rounded-lg border-0 bg-blue-600 px-3 py-2 text-xs font-black text-white disabled:opacity-50">{profileSaving ? 'Saving...' : 'Save profile'}</button>
               </form>
             )}
           </div>
+
+          {/* Theme Toggle (Dark vs Light) */}
+          {onToggleDarkMode && (
+            <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} pt-4 border-t mt-4 ${isDarkMode ? 'border-white/5' : 'border-slate-100'}`}>
+              {!isCollapsed && (
+                <span className={`text-[13px] font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-700'}`}>
+                  {isDarkMode ? 'Dark mode' : 'Light mode'}
+                </span>
+              )}
+              <button
+                onClick={onToggleDarkMode}
+                className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out border-0 ${
+                  isDarkMode ? 'bg-slate-700' : 'bg-[#4F37FE]'
+                }`}
+                title="Toggle Dark/Light Mode"
+              >
+                <span
+                  className={`pointer-events-none flex items-center justify-center h-6 w-6 rounded-full bg-white shadow-xs transform transition duration-200 ease-in-out mt-0.5 ${
+                    isDarkMode ? 'translate-x-0.5' : 'translate-x-5'
+                  }`}
+                >
+                  <span className={`w-2.5 h-2.5 rounded-full ${isDarkMode ? 'bg-slate-800' : 'bg-[#4F37FE]'}`} />
+                </span>
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
       {/* ================= MAIN WINDOW GRID ================= */}
-      <div className="flex-grow flex flex-col min-w-0 h-screen overflow-y-auto">
+      <div className="flex-grow flex flex-col min-w-0 min-h-screen md:h-screen overflow-y-auto pb-20 md:pb-0">
         
         {/* Main Header */}
-        <header className={`px-8 py-5 border-b flex items-center justify-between sticky top-0 backdrop-blur-md z-10 ${
-          isDarkMode ? 'bg-[#09090B]/90 border-zinc-800/60' : 'bg-white/90 border-slate-200'
+        <header className={`px-4 md:px-8 py-4 md:py-5 border-b flex items-center justify-between sticky top-0 backdrop-blur-md z-10 ${
+          isDarkMode ? 'bg-[#090A0F]/90 border-white/5' : 'bg-white/90 border-slate-200'
         }`}>
           <div>
-            <h1 className={`text-xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-              Admin Control Center
+            <div className="flex items-center gap-2 md:hidden mb-1">
+              <img src="/launchops-logo.png" alt="UXOS Logo" className="w-7 h-7 object-contain" />
+              <span className={`text-lg font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>UXOS Admin</span>
+            </div>
+            <h1 className={`text-lg md:text-xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+              {activeTab === 'dashboard' && 'Admin Overview'}
+              {activeTab === 'projects' && 'Projects'}
+              {activeTab === 'testers' && 'Tester Management'}
+              {activeTab === 'bugs' && 'Bug Reports'}
+              {activeTab === 'support' && 'Support Inbox'}
+              {activeTab === 'cashouts' && 'Payouts & Wallets'}
             </h1>
-            <p className="text-[10px] text-slate-500 mt-0.5">Here's what's happening on LaunchOps today.</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              {activeTab === 'dashboard' && "Here's what's happening on UXOS today."}
+              {activeTab === 'projects' && 'Manage all app testing campaigns'}
+              {activeTab === 'testers' && 'Manage tester accounts and assignments'}
+              {activeTab === 'bugs' && 'Review and publish bug reports'}
+              {activeTab === 'support' && 'Reply to client and tester support tickets'}
+              {activeTab === 'cashouts' && 'Process pending payout requests'}
+            </p>
           </div>
 
           <div className="flex items-center gap-4">
             <div className={`flex items-center gap-2 px-3 py-1.5 border rounded-xl text-xs font-bold ${
-              isDarkMode ? 'bg-zinc-900/60 border-zinc-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+              isDarkMode ? 'bg-white/5 border-white/10 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
             }`}>
-              <Calendar className="w-4 h-4 text-indigo-500" />
+              <Calendar className="w-4 h-4 text-blue-500" />
               <span>{todayLabel}</span>
             </div>
             
             <div className="relative">
-            <button onClick={() => setNotificationDropdownOpen((open) => !open)} className={`p-2 border rounded-xl relative hover:bg-slate-500/5 border-slate-250 cursor-pointer ${isDarkMode ? 'border-zinc-800' : 'border-slate-200'}`}>
+            <button onClick={() => setNotificationDropdownOpen((open) => !open)} className={`p-2 border rounded-xl relative hover:bg-slate-500/5 cursor-pointer ${isDarkMode ? 'border-white/10' : 'border-slate-200'}`}>
               <Bell className="w-4 h-4 text-slate-400" />
-              {notifications.some((notification) => !notification.readAt) && <span className="absolute top-1 right-1 w-2 h-2 bg-indigo-500 rounded-full" />}
+              {notifications.some((notification) => !notification.readAt) && <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" />}
             </button>
-            {notificationDropdownOpen && <div className={`absolute right-0 top-12 w-80 max-h-96 overflow-y-auto rounded-xl border p-2 shadow-xl ${isDarkMode ? 'bg-zinc-950 border-zinc-800' : 'bg-white border-slate-200'}`}>
-              {notifications.filter((notification) => !notification.readAt).length === 0 ? <p className="p-3 text-xs text-slate-500">You're all caught up.</p> : notifications.filter((notification) => !notification.readAt).map((notification) => <button key={notification._id} onClick={() => { onReadNotification(notification._id); if (notification.type === 'project_request') handleTabSelect('projects'); else if (notification.type === 'support_request') handleTabSelect('support'); setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs border mb-1 transition-colors ${isDarkMode ? 'bg-indigo-500/15 border-indigo-500/30 text-white' : 'bg-indigo-50 border-indigo-200 text-slate-900'}`}><span className="flex items-center justify-between gap-2 font-bold"><span>{notification.type === 'project_request' ? 'New published project' : notification.type.replace(/_/g, ' ')}</span><span className="text-[8px] uppercase px-1.5 py-0.5 rounded-full bg-indigo-600 text-white">New</span></span><span className="text-slate-500 block mt-1">{String(notification.payload.appName ?? '')}</span></button>) }
+            {notificationDropdownOpen && <div className={`absolute right-0 top-12 w-80 max-h-96 overflow-y-auto rounded-xl border p-2 shadow-xl ${isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200'}`}>
+              {notifications.filter((notification) => !notification.readAt).length === 0 ? <p className="p-3 text-xs text-slate-500">You're all caught up.</p> : notifications.filter((notification) => !notification.readAt).map((notification) => <button key={notification._id} onClick={() => { onReadNotification(notification._id); if (notification.type === 'project_request') handleTabSelect('projects'); else if (notification.type === 'support_request') handleTabSelect('support'); setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs border mb-1 transition-colors ${isDarkMode ? 'bg-blue-500/15 border-blue-500/30 text-white' : 'bg-blue-50 border-blue-200 text-slate-900'}`}><span className="flex items-center justify-between gap-2 font-bold"><span>{notification.type === 'project_request' ? 'New published project' : notification.type.replace(/_/g, ' ')}</span><span className="text-[8px] uppercase px-1.5 py-0.5 rounded-full bg-blue-600 text-white">New</span></span><span className="text-slate-500 block mt-1">{String(notification.payload.appName ?? '')}</span></button>) }
               {notifications.filter((notification) => notification.status === 'failed').map((notification) => <div key={`failed-${notification._id}`} className="mb-1 rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs"><p className="font-bold text-red-500">Failed: {notification.type.replace(/_/g, ' ')}</p><p className="mt-1 truncate text-[9px] text-slate-500">{notification.lastError || 'Delivery failed'}</p><button type="button" onClick={() => { void onResendNotification(notification._id); }} className="mt-2 rounded-lg border-0 bg-red-600 px-2.5 py-1 text-[9px] font-black uppercase text-white">Retry delivery</button></div>)}
             </div>}
             </div>
 
-            <button onClick={() => handleTabSelect('projects')} className="px-4 py-2 text-white text-xs font-black rounded-xl bg-indigo-655 hover:bg-indigo-700 shadow-md shadow-indigo-600/25 border-0 cursor-pointer" style={{ backgroundColor: '#4F46E5' }}>
+            <button onClick={() => handleTabSelect('projects')} className="px-4 py-2 text-white text-xs font-black rounded-xl bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/25 border-0 cursor-pointer active:scale-[0.97] transition-all">
               Manage Projects
             </button>
           </div>
@@ -1500,79 +1610,31 @@ export default function AdminConsole({
 
         </div>
 
-        {/* ================= BOTTOM STATUS ROW ================= */}
-        <footer className={`px-8 py-5 border-t grid grid-cols-2 md:grid-cols-5 gap-6 text-xs font-semibold ${
-          isDarkMode ? 'bg-[#0A0A0C]/90 border-zinc-800/60 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
-        }`}>
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500">
-              <RefreshCw className="w-4 h-4 animate-spin" style={{ animationDuration: '4s' }} />
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-405 block font-mono">Auto Replacements</span>
-              <span className={`font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{dashboardSummary?.replacementsToday ?? 0} Today</span>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center text-red-500">
-              <AlertCircle className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-405 block font-mono">Inactive ({dashboardSummary?.inactivityThresholdHours ?? 48}h+)</span>
-              <span className={`font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{dashboardSummary?.testers.inactive ?? 0} Testers</span>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-500">
-              <Bug className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-405 block font-mono">Bugs Resolved</span>
-              <span className={`font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{dashboardSummary?.bugs.resolvedToday ?? 0} Today</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-500">
-              <Check className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-405 block font-mono">Play Store Sync</span>
-              <span className={`font-black ${dashboardSummary?.playStoreSync.status === 'degraded' ? 'text-red-500' : dashboardSummary?.playStoreSync.status === 'operational' ? 'text-green-500' : 'text-amber-500'}`}>{dashboardSummary?.playStoreSync.status === 'degraded' ? `${dashboardSummary.playStoreSync.errors} Errors` : dashboardSummary?.playStoreSync.status === 'operational' ? 'Operational' : 'Not Configured'}</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 col-span-2 md:col-span-1">
-            <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-500">
-              <Shield className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-[10px] text-slate-405 block font-mono">System Status</span>
-              <span className="font-black text-green-500">{dashboardSummary?.system.status ?? 'Unavailable'}</span>
-            </div>
-          </div>
-        </footer>
 
       </div>
 
       {/* ================= MOBILE BOTTOM NAV ================= */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#0A0A0C] border-t border-zinc-800/60 flex items-center justify-around z-50">
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 h-16 border-t flex items-center justify-around z-50 ${
+        isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200'
+      }`}>
         {[
-          { id: 'dashboard', label: 'Dashboard', icon: <Activity className="w-5 h-5" /> },
-          { id: 'projects', label: 'Apps', icon: <Smartphone className="w-5 h-5" /> },
-          { id: 'cashouts', label: 'Payouts', icon: <Landmark className="w-5 h-5" /> }
+          { id: 'dashboard', label: 'Overview', icon: <Activity className="w-5 h-5" /> },
+          { id: 'projects', label: 'Projects', icon: <Smartphone className="w-5 h-5" /> },
+          { id: 'testers', label: 'Testers', icon: <Users className="w-5 h-5" /> },
+          { id: 'cashouts', label: 'Payouts', icon: <Landmark className="w-5 h-5" /> },
+          { id: 'support', label: 'Support', icon: <Headphones className="w-5 h-5" /> }
         ].map(link => (
           <button
             key={link.id}
             onClick={() => handleTabSelect(link.id as any)}
             className={`flex flex-col items-center justify-center w-full h-full space-y-1 border-0 bg-transparent cursor-pointer ${
-              activeTab === link.id ? 'text-indigo-500' : 'text-slate-400 hover:text-slate-200'
+              activeTab === link.id ? 'text-[#3B82F6] font-bold' : isDarkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
             }`}
           >
             {link.icon}
-            <span className="text-[10px] font-bold">{link.label}</span>
+            <span className="text-[10px]">{link.label}</span>
           </button>
         ))}
       </div>

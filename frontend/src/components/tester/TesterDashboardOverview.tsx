@@ -1,191 +1,214 @@
 "use client";
 
 import React from 'react';
-import { 
-  Activity, 
-  Wallet, 
-  CheckCircle2, 
-  Clock, 
-  ArrowRight, 
-  Sparkles,
-  Smartphone,
-  ShieldCheck
-} from 'lucide-react';
+import { Wallet, Smartphone, Bug, ChevronRight, TrendingUp, Clock, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface TesterDashboardOverviewProps {
   isDarkMode: boolean;
   onNavigateToTesting: () => void;
   onNavigateToEarnings: () => void;
+  testerName?: string;
+  walletBalance?: number;
+  activeTestsCount?: number;
+  bugsReported?: number;
+  earningsThisMonth?: number;
 }
 
 export default function TesterDashboardOverview({
   isDarkMode,
   onNavigateToTesting,
-  onNavigateToEarnings
+  onNavigateToEarnings,
+  testerName = 'Tester',
+  walletBalance = 2400,
+  activeTestsCount = 2,
+  bugsReported = 7,
+  earningsThisMonth = 1200,
 }: TesterDashboardOverviewProps) {
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
   const stats = [
     {
-      title: "Active Campaigns",
-      value: "3",
-      subtext: "2 In Testing • 1 Queued",
-      icon: <Activity className="w-5 h-5 text-[#4F37FE]" />,
-      bg: "bg-[#4F37FE]/10"
+      label: 'Wallet Balance',
+      value: `₹${walletBalance.toLocaleString('en-IN')}`,
+      sub: 'Available to withdraw',
+      icon: <Wallet className="w-5 h-5" />,
+      color: 'text-blue-500',
+      bg: isDarkMode ? 'bg-blue-500/10' : 'bg-blue-50',
+      onClick: onNavigateToEarnings,
     },
     {
-      title: "Total Earnings",
-      value: "₹2,400",
-      subtext: "Available for UPI cashout",
-      icon: <Wallet className="w-5 h-5 text-emerald-500" />,
-      bg: "bg-emerald-500/10"
+      label: 'Active Tests',
+      value: String(activeTestsCount),
+      sub: 'Currently running',
+      icon: <Smartphone className="w-5 h-5" />,
+      color: 'text-emerald-500',
+      bg: isDarkMode ? 'bg-emerald-500/10' : 'bg-emerald-50',
+      onClick: onNavigateToTesting,
     },
     {
-      title: "Consecutive Check-ins",
-      value: "8 / 14 Days",
-      subtext: "Next check-in in 14 hours",
-      icon: <CheckCircle2 className="w-5 h-5 text-indigo-500" />,
-      bg: "bg-indigo-500/10"
+      label: 'Bugs Reported',
+      value: String(bugsReported),
+      sub: 'Across all projects',
+      icon: <Bug className="w-5 h-5" />,
+      color: 'text-rose-500',
+      bg: isDarkMode ? 'bg-rose-500/10' : 'bg-rose-50',
+      onClick: onNavigateToTesting,
     },
     {
-      title: "Tester Reputation",
-      value: "4.9 ★",
-      subtext: "Top 5% Verified Panelist",
-      icon: <ShieldCheck className="w-5 h-5 text-amber-500" />,
-      bg: "bg-amber-500/10"
-    }
+      label: 'Earned This Month',
+      value: `₹${earningsThisMonth.toLocaleString('en-IN')}`,
+      sub: 'Aug 2026',
+      icon: <TrendingUp className="w-5 h-5" />,
+      color: 'text-violet-500',
+      bg: isDarkMode ? 'bg-violet-500/10' : 'bg-violet-50',
+      onClick: onNavigateToEarnings,
+    },
+  ];
+
+  const recentActivity = [
+    { icon: <CheckCircle className="w-4 h-4 text-emerald-500" />, text: 'Step 1 completed for Blinkit testing', time: '2h ago' },
+    { icon: <Bug className="w-4 h-4 text-rose-500" />, text: 'Bug report submitted on Deloitte app', time: '5h ago' },
+    { icon: <Clock className="w-4 h-4 text-amber-500" />, text: 'Joined Swiggy testing queue', time: 'Yesterday' },
   ];
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
-      {/* Welcome Banner */}
-      <div className={`p-8 rounded-3xl border shadow-xs relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6 ${
-        isDarkMode ? 'bg-[#0F1017] border-white/5' : 'bg-white border-slate-200/80'
+      {/* Greeting + CTA Row */}
+      <div className={`rounded-3xl p-8 relative overflow-hidden border ${
+        isDarkMode ? 'bg-[#0F1017] border-white/5' : 'bg-white border-slate-200/80 shadow-xs'
       }`}>
-        <div className="space-y-2 max-w-xl z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#4F37FE]/10 text-[#4F37FE] text-[12px] font-bold">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Google Play 14-Day Testing Panel</span>
-          </div>
-          <h1 className={`text-[28px] font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-[#0E1015]'}`}>
-            Welcome back, Tester
-          </h1>
-          <p className="text-[14px] text-slate-500 dark:text-slate-400 font-medium">
-            You currently have 2 active test cycles requiring daily check-ins. Keep testing every day to maintain your payout eligibility!
-          </p>
+        {/* Background glow */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className={`absolute -top-16 -right-16 w-64 h-64 rounded-full blur-3xl opacity-20 ${
+            isDarkMode ? 'bg-blue-500' : 'bg-blue-300'
+          }`} />
         </div>
 
-        <div className="flex items-center gap-3 shrink-0 z-10">
-          <button
-            onClick={onNavigateToTesting}
-            className="px-8 py-3.5 bg-[#4F37FE] hover:bg-[#432EE0] text-white text-[14px] font-bold rounded-2xl shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer flex items-center gap-2"
-          >
-            <span>Go to Testing</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Glow backdrop */}
-        <div className="absolute -right-20 -top-20 w-80 h-80 bg-[#4F37FE]/10 rounded-full blur-3xl pointer-events-none" />
-      </div>
-
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {stats.map((s, i) => (
-          <div
-            key={i}
-            className={`p-6 rounded-3xl border shadow-xs flex flex-col justify-between ${
-              isDarkMode ? 'bg-[#0F1017] border-white/5' : 'bg-white border-slate-200/80'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[13px] font-semibold text-slate-400">{s.title}</span>
-              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${s.bg}`}>
-                {s.icon}
-              </div>
-            </div>
-            <div>
-              <div className={`text-[26px] font-extrabold ${isDarkMode ? 'text-white' : 'text-[#0E1015]'}`}>
-                {s.value}
-              </div>
-              <div className="text-[12px] text-slate-400 font-medium mt-1">
-                {s.subtext}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Quick Action Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Active Test Card Preview */}
-        <div className={`p-6 rounded-3xl border shadow-xs ${
-          isDarkMode ? 'bg-[#0F1017] border-white/5' : 'bg-white border-slate-200/80'
-        }`}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={`text-[17px] font-extrabold ${isDarkMode ? 'text-white' : 'text-[#0E1015]'}`}>
-              Current Assigned Task
-            </h3>
-            <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-full">
-              In Progress
-            </span>
-          </div>
-
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-14 h-14 rounded-2xl bg-[#F8CB38] flex items-center justify-center font-black text-[#0E5429] text-base shrink-0 shadow-xs">
-              blinkit
-            </div>
-            <div>
-              <h4 className={`text-[16px] font-extrabold ${isDarkMode ? 'text-white' : 'text-[#0E1015]'}`}>
-                Blinkit - Playstore closed Testing
-              </h4>
-              <p className="text-[12px] text-slate-400">
-                Step 1 Verified • 8 of 14 continuous check-ins recorded
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={onNavigateToTesting}
-            className="w-full py-3 rounded-xl bg-[#4F37FE] hover:bg-[#432EE0] text-white text-[14px] font-bold shadow-xs transition-colors cursor-pointer text-center"
-          >
-            Continue Testing Workflow
-          </button>
-        </div>
-
-        {/* Payout & Wallet Shortcut */}
-        <div className={`p-6 rounded-3xl border shadow-xs flex flex-col justify-between ${
-          isDarkMode ? 'bg-[#0F1017] border-white/5' : 'bg-white border-slate-200/80'
-        }`}>
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className={`text-[17px] font-extrabold ${isDarkMode ? 'text-white' : 'text-[#0E1015]'}`}>
-                Wallet & Cashout
-              </h3>
-              <span className="text-xs font-bold text-[#4F37FE] bg-[#4F37FE]/10 px-2.5 py-1 rounded-full">
-                Instant UPI
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2 mb-2">
-              <span className={`text-[32px] font-black ${isDarkMode ? 'text-white' : 'text-[#0E1015]'}`}>
-                ₹2,400.00
-              </span>
-              <span className="text-xs font-semibold text-slate-400">Available Balance</span>
-            </div>
-            <p className="text-[12px] text-slate-500 font-medium mb-4">
-              Withdraw straight to any UPI VPA (Google Pay, PhonePe, Paytm). 48-Hour SLA guarantee.
+            <p className="text-[13px] font-semibold text-slate-400 mb-1">{greeting} 👋</p>
+            <h2 className={`text-[28px] font-black tracking-tight leading-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+              {testerName}
+            </h2>
+            <p className={`text-[14px] font-medium mt-2 max-w-sm ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+              You have <span className={`font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{activeTestsCount} active test{activeTestsCount !== 1 ? 's' : ''}</span> in progress. Keep testing to earn more!
             </p>
           </div>
 
-          <button
-            onClick={onNavigateToEarnings}
-            className={`w-full py-3 rounded-xl border font-bold text-[14px] transition-colors cursor-pointer text-center ${
-              isDarkMode 
-                ? 'border-white/10 text-white hover:bg-white/5' 
-                : 'border-slate-300 text-slate-800 hover:bg-slate-50'
+          <div className="flex gap-3 flex-wrap">
+            <button
+              onClick={onNavigateToTesting}
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.97] text-white text-[14px] font-bold rounded-2xl shadow-md shadow-blue-600/20 border-0 cursor-pointer transition-all"
+            >
+              <Smartphone className="w-4 h-4" />
+              My Testing Apps
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onNavigateToEarnings}
+              className={`flex items-center gap-2 px-5 py-2.5 text-[14px] font-bold rounded-2xl border cursor-pointer transition-all active:scale-[0.97] ${
+                isDarkMode ? 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+              }`}
+            >
+              <Wallet className="w-4 h-4" />
+              View Earnings
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((stat, i) => (
+          <motion.button
+            key={i}
+            onClick={stat.onClick}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.07, type: 'spring', stiffness: 300, damping: 24 }}
+            whileHover={{ y: -2 }}
+            className={`text-left p-6 rounded-3xl border cursor-pointer w-full transition-all duration-200 ${
+              isDarkMode ? 'bg-[#0F1017] border-white/5 hover:border-white/10' : 'bg-white border-slate-200/80 hover:border-slate-300 shadow-xs'
             }`}
           >
-            View Earnings & Cashout
-          </button>
+            <div className={`w-10 h-10 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center mb-4`}>
+              {stat.icon}
+            </div>
+            <div className={`text-[26px] font-black tracking-tight leading-none ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+              {stat.value}
+            </div>
+            <div className="text-[12px] font-bold text-slate-400 mt-1.5">{stat.label}</div>
+            <div className="text-[11px] text-slate-400/70 mt-0.5">{stat.sub}</div>
+          </motion.button>
+        ))}
+      </div>
+
+      {/* Activity Feed + Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Recent Activity */}
+        <div className={`lg:col-span-7 rounded-3xl border p-6 ${
+          isDarkMode ? 'bg-[#0F1017] border-white/5' : 'bg-white border-slate-200/80 shadow-xs'
+        }`}>
+          <h3 className={`text-[16px] font-extrabold mb-5 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+            Recent Activity
+          </h3>
+          <div className="space-y-4">
+            {recentActivity.map((item, i) => (
+              <div key={i} className={`flex items-start gap-3 pb-4 ${i < recentActivity.length - 1 ? `border-b ${isDarkMode ? 'border-white/5' : 'border-slate-100'}` : ''}`}>
+                <div className={`w-8 h-8 rounded-2xl flex items-center justify-center shrink-0 ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'}`}>
+                  {item.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-[13px] font-semibold leading-snug ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                    {item.text}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{item.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="lg:col-span-5 space-y-4">
+          {[
+            {
+              title: 'Explore App Testing',
+              desc: 'Browse new testing campaigns and join a project',
+              icon: <Smartphone className="w-5 h-5 text-blue-500" />,
+              bg: isDarkMode ? 'bg-blue-500/10' : 'bg-blue-50',
+              onClick: onNavigateToTesting,
+            },
+            {
+              title: 'Request Payout',
+              desc: `₹${walletBalance.toLocaleString('en-IN')} available · UPI transfer · 48h SLA`,
+              icon: <Wallet className="w-5 h-5 text-emerald-500" />,
+              bg: isDarkMode ? 'bg-emerald-500/10' : 'bg-emerald-50',
+              onClick: onNavigateToEarnings,
+            },
+          ].map((action, i) => (
+            <motion.button
+              key={i}
+              onClick={action.onClick}
+              whileHover={{ y: -2 }}
+              className={`w-full text-left p-5 rounded-3xl border flex items-center gap-4 cursor-pointer transition-all ${
+                isDarkMode ? 'bg-[#0F1017] border-white/5 hover:border-white/10' : 'bg-white border-slate-200/80 hover:border-slate-300 shadow-xs'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-2xl ${action.bg} flex items-center justify-center shrink-0`}>
+                {action.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className={`text-[14px] font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                  {action.title}
+                </div>
+                <div className="text-[12px] text-slate-400 mt-0.5 truncate">{action.desc}</div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+            </motion.button>
+          ))}
         </div>
       </div>
     </div>

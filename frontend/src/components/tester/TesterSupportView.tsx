@@ -22,77 +22,18 @@ interface SupportApp {
   description: string;
 }
 
-const SUPPORT_APPS: SupportApp[] = [
-  {
-    id: 'blinkit',
-    name: 'Blinkit',
-    subtitle: 'Playstore closed Testing',
-    iconBg: '#F8CB38',
-    iconContent: (
-      <div className="text-center">
-        <span className="text-[#0E5429] font-black text-base tracking-tight leading-none block">blinkit</span>
-        <span className="text-[7px] font-semibold text-slate-800 leading-tight block">India's Last Minute App</span>
-      </div>
-    ),
-    statusText: 'Filling up - Aug 20',
-    statusDotColor: 'orange',
-    description: 'The people selected for this panel will be expected to remain active, responsive and consistent when testing projects are assigned.'
-  },
-  {
-    id: 'deloitte',
-    name: 'Deloitte',
-    subtitle: 'Playstore closed Testing',
-    iconBg: '#050505',
-    iconContent: (
-      <div className="flex items-baseline text-white font-black text-2xl tracking-tighter">
-        <span>D</span>
-        <span className="w-2 h-2 rounded-full bg-[#86BC25] ml-0.5 mb-0.5"></span>
-      </div>
-    ),
-    statusText: 'Wait in line - Aug 20',
-    statusDotColor: 'yellow',
-    description: 'this our business right now so I will say the nature of the business and i WILL tell you the exactly the market that we want to build upon so here we go in this process like this - first I will explain the what business we are and I will tell you the how we want to position it.'
-  }
-];
+const SUPPORT_APPS: SupportApp[] = [];
 
 interface TesterSupportViewProps {
   isDarkMode: boolean;
+  onSubmitTicket?: (ticket: { subject: string; message: string; projectId?: string }) => Promise<void>;
 }
 
-export default function TesterSupportView({ isDarkMode }: TesterSupportViewProps) {
+export default function TesterSupportView({ isDarkMode, onSubmitTicket }: TesterSupportViewProps) {
   const [selectedApp, setSelectedApp] = useState<SupportApp | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [inputText, setInputText] = useState('');
-  const [messages, setMessages] = useState<Record<string, Message[]>>({
-    blinkit: [
-      {
-        id: '1',
-        sender: 'user',
-        text: 'My Email Is not working',
-        time: 'Sent 19:20AM'
-      },
-      {
-        id: '2',
-        sender: 'support',
-        text: 'Sure please re-send you email once',
-        time: 'Sent 19:21AM'
-      }
-    ],
-    deloitte: [
-      {
-        id: '1',
-        sender: 'user',
-        text: 'Could you please confirm if my Step 1 proof was received?',
-        time: 'Sent 10:15AM'
-      },
-      {
-        id: '2',
-        sender: 'support',
-        text: 'Yes, your proof is under review by our campaign lead.',
-        time: 'Sent 10:18AM'
-      }
-    ]
-  });
+  const [messages, setMessages] = useState<Record<string, Message[]>>({});
 
   const handleSendMessage = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -196,7 +137,7 @@ export default function TesterSupportView({ isDarkMode }: TesterSupportViewProps
             {/* Input Field */}
             <input
               type="text"
-              placeholder="Describe your Quarry here"
+              placeholder="Describe your query here..."
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               className={`flex-1 px-5 py-3.5 rounded-2xl border text-[14px] outline-none transition-colors ${
@@ -328,7 +269,7 @@ export default function TesterSupportView({ isDarkMode }: TesterSupportViewProps
       {/* Storage Note */}
       <div className="pt-6">
         <p className="text-[14px] text-slate-500 dark:text-slate-400 font-normal">
-          Note : Once Testing completed the data will be deleted form backend for Storage Management.
+          Note: Once testing is completed, the data will be deleted from the backend for storage management.
         </p>
       </div>
     </div>

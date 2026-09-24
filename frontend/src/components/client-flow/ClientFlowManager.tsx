@@ -17,6 +17,7 @@ import type { BackendAssignment, BackendNotification, BackendProjectFile, Backen
 
 interface ClientFlowManagerProps {
   isDarkMode: boolean;
+  onToggleDarkMode?: () => void;
   onBackToHome: () => void;
   initialView?: 'wizard' | 'dashboard';
   onCheckoutTier: (tierIndex: number) => Promise<boolean>;
@@ -43,6 +44,7 @@ interface ClientFlowManagerProps {
 
 export default function ClientFlowManager({
   isDarkMode,
+  onToggleDarkMode,
   onBackToHome,
   initialView = 'wizard',
   onCheckoutTier,
@@ -191,6 +193,7 @@ export default function ClientFlowManager({
     return (
       <ClientAppDashboard
         isDarkMode={isDarkMode}
+        onToggleDarkMode={onToggleDarkMode}
         onLogout={onLogout}
         onNewAppWizard={handleStartNewApp}
         newRegisteredApp={completedProjectSummary}

@@ -225,7 +225,7 @@ export default function ClerkAuthScreen({ isDarkMode, initialRole = "tester", on
               {syncState === "syncing" && (
                 <div className={`flex items-center gap-2 text-sm font-bold ${isDarkMode ? "text-indigo-300" : "text-indigo-700"}`}>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Connecting to LaunchOps
+                  Connecting to UXOS
                 </div>
               )}
 

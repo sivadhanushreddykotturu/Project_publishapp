@@ -1,11 +1,11 @@
 import { TestApp, BugReport, TesterAssignment, WithdrawalRequest, Transaction } from '../types';
 
 /**
- * LaunchOps Centralized API Client Module
+ * UXOS Centralized API Client Module
  * -------------------------------------------------------------
- * Configured for the LaunchOps backend API.
+ * Configured for the UXOS backend API.
  * To point to your live backend server, set NEXT_PUBLIC_API_BASE_URL in .env.local
- * e.g. NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api
+ * e.g. NEXT_PUBLIC_API_BASE_URL=http://localhost:4000
  */
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';

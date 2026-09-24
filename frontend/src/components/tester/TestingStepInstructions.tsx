@@ -42,27 +42,7 @@ export default function TestingStepInstructions({
     size?: string;
     progress: number;
     statusText?: string;
-  } | null>(() => {
-    if (initialStep === 1) {
-      return {
-        name: 'Blinkit step1.jpg',
-        progress: 100,
-        statusText: 'Your report under review'
-      };
-    } else if (initialStep === 2) {
-      return {
-        name: 'Blinkit step2.jpg',
-        progress: 49,
-        statusText: ''
-      };
-    } else {
-      return {
-        name: 'Blinkit_bug report.pdf',
-        progress: 100,
-        statusText: 'Your report under review'
-      };
-    }
-  });
+  } | null>(null);
 
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -348,7 +328,7 @@ export default function TestingStepInstructions({
             {/* Share Button */}
             <button
               onClick={() => alert("Share link copied!")}
-              className="w-12 h-12 rounded-2xl bg-[#4F37FE] hover:bg-[#432EE0] text-white flex items-center justify-center shrink-0 shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer"
+              className="w-14 h-14 rounded-2xl bg-[#4F37FE] hover:bg-[#432EE0] active:scale-[0.96] text-white flex items-center justify-center shrink-0 shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer border-0"
               title="Share"
             >
               <Share2 className="w-5 h-5" />
@@ -357,16 +337,16 @@ export default function TestingStepInstructions({
             {/* Copy Button */}
             <button
               onClick={handleCopyLink}
-              className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#4F37FE] hover:bg-[#432EE0] text-white text-[14px] font-bold shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer"
+              className="flex items-center gap-2.5 px-7 h-14 rounded-2xl bg-[#4F37FE] hover:bg-[#432EE0] active:scale-[0.96] text-white text-[15px] font-bold shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer border-0"
             >
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
               <span>{copied ? 'Copied' : 'Copy'}</span>
             </button>
 
             {/* Step Link Button */}
             <button
               onClick={handleStepLinkAction}
-              className="flex-1 py-3.5 rounded-2xl bg-[#4F37FE] hover:bg-[#432EE0] text-white text-[15px] font-bold shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer text-center"
+              className="flex-1 h-14 rounded-2xl bg-[#4F37FE] hover:bg-[#432EE0] active:scale-[0.96] text-white text-[16px] font-bold shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer text-center border-0"
             >
               {currentStep === 1 && (uploadedFile ? "Step2 Link" : "Step1 Link")}
               {currentStep === 2 && (uploadedFile?.progress === 100 ? "Step3 Link" : "Step2 Link")}

@@ -76,7 +76,7 @@ export default function CallToAction({ onStartTesting, onTalkToSales, isDarkMode
             {/* Rocket Launch Image with Slide-in Animation */}
             <motion.img
               src="/cta-rocket.png"
-              alt="LaunchOps App Rocket Launch"
+              alt="UXOS App Rocket Launch"
               initial={{ opacity: 0, x: 70 }}
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}

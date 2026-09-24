@@ -9,6 +9,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import type { TestApp } from '../../types';
 import type { BackendAssignment, BackendNotification, BackendProjectFile, BackendSupportTicket, LaunchOpsUser } from '../../lib/launchops-api';
+import UXOSBrandLogo from '../ui/UXOSBrandLogo';
 
 export interface ClientAppItem {
   id: string;
@@ -267,23 +268,15 @@ export default function ClientAppDashboard({
       {/* ========================================================= */}
       {/* LEFT SIDEBAR (Matching Menu.png & media_1788953798293.png) */}
       {/* ========================================================= */}
-      <aside className={`w-64 border-r flex flex-col justify-between shrink-0 select-none py-8 px-5 transition-colors ${
+      <aside className={`hidden md:flex w-64 border-r flex-col justify-between shrink-0 select-none py-8 px-5 transition-colors ${
         isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200/80'
       }`}>
         <div className="space-y-10">
           {/* Logo */}
-          <div className="px-3 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0">
-              <img 
-                src="/launchops-logo.png" 
-                alt="UXOS" 
-                className="w-full h-full object-contain"
-              />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-slate-900">
-              UXOS
-            </span>
-          </div>
+          <UXOSBrandLogo
+            isDarkMode={isDarkMode}
+            className="px-3"
+          />
 
           {/* Navigation items */}
           <nav className="space-y-2">
@@ -377,23 +370,23 @@ export default function ClientAppDashboard({
             <span>Logout</span>
           </button>
 
-          {/* Light Mode Switch (matching the toggle in Menu.png) */}
-          <div className="flex items-center justify-between px-4 py-2">
+          {/* Theme Toggle (Dark vs Light) */}
+          <div className="flex items-center justify-between pt-2">
             <div className="flex items-center gap-3 text-slate-600 dark:text-slate-400 text-[15px] font-bold">
-              <Sun className="w-5 h-5 stroke-[2.2]" />
-              <span>Light mode</span>
+              {isDarkMode ? <Moon className="w-5 h-5 stroke-[2.2]" /> : <Sun className="w-5 h-5 stroke-[2.2]" />}
+              <span>{isDarkMode ? 'Dark mode' : 'Light mode'}</span>
             </div>
 
             <button
               onClick={handleToggleDark}
               className={`w-14 h-8 rounded-full p-1 transition-colors cursor-pointer relative flex items-center ${
-                !isDarkMode ? 'bg-[#4F37FE]' : 'bg-slate-700'
+                isDarkMode ? 'bg-slate-700' : 'bg-[#4F37FE]'
               }`}
             >
               <div className={`w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-md transition-transform duration-200 ${
-                !isDarkMode ? 'translate-x-6 text-[#4F37FE]' : 'translate-x-0 text-slate-700'
+                isDarkMode ? 'translate-x-6 text-slate-700' : 'translate-x-0 text-[#4F37FE]'
               }`}>
-                {!isDarkMode ? <Sun className="w-3.5 h-3.5 stroke-[2.5]" /> : <Moon className="w-3.5 h-3.5 stroke-[2.5]" />}
+                {isDarkMode ? <Moon className="w-3.5 h-3.5 stroke-[2.5]" /> : <Sun className="w-3.5 h-3.5 stroke-[2.5]" />}
               </div>
             </button>
           </div>
@@ -403,11 +396,14 @@ export default function ClientAppDashboard({
       {/* ========================================================= */}
       {/* MAIN CONTENT AREA */}
       {/* ========================================================= */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen md:h-screen overflow-y-auto pb-20 md:pb-0">
         {/* Top Header Bar */}
-        <header className="h-20 px-8 flex items-center justify-between shrink-0">
-          {/* Left: Back / Title or empty */}
+        <header className="h-20 px-4 md:px-8 flex items-center justify-between shrink-0">
+          {/* Left: Back / Title or mobile logo */}
           <div>
+            <div className="flex items-center gap-2 md:hidden mb-1">
+              <UXOSBrandLogo isDarkMode={isDarkMode} />
+            </div>
             {selectedApp ? (
               <div className="flex items-center gap-4">
                 <button
@@ -540,11 +536,11 @@ export default function ClientAppDashboard({
                 </div>
 
                 {/* Cards Grid (Blinkit, Deloitte, etc.) */}
-                {error && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-600">{error}</div>}
-                {isLoading && <div className="py-16 text-center text-sm font-semibold text-slate-500">Loading projects from MongoDB…</div>}
+                {error && <div className={`rounded-2xl border p-4 text-sm font-semibold ${isDarkMode ? 'border-red-500/30 bg-red-950/80 text-red-200' : 'border-red-200 bg-red-50 text-red-600'}`}>{error}</div>}
+                {isLoading && <div className="py-16 text-center text-sm font-semibold text-slate-400">Loading projects from MongoDB…</div>}
                 {!isLoading && !error && apps.length === 0 && (
-                  <div className="rounded-3xl border border-dashed border-slate-300 bg-white/60 py-16 text-center">
-                    <p className="font-bold text-slate-700">No matching projects found</p>
+                  <div className={`rounded-3xl border border-dashed py-16 text-center ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-slate-300 bg-white/60'}`}>
+                    <p className={`font-bold ${isDarkMode ? 'text-white' : 'text-slate-700'}`}>No matching projects found</p>
                     <button onClick={onNewAppWizard} className="mt-4 rounded-xl bg-[#4F37FE] px-5 py-2.5 text-sm font-bold text-white">Create a testing project</button>
                   </div>
                 )}
@@ -696,58 +692,63 @@ export default function ClientAppDashboard({
                 {/* TOP ROW: Tester Table (Left) + All Testing Files (Right) */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                   {/* LEFT: Tester Progress Table (8 cols) */}
-                  <div className={`lg:col-span-8 rounded-3xl border p-7 shadow-sm ${
+                  <div className={`lg:col-span-8 rounded-3xl border p-5 sm:p-7 shadow-sm ${
                     isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200/90'
                   }`}>
-                    {/* Table Header Row */}
-                    <div className="grid grid-cols-12 text-[14px] font-bold text-[#4F37FE] pb-4 border-b border-slate-100 dark:border-white/10">
-                      <div className="col-span-4">Tester Name</div>
-                      <div className="col-span-3 text-center">Became Tester</div>
-                      <div className="col-span-3 text-center">App Installed</div>
-                      <div className="col-span-2 text-right">Bug Report</div>
-                    </div>
-
-                    {/* Table Body Rows */}
-                    <div className="divide-y divide-slate-100 dark:divide-white/5">
-                      {projectAssignments.map((assignment) => {
-                        const tester = typeof assignment.testerId === 'object' ? assignment.testerId.userId : undefined;
-                        const testerName = tester?.name || tester?.email || 'Assigned tester';
-                        return (
-                        <div
-                          key={assignment._id}
-                          className="grid grid-cols-12 items-center py-4 text-[14px] font-medium"
-                        >
-                          {/* Tester Name with Up/Down Arrow Icon */}
-                          <div className="col-span-4 flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full border-2 border-[#4F37FE] text-[#4F37FE] flex items-center justify-center shrink-0">
-                              {assignment.status === 'active' || assignment.status === 'completed' ? (
-                                <ArrowUp className="w-4 h-4 stroke-[2.5]" />
-                              ) : (
-                                <ArrowDown className="w-4 h-4 stroke-[2.5]" />
-                              )}
-                            </div>
-                            <span className="font-bold text-slate-800 dark:text-slate-200">
-                              {testerName}
-                            </span>
-                          </div>
-
-                          {/* Became Tester Status */}
-                          <div className="col-span-3 text-center text-slate-600 dark:text-slate-400">
-                            {assignment.currentStep > 1 ? 'Completed' : 'Pending'}
-                          </div>
-
-                          {/* App Installed Status */}
-                          <div className="col-span-3 text-center text-slate-600 dark:text-slate-400">
-                            {assignment.currentStep > 3 ? 'Installed' : 'Pending'}
-                          </div>
-
-                          {/* Bug Report Download Button */}
-                          <div className="col-span-2 flex justify-end">
-                            <span className="text-xs font-semibold text-slate-400">From bug reports</span>
-                          </div>
+                    <div className="overflow-x-auto min-w-full">
+                      <div className="min-w-[540px]">
+                        {/* Table Header Row */}
+                        <div className="grid grid-cols-12 text-[14px] font-bold text-[#4F37FE] pb-4 border-b border-slate-100 dark:border-white/10">
+                          <div className="col-span-4">Tester Name</div>
+                          <div className="col-span-3 text-center">Became Tester</div>
+                          <div className="col-span-3 text-center">App Installed</div>
+                          <div className="col-span-2 text-right">Bug Report</div>
                         </div>
-                      )})}
-                      {!detailLoading && projectAssignments.length === 0 && <div className="py-8 text-center text-sm text-slate-500">No testers assigned yet.</div>}
+
+                        {/* Table Body Rows */}
+                        <div className="divide-y divide-slate-100 dark:divide-white/5">
+                          {projectAssignments.map((assignment) => {
+                            const tester = typeof assignment.testerId === 'object' ? assignment.testerId.userId : undefined;
+                            const testerName = tester?.name || tester?.email || 'Assigned tester';
+                            return (
+                            <div
+                              key={assignment._id}
+                              className="grid grid-cols-12 items-center py-4 text-[14px] font-medium"
+                            >
+                              {/* Tester Name with Up/Down Arrow Icon */}
+                              <div className="col-span-4 flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full border-2 border-[#4F37FE] text-[#4F37FE] flex items-center justify-center shrink-0">
+                                  {assignment.status === 'active' || assignment.status === 'completed' ? (
+                                    <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+                                  ) : (
+                                    <ArrowDown className="w-4 h-4 stroke-[2.5]" />
+                                  )}
+                                </div>
+                                <span className="font-bold text-slate-800 dark:text-slate-200">
+                                  {testerName}
+                                </span>
+                              </div>
+
+                              {/* Became Tester Status */}
+                              <div className="col-span-3 text-center text-slate-600 dark:text-slate-400">
+                                {assignment.currentStep > 1 ? 'Completed' : 'Pending'}
+                              </div>
+
+                              {/* App Installed Status */}
+                              <div className="col-span-3 text-center text-slate-600 dark:text-slate-400">
+                                {assignment.currentStep > 2 ? 'Completed' : 'Pending'}
+                              </div>
+
+                               {/* Bug Report Status */}
+                               <div className="col-span-2 text-right text-slate-600 dark:text-slate-400">
+                                 {assignment.proofs?.some((p) => p.step === 5) ? 'Submitted' : 'None'}
+                               </div>
+                            </div>
+                          );
+                          })}
+                          {!detailLoading && projectAssignments.length === 0 && <div className="py-8 text-center text-sm text-slate-500">No testers assigned yet.</div>}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -1019,6 +1020,40 @@ export default function ClientAppDashboard({
           </div>
         </div>
       )}
+
+      {/* ================= MOBILE BOTTOM NAV ================= */}
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 h-16 border-t flex items-center justify-around z-50 ${
+        isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200'
+      }`}>
+        {[
+          { id: 'dashboard', label: 'Dashboard', icon: <LayoutGrid className="w-5 h-5" /> },
+          { id: 'testing', label: 'App Testing', icon: <Activity className="w-5 h-5" /> },
+          { id: 'services', label: 'Services', icon: <Building2 className="w-5 h-5" /> },
+          { id: 'support', label: 'Support', icon: <Headphones className="w-5 h-5" /> }
+        ].map((link) => (
+          <button
+            key={link.id}
+            onClick={() => {
+              if (link.id === 'services') {
+                setActiveNav('services');
+                onNewAppWizard();
+              } else if (link.id === 'support') {
+                setActiveNav('support');
+                setIsSupportOpen(true);
+              } else {
+                setActiveNav(link.id as any);
+                if (link.id === 'dashboard') setSelectedApp(null);
+              }
+            }}
+            className={`flex flex-col items-center justify-center w-full h-full space-y-1 border-0 bg-transparent cursor-pointer ${
+              activeNav === link.id ? 'text-[#4F37FE] font-bold' : isDarkMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            {link.icon}
+            <span className="text-[10px]">{link.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

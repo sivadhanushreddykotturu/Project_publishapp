@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Menu, X, ChevronDown, ArrowRight, Sun, Moon } from 'lucide-react';
+import UXOSBrandLogo from './ui/UXOSBrandLogo';
 
 interface NavbarProps {
   currentTab: string;
@@ -42,28 +43,14 @@ export default function Navbar({
     }`}>
       <nav className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
         {/* Logo */}
-        <button 
+        <UXOSBrandLogo
+          isDarkMode={isDarkMode}
           onClick={() => {
             const role = typeof window !== 'undefined' ? localStorage.getItem('launchops_user_role') : null;
             onTabChange(role === 'client' ? 'client' : role === 'tester' ? 'tester' : 'home', role === 'client' ? 'dashboard' : undefined);
             setIsOpen(false);
           }}
-          className="flex items-center gap-2 cursor-pointer group text-left border-0 bg-transparent"
-          id="nav-logo-btn"
-        >
-          <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0">
-            <img 
-              src="/launchops-logo.png" 
-              alt="UXOS Logo" 
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <span className={`font-extrabold tracking-widest text-xl uppercase transition-colors ${
-            isDarkMode ? 'text-white' : 'text-slate-900'
-          } group-hover:text-[#4F37FE]`}>
-            UX<span className="text-[#4F37FE]">OS</span>
-          </span>
-        </button>
+        />
 
         {/* Desktop Navigation Links */}
         <div className={`hidden lg:flex items-center gap-7 text-sm font-semibold ${

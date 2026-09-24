@@ -307,9 +307,7 @@ export default function HeroSection({
           }`}
           id="hero-stats-footer"
         >
-          <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 items-stretch justify-center divide-y lg:divide-y-0 lg:divide-x ${
-            isDarkMode ? 'divide-white/5' : 'divide-slate-100'
-          }`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 md:gap-8 items-stretch justify-center">
             {stats.map((item, index) => {
               const isClickable = index === 0 || index === 4;
               const handleStatClick = () => {

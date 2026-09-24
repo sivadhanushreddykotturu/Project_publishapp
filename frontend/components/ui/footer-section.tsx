@@ -123,7 +123,7 @@ function Footerdemo({ isDarkMode: parentDarkMode, onToggleDarkMode, onTabChange 
               <p>HITEC City, Madhapur</p>
               <p>Hyderabad, Telangana 500081</p>
               <p>Phone: +91 40 4567 8900</p>
-              <p>Email: hello@launchops.com</p>
+              <p>Email: hello@uxos.in</p>
             </address>
           </div>
           <div className="relative">
@@ -201,7 +201,7 @@ function Footerdemo({ isDarkMode: parentDarkMode, onToggleDarkMode, onTabChange 
         }`}>
           <div>
             <p className={`text-sm ${isDark ? 'text-gray-500' : 'text-slate-500'}`}>
-              © 2026 LaunchOps. All rights reserved.
+              © 2026 UXOS. All rights reserved.
             </p>
             <p className={`text-xs mt-1 ${isDark ? 'text-gray-600' : 'text-slate-400'}`}>
               Founded by Nandha Kishore · Hyderabad, India

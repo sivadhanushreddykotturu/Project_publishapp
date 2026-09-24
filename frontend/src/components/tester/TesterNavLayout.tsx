@@ -12,6 +12,7 @@ import {
   Bell 
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import UXOSBrandLogo from '../ui/UXOSBrandLogo';
 
 export type TesterNavTab = 'dashboard' | 'app-testing' | 'earnings' | 'support';
 
@@ -71,22 +72,11 @@ export default function TesterNavLayout({
       }`}>
         {/* Brand / Logo */}
         <div>
-          <button 
+          <UXOSBrandLogo
+            isDarkMode={isDarkMode}
             onClick={onLogout}
-            className="flex items-center gap-2 px-2 border-0 bg-transparent cursor-pointer group text-left"
-            title="Return to UXOS Home"
-          >
-            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0">
-              <img 
-                src="/launchops-logo.png" 
-                alt="UXOS" 
-                className="w-full h-full object-contain"
-              />
-            </div>
-            <span className="text-[24px] font-black tracking-tight font-sans text-slate-900 dark:text-white leading-none">
-              UXOS
-            </span>
-          </button>
+            className="px-2"
+          />
 
           {/* Navigation Links */}
           <nav className="space-y-2.5">

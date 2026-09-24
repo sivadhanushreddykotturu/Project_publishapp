@@ -8,6 +8,7 @@ import {
 import { TestApp, BugReport } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import ClientOnboardingWizard from './client-flow/ClientOnboardingWizard';
+import UXOSBrandLogo from './ui/UXOSBrandLogo';
 
 interface ClientDashboardProps {
   isDarkMode: boolean;
@@ -184,103 +185,151 @@ export default function ClientDashboard({
     }
   };
 
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   return (
-    <div className={`h-screen overflow-hidden font-sans transition-colors duration-300 flex ${
-      isDarkMode ? 'bg-[#09090B] text-slate-100' : 'bg-slate-50 text-slate-900'
-    }`}>      {/* ================= LEFT SIDEBAR (THEME AWARE LIKE TESTER DASHBOARD) ================= */}
-      <aside className={`hidden md:flex w-[260px] border-r shrink-0 flex-col justify-between p-6 sticky top-0 h-screen z-20 ${
-        isDarkMode ? 'bg-[#09090B] border-zinc-800' : 'bg-white border-slate-200'
+    <div className={`min-h-screen md:h-screen md:overflow-hidden font-sans transition-colors duration-300 flex ${
+      isDarkMode ? 'bg-[#090A0F] text-slate-100' : 'bg-[#F4F5F8] text-slate-900'
+    }`}>
+      {/* ================= LEFT SIDEBAR (COLLAPSIBLE, MATCHES TESTER/ADMIN) ================= */}
+      <aside className={`hidden md:flex shrink-0 flex-col justify-between py-7 border-r transition-all duration-300 ${
+        isCollapsed ? 'w-20 px-3 items-center' : 'w-64 px-4'
+      } ${
+        isDarkMode ? 'bg-[#0F1017] border-white/5' : 'bg-white border-slate-200/80 shadow-xs'
       }`}>
-        <div className="space-y-8">
-          {/* Logo */}
-          <button 
-            onClick={onLogout}
-            className="flex items-center gap-2 px-2 border-0 bg-transparent cursor-pointer group text-left"
-            title="Return to UXOS Home"
+        <div className="w-full">
+          {/* Platform Logo & Collapse Toggle */}
+          <div
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className={`flex items-center mb-8 cursor-pointer select-none ${isCollapsed ? 'justify-center' : 'px-2 justify-between'}`}
+            title="Click to collapse/expand sidebar"
           >
-            <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center transform rotate-12 group-hover:rotate-0 transition-transform shadow-md shadow-indigo-600/30">
-              <span className="text-white font-extrabold italic text-sm">LO</span>
+            <div className="flex items-center gap-3">
+              <img src="/launchops-logo.png" alt="UXOS Logo" className="w-8 h-8 object-contain shrink-0" />
+              {!isCollapsed && (
+                <span className={`text-[22px] font-black tracking-tight font-sans ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                  UXOS
+                </span>
+              )}
             </div>
-            <span className="font-black tracking-wider text-lg uppercase font-display group-hover:text-indigo-600 transition-colors">
-              Launch<span className="text-indigo-600">Ops</span>
-            </span>
-          </button>
+          </div>
 
           {/* Navigation Links */}
-          <nav className="space-y-1.5">
+          <nav className="space-y-2.5 w-full">
             {[
-              { id: 'apps', label: 'My Applications', icon: <Smartphone className="w-4.5 h-4.5" /> },
-              { id: 'new-app', label: 'Request New App', icon: <Plus className="w-4.5 h-4.5" /> },
-              { id: 'billing', label: 'Billing & Invoices', icon: <Landmark className="w-4.5 h-4.5" /> },
-              { id: 'bugs', label: 'Reported Flaws', icon: <Bug className="w-4.5 h-4.5" /> }
+              {
+                id: 'apps',
+                label: 'My Applications',
+                icon: (
+                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                    <path d="M4 3h16c1.1 0 2 .9 2 2v10c0 1.1-.9 2-2 2h-5v2h2c.55 0 1 .45 1 1s-.45 1-1 1H7c-.55 0-1-.45-1-1s.45-1 1-1h2v-2H4c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2zm2 4v6h12V7H6z" />
+                  </svg>
+                )
+              },
+              {
+                id: 'new-app',
+                label: 'Request New App',
+                icon: (
+                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                  </svg>
+                )
+              },
+              {
+                id: 'billing',
+                label: 'Billing & Invoices',
+                icon: (
+                  <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                    <path d="M20 7H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm-2 6h-3c-.55 0-1-.45-1-1s.45-1 1-1h3v2zM4 4h14c.55 0 1 .45 1 1s-.45 1-1 1H4C3.45 6 3 5.55 3 5s.45-1 1-1z" />
+                  </svg>
+                )
+              },
+              {
+                id: 'bugs',
+                label: 'Reported Flaws',
+                icon: <Bug className="w-5 h-5" />
+              }
             ].map((link) => {
               const isActive = activeTab === link.id;
               return (
                 <button
                   key={link.id}
                   onClick={() => handleTabSelect(link.id as any)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all border-none cursor-pointer text-left ${
-                    isActive 
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' 
+                  className={`relative w-full flex items-center ${isCollapsed ? 'justify-center py-3.5 px-0' : 'gap-3.5 px-4 py-3.5'} rounded-2xl text-[15px] font-bold transition-all duration-150 cursor-pointer border-0 ${
+                    isActive
+                      ? 'bg-[#3B82F6] text-white shadow-lg shadow-blue-500/20'
                       : isDarkMode
-                        ? 'text-slate-400 hover:text-white hover:bg-zinc-800/30 bg-transparent'
-                        : 'text-slate-650 hover:text-slate-900 hover:bg-indigo-50/30 bg-transparent'
+                        ? 'text-slate-400 hover:text-white hover:bg-white/5 bg-transparent'
+                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100 bg-transparent'
                   }`}
+                  title={isCollapsed ? link.label : undefined}
                 >
-                  {link.icon}
-                  <span>{link.label}</span>
+                  {isActive && (
+                    <motion.div
+                      layoutId="clientSidebarActiveIndicator"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-white rounded-r-full"
+                    />
+                  )}
+                  <span className="shrink-0">{link.icon}</span>
+                  {!isCollapsed && <span>{link.label}</span>}
                 </button>
               );
             })}
           </nav>
         </div>
 
-        {/* Profile Footer */}
-        <div className={`pt-6 border-t ${isDarkMode ? 'border-zinc-800' : 'border-slate-100'}`}>
-          <div className="flex items-center justify-between">
+        {/* User Card & Logout */}
+        <div className={`pt-6 border-t ${isDarkMode ? 'border-white/5' : 'border-slate-100'} w-full`}>
+          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center font-black text-indigo-600 font-display">
+              <div className="w-9 h-9 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center font-black text-blue-500 shrink-0 text-[14px]">
                 C
               </div>
-              <div className="hidden sm:block text-left text-xs leading-none">
-                <span className={`font-bold block ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Client Room</span>
-                <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-1 mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> App Developer
-                </span>
-              </div>
+              {!isCollapsed && (
+                <div className="text-left text-xs leading-none">
+                  <span className={`font-bold block ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Client Room</span>
+                  <span className="text-[10px] text-slate-500 font-semibold flex items-center gap-1 mt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> App Developer
+                  </span>
+                </div>
+              )}
             </div>
-            <button 
-              onClick={onLogout}
-              className={`p-2 rounded-xl border-none cursor-pointer bg-transparent transition-colors ${
-                isDarkMode ? 'text-slate-400 hover:text-red-450 hover:bg-zinc-800/30' : 'text-slate-500 hover:text-red-600 hover:bg-red-50/50'
-              }`}
-              title="Logout"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+            {!isCollapsed && (
+              <button
+                onClick={onLogout}
+                className={`p-2 rounded-xl border-none cursor-pointer bg-transparent transition-colors ${
+                  isDarkMode ? 'text-slate-400 hover:text-red-400 hover:bg-white/5' : 'text-slate-500 hover:text-red-600 hover:bg-red-50/50'
+                }`}
+                title="Logout"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </aside>
 
       {/* ================= MAIN CONTENT VIEWPORT ================= */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen md:h-screen overflow-y-auto pb-20 md:pb-0">
         
         {/* Top Header Bar */}
-        <header className={`px-8 py-5 border-b flex items-center justify-between sticky top-0 backdrop-blur-md z-10 ${
+        <header className={`px-4 md:px-8 py-4 md:py-5 border-b flex items-center justify-between sticky top-0 backdrop-blur-md z-10 ${
           isDarkMode ? 'bg-[#09090B]/90 border-zinc-800/60' : 'bg-white/90 border-slate-200'
         }`}>
           <div>
-            <h1 className={`text-xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-905'}`}>
+            <div className="flex items-center gap-2 md:hidden mb-1">
+              <UXOSBrandLogo isDarkMode={isDarkMode} onClick={onLogout} />
+            </div>
+            <h1 className={`text-lg md:text-xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
               Console Control Room
             </h1>
             <p className="text-[10px] text-slate-500 mt-0.5">Manage closed testing releases, verify apps, and audit reports.</p>
           </div>
 
           <div className="flex items-center gap-3">
-            <button 
+            <button
               onClick={() => handleTabSelect('new-app')}
-              className="px-4 py-2 text-white text-xs font-black rounded-xl border-0 cursor-pointer shadow-md"
-              style={{ backgroundColor: '#4F46E5' }}
+              className="px-4 py-2 text-white text-xs font-black rounded-xl border-0 cursor-pointer shadow-md bg-blue-600 hover:bg-blue-700 active:scale-[0.97] transition-all"
             >
               + Request App
             </button>
@@ -298,10 +347,26 @@ export default function ClientDashboard({
               <div className="space-y-4">
                 <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider block font-mono">Select Application</span>
                 {clientProjects.length === 0 ? (
-                  <div className={`p-10 border rounded-2xl text-center text-slate-500 text-xs font-semibold ${
-                    isDarkMode ? 'bg-zinc-900/40 border-zinc-850' : 'bg-white border-slate-200'
+                  <div className={`p-10 border rounded-3xl text-center ${
+                    isDarkMode ? 'bg-white/3 border-white/5' : 'bg-white border-slate-200 shadow-xs'
                   }`}>
-                    No applications registered yet.
+                    <div className={`w-14 h-14 rounded-3xl mx-auto mb-4 flex items-center justify-center ${
+                      isDarkMode ? 'bg-white/5' : 'bg-blue-50'
+                    }`}>
+                      <Smartphone className="w-6 h-6 text-blue-500" />
+                    </div>
+                    <p className={`font-bold text-[15px] mb-1 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
+                      No applications yet
+                    </p>
+                    <p className="text-[12px] text-slate-400 font-medium mb-5">
+                      Register your first app to start closed testing
+                    </p>
+                    <button
+                      onClick={() => handleTabSelect('new-app')}
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-bold rounded-2xl border-0 cursor-pointer shadow-md shadow-blue-600/20 active:scale-[0.97] transition-all"
+                    >
+                      + Request New App
+                    </button>
                   </div>
                 ) : (
                   clientProjects.map((proj) => (
@@ -346,11 +411,11 @@ export default function ClientDashboard({
               {/* Right Columns: Detail Panel */}
               <div className="lg:col-span-2">
                 {selectedProject ? (
-                  <div className={`border rounded-3xl p-8 relative overflow-hidden transition-all duration-350 ${
-                    isDarkMode ? 'glass-card-dark shadow-2xl' : 'glass-card-light shadow-md'
+                  <div className={`border rounded-3xl p-8 relative overflow-hidden transition-all duration-300 ${
+                    isDarkMode ? 'bg-[#0F1017] border-white/5 shadow-2xl' : 'bg-white border-slate-200 shadow-md'
                   }`}>
                     {/* Top Accent line */}
-                    <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: '#4F46E5' }} />
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-blue-600 rounded-t-3xl" />
 
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-6 mb-8 border-slate-200/25">
                       <div>
@@ -583,7 +648,7 @@ export default function ClientDashboard({
                         </div>
                       </div>
 
-                      <span className="text-[10px] font-semibold text-slate-500">No action is required in LaunchOps.</span>
+                      <span className="text-[10px] font-semibold text-slate-500">No action is required in UXOS.</span>
                     </div>
                   ))}
                 </div>
@@ -654,7 +719,9 @@ export default function ClientDashboard({
       </div>
 
       {/* ================= MOBILE BOTTOM NAV ================= */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#0A0A0C] border-t border-zinc-800/60 flex items-center justify-around z-50">
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 h-16 border-t flex items-center justify-around z-50 ${
+        isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200'
+      }`}>
         {[
           { id: 'apps', label: 'Apps', icon: <Smartphone className="w-5 h-5" /> },
           { id: 'new-app', label: 'New', icon: <Plus className="w-5 h-5" /> },
@@ -665,7 +732,9 @@ export default function ClientDashboard({
             key={link.id}
             onClick={() => handleTabSelect(link.id as any)}
             className={`flex flex-col items-center justify-center w-full h-full space-y-1 border-0 bg-transparent cursor-pointer ${
-              activeTab === link.id ? 'text-indigo-500' : 'text-slate-400 hover:text-slate-200'
+              activeTab === link.id
+                ? 'text-blue-500 font-bold'
+                : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-900'
             }`}
           >
             {link.icon}
