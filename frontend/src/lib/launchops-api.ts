@@ -138,6 +138,7 @@ export type BackendProject = {
     required: boolean;
     status: "not_required" | "pending" | "submitted" | "verified" | "rejected";
   };
+  clientFiles?: BackendProjectFile[];
   createdAt: string;
   updatedAt: string;
 };

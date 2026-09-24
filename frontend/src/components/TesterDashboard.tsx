@@ -349,6 +349,8 @@ export default function TesterDashboard({
           {activeTab === 'instructions' && (
             <TestingStepInstructions
               isDarkMode={isDarkMode}
+              project={projects.find((project) => project.id === selectedAppId)}
+              assignment={assignments.find((assignment) => assignment.projectId === selectedAppId)}
               appName={
                 projects.find((project) => project.id === selectedAppId)?.name ||
                 assignments.find((assignment) => assignment.projectId === selectedAppId)?.appName ||
@@ -358,6 +360,9 @@ export default function TesterDashboard({
               initialStep={selectedStep}
               onBack={() => handleTabSelect('my-apps')}
               onOpenSupport={() => handleTabSelect('support')}
+              onUploadProof={onUploadProof}
+              onSubmitStep1Email={onSubmitStep1Email}
+              onClickStep3Link={onClickStep3Link}
               onCompleteStep={(step) => {
                 if (step < 3) setSelectedStep((step + 1) as any);
               }}

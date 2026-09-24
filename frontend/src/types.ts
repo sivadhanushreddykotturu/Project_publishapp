@@ -40,6 +40,7 @@ export interface TestApp {
   releaseNotes?: string;
   demoCredentials?: string;
   instructions?: string;
+  clientFiles?: Array<{ name: string; key: string; contentType: string; size: number; uploadedAt: string }>;
 }
 
 export interface BugReport {

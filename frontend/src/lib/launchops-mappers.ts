@@ -78,6 +78,8 @@ export function mapProject(project: BackendProject): TestApp {
     waitlistCount: project.waitlistCount,
     joinState: project.joinState,
     optInUrl: project.playIntegration?.optInUrl,
+    instructions: project.appDetails.description,
+    clientFiles: project.clientFiles ?? [],
     workflowSteps: project.steps?.map((step) => ({ order: step.order, type: step.type, state: step.state, deadline: step.deadline })),
     playIntegration: {
       serviceAccountSet: Boolean(project.playIntegration?.serviceAccountLinked),
