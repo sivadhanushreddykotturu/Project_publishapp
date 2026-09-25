@@ -30,15 +30,36 @@ function cleanQuote(id: string, rawText: string): string {
   return firstPara;
 }
 
+let cachedTestimonials: any[] | null = null;
+let lastFetchTimestamp = 0;
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour in-memory cache
+
 export async function GET() {
+  const now = Date.now();
+
+  // 1. Return in-memory cached testimonials if fresh (prevents any rate-limiting)
+  if (cachedTestimonials && now - lastFetchTimestamp < CACHE_TTL_MS) {
+    return NextResponse.json(cachedTestimonials, {
+      headers: {
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+      },
+    });
+  }
+
   const key = process.env.SENJA_API_KEY || "Kocgk8v90Z0tQT04rChy9l218JJm";
 
   try {
     const res = await fetch("https://api.senja.io/v1/testimonials?limit=20", {
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      next: { revalidate: 300 },
+      next: { revalidate: 3600 },
     });
-    if (!res.ok) return NextResponse.json([]);
+    if (!res.ok) {
+      // Fallback to stale cache if upstream is rate-limited or down
+      if (cachedTestimonials) {
+        return NextResponse.json(cachedTestimonials);
+      }
+      return NextResponse.json([]);
+    }
     const json = await res.json();
     const rawList = Array.isArray(json)
       ? json
@@ -65,8 +86,19 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json(list.slice(0, 9));
+    const result = list.slice(0, 9);
+    cachedTestimonials = result;
+    lastFetchTimestamp = now;
+
+    return NextResponse.json(result, {
+      headers: {
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+      },
+    });
   } catch {
+    if (cachedTestimonials) {
+      return NextResponse.json(cachedTestimonials);
+    }
     return NextResponse.json([]);
   }
 }
