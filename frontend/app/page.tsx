@@ -21,7 +21,7 @@ const clerkPublishableKey =
 export default function LandingPage() {
   return (
     <ClerkProvider publishableKey={clerkPublishableKey}>
-      <main className="min-h-screen bg-paper text-ink-950">
+      <main className="min-h-screen bg-[#F6F7FB] text-slate-900 font-sans antialiased selection:bg-[#4F37FE]/15 selection:text-[#4F37FE]">
         <Nav />
         <Hero />
         <Problem />

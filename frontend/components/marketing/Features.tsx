@@ -39,35 +39,44 @@ const steps = [
 const services = [
   {
     icon: Sparkles,
-    iconBg: "bg-orange-100",
+    iconBg: "bg-purple-100 text-purple-700",
     title: "UX Testing",
-    desc: "Real testers go through your defined flows: navigation, onboarding, usability, and friction. You get a consolidated report with evidence and recommendations.",
+    badge: "Only Android",
+    desc: "14 testers on physical Android devices. Comprehensive usability, onboarding, and flow friction analysis with video evidence. Full closed testing cycle included! No extra testers will be added.",
     price: "₹5,000",
     cta: "Start UX Testing",
+    href: "/auth/client",
   },
   {
     icon: Smartphone,
-    iconBg: "bg-lime-300",
-    title: "Google Play Closed Testing",
-    desc: "An active tester community for your required closed-testing period: recruitment, distribution, coordination, and support.",
-    price: "₹3,000",
-    cta: "Start Play Store Testing",
-  },
-  {
-    icon: FileCheck2,
-    iconBg: "bg-blue-100",
-    title: "Play Store Testing + Management",
-    desc: "For teams that want more than testers: closed testing, coordination, and Play Store release-related assistance.",
-    price: "₹5,000",
-    cta: "Get Started",
+    iconBg: "bg-indigo-100 text-indigo-700",
+    title: "Play Store Closed Testing",
+    badge: "Android",
+    desc: "14-day Google Play closed testing with verified physical Android devices. Real opted-in testers, daily check-ins, automated free tester replacement, and completion reports.",
+    price: "₹2,999",
+    cta: "Start Play Testing",
+    href: "/auth/client",
   },
   {
     icon: Apple,
-    iconBg: "bg-blue-100",
-    title: "iOS / App Store Testing",
-    desc: "Test your iOS application with real testers before releasing it publicly. Recruitment, coordination, and feedback collection.",
-    price: "₹3,000",
-    cta: "Start iOS Testing",
+    iconBg: "bg-slate-100 text-slate-800",
+    title: "Apple Connect Setup",
+    badge: "Setup Only",
+    desc: "Complete App Store Connect & Apple Developer setup: App ID, certificates, provisioning profiles, and TestFlight internal/external beta group creation.",
+    price: "₹2,499",
+    cta: "Get Apple Setup",
+    href: "/auth/client",
+  },
+  {
+    icon: Apple,
+    iconBg: "bg-amber-100 text-amber-800",
+    title: "iOS App Testing",
+    badge: "Coming Soon",
+    desc: "Physical iPhone & iPad testing community with automated TestFlight tester management, crash diagnostics, and usability feedback.",
+    price: "Coming Soon",
+    cta: "Coming Soon",
+    href: "#pricing",
+    isComingSoon: true,
   },
 ];
 
@@ -198,32 +207,57 @@ export function Features() {
             {services.map((s) => (
               <div
                 key={s.title}
-                className="flex flex-col rounded-card border border-black/5 bg-white p-6 shadow-card transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-card-hover"
+                className="flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-indigo-200"
               >
-                <span
-                  className={`grid size-10 place-items-center rounded-xl ${s.iconBg} text-ink-950`}
-                >
-                  <s.icon className="size-5" strokeWidth={1.8} />
-                </span>
-                <h3 className="mt-6 text-[17px] font-bold text-ink-950">
-                  {s.title}
-                </h3>
-                <p className="mt-1.5 flex-1 text-[13.5px] leading-relaxed text-ink-500">
-                  {s.desc}
-                </p>
-                <p className="mt-5 text-[13px] text-ink-500">
-                  Starting from{" "}
-                  <span className="text-[18px] font-bold text-ink-950">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`grid size-11 place-items-center rounded-2xl ${s.iconBg} shadow-xs`}
+                    >
+                      <s.icon className="size-5" strokeWidth={1.8} />
+                    </span>
+                    {s.badge && (
+                      <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                        s.isComingSoon 
+                          ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                          : s.badge === 'Only Android'
+                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                          : 'bg-indigo-50 text-[#4F37FE] border-indigo-100'
+                      }`}>
+                        {s.badge}
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="mt-5 text-[18px] font-bold text-slate-900">
+                    {s.title}
+                  </h3>
+                  <p className="mt-2 text-[13px] leading-relaxed text-slate-500 font-medium">
+                    {s.desc}
+                  </p>
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-slate-100">
+                  <p className="text-[12px] font-semibold text-slate-400">
+                    {s.isComingSoon ? "Availability" : "Price"}
+                  </p>
+                  <p className="text-[20px] font-black text-slate-900">
                     {s.price}
-                  </span>
-                </p>
-                <Link
-                  href="/auth/client"
-                  className="btn btn-secondary mt-4 px-4 py-2.5 text-[14px]"
-                >
-                  {s.cta}
-                  <ArrowRight className="size-4" />
-                </Link>
+                  </p>
+
+                  {s.isComingSoon ? (
+                    <div className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-slate-200/80 bg-slate-50 px-4 py-2.5 text-[13.5px] font-semibold text-slate-400 select-none">
+                      <span>Coming Soon</span>
+                    </div>
+                  ) : (
+                    <Link
+                      href={s.href}
+                      className="mt-4 flex items-center justify-center gap-2 rounded-xl bg-[#4F37FE] hover:bg-[#432ee0] px-4 py-2.5 text-[13.5px] font-bold text-white shadow-sm transition-all"
+                    >
+                      <span>{s.cta}</span>
+                      <ArrowRight className="size-3.5" />
+                    </Link>
+                  )}
+                </div>
               </div>
             ))}
           </div>

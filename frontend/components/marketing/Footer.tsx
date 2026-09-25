@@ -12,8 +12,9 @@ const COLS = [
     ],
   },
   {
-    heading: "For Testers",
+    heading: "Community & Testers",
     links: [
+      { label: "WhatsApp Community", href: "https://chat.whatsapp.com/Il76kyPsNg684F2ITanNRY", external: true },
       { label: "Become an Android Tester", href: "/auth/tester" },
       { label: "Tester Dashboard", href: "/tester" },
     ],
@@ -43,7 +44,7 @@ const COLS = [
 
 export function Footer() {
   return (
-    <footer className="border-t border-black/5 bg-paper">
+    <footer className="border-t border-slate-200/80 bg-white">
       <div className="mx-auto max-w-6xl px-6 py-16">
         {/* top row: logo + columns */}
         <div className="grid gap-12 md:grid-cols-[1.5fr_repeat(4,1fr)]">
@@ -65,12 +66,14 @@ export function Footer() {
               <ul className="flex flex-col gap-2.5">
                 {col.links.map((l) => (
                   <li key={l.label}>
-                    <Link
+                    <a
                       href={l.href}
-                      className="text-[14px] text-ink-500 transition-colors hover:text-ink-950"
+                      target={(l as any).external ? "_blank" : undefined}
+                      rel={(l as any).external ? "noopener noreferrer" : undefined}
+                      className="text-[14px] text-slate-500 transition-colors hover:text-slate-900"
                     >
                       {l.label}
-                    </Link>
+                    </a>
                   </li>
                 ))}
               </ul>

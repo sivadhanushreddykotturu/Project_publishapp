@@ -24,11 +24,12 @@ export default function Navbar({
 }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const navItems: { label: string; tab: string; subtab?: string; badge?: string }[] = [
-    { label: 'Client Setup', tab: 'auth', subtab: 'client', badge: '14 Testers' },
-    { label: 'Tester Hub', tab: 'tester' },
-    { label: 'Solutions', tab: 'solutions' },
-    { label: 'Pricing', tab: 'pricing' }
+  const navItems: { label: string; tab?: string; subtab?: string; href?: string; badge?: string; external?: boolean }[] = [
+    { label: 'Services', href: '/#services' },
+    { label: 'How It Works', href: '/#how-it-works' },
+    { label: 'Pricing', href: '/#pricing', tab: 'pricing' },
+    { label: 'Community', href: 'https://chat.whatsapp.com/Il76kyPsNg684F2ITanNRY', external: true },
+    { label: 'Tester Hub', tab: 'tester' }
   ];
 
   return (
@@ -39,43 +40,53 @@ export default function Navbar({
       className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b font-sans shadow-xs transition-colors duration-300 ${
       isDarkMode 
         ? 'bg-[#050505]/90 border-white/5 text-white' 
-        : 'bg-white/90 border-slate-200 text-slate-900'
+        : 'bg-white/95 border-slate-200 text-slate-900'
     }`}>
       <nav className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
         {/* Logo */}
         <UXOSBrandLogo
           isDarkMode={isDarkMode}
           onClick={() => {
-            const role = typeof window !== 'undefined' ? localStorage.getItem('launchops_user_role') : null;
-            onTabChange(role === 'client' ? 'client' : role === 'tester' ? 'tester' : 'home', role === 'client' ? 'dashboard' : undefined);
-            setIsOpen(false);
+            window.location.href = '/';
           }}
         />
 
         {/* Desktop Navigation Links */}
-        <div className={`hidden lg:flex items-center gap-7 text-sm font-semibold ${
+        <div className={`hidden lg:flex items-center gap-8 text-sm font-semibold ${
           isDarkMode ? 'text-slate-300' : 'text-slate-600'
         }`}>
           {navItems.map((item) => {
-            const isActive = currentTab === item.tab;
+            const isActive = item.tab && currentTab === item.tab;
             
+            if (item.href && !item.tab) {
+              return (
+                <a
+                  key={item.label}
+                  href={item.href}
+                  target={item.external ? "_blank" : undefined}
+                  rel={item.external ? "noopener noreferrer" : undefined}
+                  className="hover:text-[#4F37FE] transition-colors py-2"
+                >
+                  {item.label}
+                </a>
+              );
+            }
+
             return (
               <button
                 key={item.label}
-                onClick={() => onTabChange(item.tab, item.subtab)}
+                onClick={() => {
+                  if (item.tab) onTabChange(item.tab, item.subtab);
+                  else if (item.href) window.location.href = item.href;
+                }}
                 className={`flex items-center gap-1.5 hover:text-[#4F37FE] transition-colors cursor-pointer relative py-2 border-0 bg-transparent ${
                   isActive 
                     ? 'text-[#4F37FE] font-bold' 
                     : isDarkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'
                 }`}
-                id={`nav-${item.tab.replace(/\s+/g, '-')}-btn`}
+                id={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}-btn`}
               >
                 <span>{item.label}</span>
-                {item.badge && (
-                  <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded-full bg-[#4F37FE]/15 text-[#4F37FE] border border-[#4F37FE]/30">
-                    {item.badge}
-                  </span>
-                )}
                 {isActive && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4F37FE] rounded-full" />
                 )}
@@ -86,6 +97,16 @@ export default function Navbar({
 
         {/* Header Actions */}
         <div className="hidden lg:flex items-center gap-3.5">
+          {/* Log In text link */}
+          <button
+            onClick={() => onTabChange('auth', 'client')}
+            className={`text-sm font-bold transition-colors cursor-pointer bg-transparent border-0 px-2 py-1 ${
+              isDarkMode ? 'text-slate-300 hover:text-white' : 'text-slate-700 hover:text-[#4F37FE]'
+            }`}
+          >
+            Log In
+          </button>
+
           {/* Theme Toggle Button */}
           <button
             onClick={onToggleDarkMode}
@@ -100,28 +121,13 @@ export default function Navbar({
             {isDarkMode ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
           </button>
 
-          {/* Tester Portal button */}
-          <button
-            onClick={() => onTabChange('auth', 'tester')}
-            className={`px-4 py-2.5 rounded-full text-xs font-bold border transition-all cursor-pointer ${
-              currentTab === 'tester'
-                ? 'bg-[#4F37FE]/15 text-[#4F37FE] border-[#4F37FE]'
-                : isDarkMode 
-                  ? 'bg-white/5 border-white/10 text-slate-200 hover:bg-white/10' 
-                  : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
-            }`}
-            id="nav-tester-portal-btn"
-          >
-            Tester Portal
-          </button>
-
-          {/* Client Setup CTA */}
+          {/* Start Testing CTA */}
           <button 
             onClick={() => onTabChange('auth', 'client')}
             className="bg-[#4F37FE] hover:bg-[#432ee0] px-5 py-2.5 rounded-full text-xs md:text-sm font-bold flex items-center gap-2 transition hover:shadow-lg hover:shadow-indigo-500/20 cursor-pointer text-white border-0"
             id="nav-client-setup-btn"
           >
-            <span>Client Setup</span>
+            <span>Start Testing</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -159,13 +165,29 @@ export default function Navbar({
         }`}>
           <div className="flex flex-col gap-2">
             {navItems.map((item) => {
-              const isActive = currentTab === item.tab;
+              const isActive = item.tab && currentTab === item.tab;
+
+              if (item.href && !item.tab) {
+                return (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    target={item.external ? "_blank" : undefined}
+                    rel={item.external ? "noopener noreferrer" : undefined}
+                    onClick={() => setIsOpen(false)}
+                    className="text-left text-base font-semibold py-2.5 px-3 rounded-xl transition-colors flex items-center justify-between text-slate-600 hover:text-[#4F37FE]"
+                  >
+                    <span>{item.label}</span>
+                  </a>
+                );
+              }
 
               return (
                 <button
                   key={item.label}
                   onClick={() => {
-                    onTabChange(item.tab, item.subtab);
+                    if (item.tab) onTabChange(item.tab, item.subtab);
+                    else if (item.href) window.location.href = item.href;
                     setIsOpen(false);
                   }}
                   className={`text-left text-base font-semibold py-2.5 px-3 rounded-xl transition-colors flex items-center justify-between ${
@@ -193,7 +215,7 @@ export default function Navbar({
               }}
               className="w-full bg-[#4F37FE] hover:bg-[#432ee0] py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-white shadow-md cursor-pointer border-0"
             >
-              Client Setup (14 Testers)
+              Start Testing
               <ArrowRight className="w-4 h-4" />
             </button>
             <button

@@ -5,31 +5,31 @@ import { Star, ChevronLeft, ChevronRight } from 'lucide-react';
 const testimonials = [
   {
     id: 1,
-    quote: "UXOS helped us find critical issues we missed internally. Our crash rate dropped by 42% after launch.",
-    author: "Rohit Sharma",
-    role: "CTO, FitTrack",
+    quote: "I found Nandha Kishore through Instagram when looking for help to get my app live on the Play Store. His testing community helped me find a lot of bugs and UI issues that I hadn’t noticed myself. That feedback helped me improve the app and gave me more confidence before making it live.",
+    author: "Sandeep Ande",
+    role: "Urnest · Bangalore",
     avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&fit=crop&q=80"
   },
   {
     id: 2,
-    quote: "The quality of bug reports is incredible. It saves us 10x the manual QA effort.",
-    author: "Priya Nair",
-    role: "QA Lead, Meesho",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&fit=crop&q=80"
+    quote: "I run a software agency and needed constant help with app testing and publishing. Nandha made the whole process much easier for me. He’s reliable, helpful, and guided me quickly through testing and publishing our apps.",
+    author: "Vivek S",
+    role: "Founder & CEO, Quick Tap Services",
+    avatar: "https://cdn.senja.io/public/avatar/41f03cec-bacf-4664-94d6-5277f9aafb37_vivek.png"
   },
   {
     id: 3,
-    quote: "We tested across 40+ real devices in just 3 days. That's power!",
-    author: "Arjun Verma",
-    role: "Founder, QuickCart",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&fit=crop&q=80"
+    quote: "Two of the testers sent me full written QA reports with screenshots, checking my scoring maths against official win-by-two rules. That feedback turned into real fixes: match setup, navigation, tournaments. Google granted production access and One Sport is now live!",
+    author: "Saikumar Kambhampati",
+    role: "Cloud Engineer, One Sport",
+    avatar: "https://cdn.senja.io/public/avatar/92478493-3c46-4d0d-9044-a2955fc78cc3_saikumar_digital_logo.png"
   },
   {
     id: 4,
-    quote: "Ensured our Android 14 release worked flawlessly across various foldables and tablets. Amazing turnaround!",
-    author: "Sarah Jenkins",
-    role: "Lead Android Dev, HealthUp",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&fit=crop&q=80"
+    quote: "Their team conducted UX testing and shared a detailed bug and UX report, helping us identify several issues before launch. Fixing these early improved our user experience and gave us a strong foundation for retention.",
+    author: "Santhosh",
+    role: "Founder, kanma",
+    avatar: "https://cdn.senja.io/public/avatar/ee680200-3acb-4b45-8740-71cebc5e157c_WhatsApp%20Image%202026-09-11%20at%201.04.31%20AM.jpeg"
   }
 ];
 
