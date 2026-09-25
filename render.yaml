@@ -36,4 +36,4 @@ services:
       - key: APP_BASE_URL
         sync: false
       - key: WEB_BASE_URL
-        value: https://launchops-app.vercel.app
+        value: https://uxos.in
