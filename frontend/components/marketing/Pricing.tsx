@@ -140,18 +140,19 @@ export function Pricing() {
           {/* 2. UX Testing (ONLY ANDROID) - RECOMMENDED */}
           <div className="relative flex flex-col justify-between rounded-3xl border-2 border-[#4F37FE] bg-white p-8 shadow-xl shadow-indigo-500/10 hover:shadow-2xl transition-all duration-300">
             {/* Top pill badge */}
-            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-              <span className="bg-[#4F37FE] text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1 rounded-full shadow-md">
-                RECOMMENDED · FULL AUDIT
+            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10">
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[#4F37FE] px-4 py-1 text-[11px] font-black uppercase tracking-wider text-white shadow-md">
+                <Sparkles className="size-3 text-amber-300" />
+                <span>Recommended</span>
               </span>
             </div>
 
             <div>
               <div className="flex items-center justify-between gap-3">
-                <span className="rounded-full bg-purple-50 border border-purple-200 px-3 py-1 text-[11px] font-extrabold tracking-wide text-purple-700">
+                <span className="whitespace-nowrap rounded-full bg-purple-50 border border-purple-200 px-3 py-1 text-[11px] font-extrabold tracking-wide text-purple-700">
                   UX & QA STUDY
                 </span>
-                <span className="rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[11px] font-bold text-amber-800">
+                <span className="whitespace-nowrap rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[11px] font-bold text-amber-800">
                   Only Android
                 </span>
               </div>
