@@ -41,7 +41,9 @@ export function AgencySection() {
               </p>
 
               <a
-                href="mailto:support@uxos.in?subject=Agency%20Enquiry"
+                href="https://mail.google.com/mail/?view=cm&fs=1&to=support%40uxos.in&su=Agency%20Partnership%20Enquiry&body=Hi%20UXOS%20team%2C%0A%0AI%27m%20interested%20in%20partnering%20with%20UXOS%20for%20app%20testing.%0A%0ACompany%20name%3A%0AContact%20name%3A%0APhone%3A%0AExpected%20testing%20volume%3A%0A"
+                target="_blank"
+                rel="noopener noreferrer"
                 id="agency-contact-cta"
                 className="group mt-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-6 py-3 text-[14.5px] font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/20"
               >
