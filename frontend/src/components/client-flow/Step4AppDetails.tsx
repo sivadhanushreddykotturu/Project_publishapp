@@ -162,10 +162,10 @@ export default function Step4AppDetails({
       </div>
 
       {/* Navigation Buttons */}
-      <div className="flex items-center justify-center gap-4 pt-4">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 pt-4 w-full max-w-sm mx-auto">
         <button
           onClick={onBack}
-          className={`px-12 py-3.5 rounded-2xl text-[15px] font-bold border transition-colors cursor-pointer ${
+          className={`w-full sm:w-auto px-8 py-3.5 rounded-2xl text-[15px] font-bold border transition-colors cursor-pointer text-center ${
             isDarkMode 
               ? 'bg-[#0F1017] border-white/10 text-white hover:bg-white/5' 
               : 'bg-white border-slate-200/90 text-slate-800 hover:bg-slate-50'
@@ -177,7 +177,7 @@ export default function Step4AppDetails({
         <button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="px-16 py-3.5 bg-[#4F37FE] hover:bg-[#432EE0] disabled:opacity-60 text-white text-[15px] font-bold rounded-2xl shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer"
+          className="w-full sm:w-auto px-10 py-3.5 bg-[#4F37FE] hover:bg-[#432EE0] disabled:opacity-60 text-white text-[15px] font-bold rounded-2xl shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer text-center"
         >
           {isSubmitting ? 'Creating Project...' : 'Next'}
         </button>

@@ -79,6 +79,7 @@ export type BackendClient = {
   userId: LaunchOpsUser;
   companyName?: string;
   contactName: string;
+  logoUrl?: string;
   billingInfo?: { gstin?: string; billingAddress?: string };
   activePackage?: BackendProject["package"];
   projects: string[];

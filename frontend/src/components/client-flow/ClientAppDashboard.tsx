@@ -272,7 +272,7 @@ export default function ClientAppDashboard({
 
   return (
     <div className={`min-h-screen flex transition-colors duration-200 ${
-      isDarkMode ? 'bg-[#0B0C10] text-slate-100' : 'bg-[#F6F7FB] text-slate-900'
+      isDarkMode ? 'dark bg-[#0B0C10] text-slate-100' : 'bg-[#F6F7FB] text-slate-900'
     }`}>
       {/* ========================================================= */}
       {/* LEFT SIDEBAR (Matching Menu.png & media_1788953798293.png) */}
@@ -422,7 +422,7 @@ export default function ClientAppDashboard({
                   <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
                 </button>
                 <div>
-                  <h2 className="text-[22px] font-black text-slate-900 dark:text-white leading-tight">
+                  <h2 className={`text-[22px] font-black leading-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                     {selectedApp.name}
                   </h2>
                   <p className="text-[13px] font-medium text-slate-400">
@@ -455,7 +455,7 @@ export default function ClientAppDashboard({
               onMouseEnter={() => setProfileOpen(true)}
               onClick={() => setProfileOpen((open) => !open)}
             >
-              <div className="text-[15px] font-black text-slate-900 dark:text-white">
+              <div className={`text-[15px] font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                 {currentClient?.companyName || currentUser?.name || 'Client'}
               </div>
               <div className="flex items-center gap-1.5 text-[12px] font-bold text-slate-400 justify-end">
@@ -595,7 +595,7 @@ export default function ClientAppDashboard({
 
                           {/* App Meta Info */}
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-[20px] font-black tracking-tight text-slate-900 dark:text-white truncate">
+                            <h3 className={`text-[20px] font-black tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                               {app.name}
                             </h3>
                             <p className="text-[13px] font-medium text-slate-400 mt-0.5">
@@ -639,7 +639,7 @@ export default function ClientAppDashboard({
 
                         {/* Description Section */}
                         <div className="space-y-2">
-                          <h4 className="text-[16px] font-black tracking-tight text-slate-900 dark:text-white">
+                          <h4 className={`text-[16px] font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                             Description
                           </h4>
                           <p className="text-[13px] font-normal leading-relaxed text-slate-600 dark:text-slate-400 line-clamp-4">
@@ -685,10 +685,10 @@ export default function ClientAppDashboard({
                         <Phone className="w-6 h-6" />
                       </div>
                       <div>
-                        <h4 className="text-[16px] font-black text-slate-900 dark:text-white">
+                        <h4 className={`text-[16px] font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                           Direct Specialist Consultation Active
                         </h4>
-                        <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        <p className={`text-[13px] mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                           Our dedicated {selectedApp.category === 'IOS App Publishing' ? 'iOS App Store release team' : 'UX testing research lead'} will contact you via WhatsApp and phone call to coordinate requirements.
                         </p>
                       </div>
@@ -769,7 +769,7 @@ export default function ClientAppDashboard({
                     <div>
                       <div className="flex items-center justify-center gap-2">
                         <Mail className="w-5 h-5 text-[#4F37FE]" />
-                        <h3 className="text-[18px] font-black text-slate-900 dark:text-white">Email timeline</h3>
+                        <h3 className={`text-[18px] font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Email timeline</h3>
                       </div>
                       <div className="h-[1.5px] bg-gradient-to-r from-transparent via-[#4F37FE]/40 to-transparent my-4" />
                       <div className="space-y-3">
@@ -779,7 +779,7 @@ export default function ClientAppDashboard({
                               <span className={`mt-1 w-2.5 h-2.5 rounded-full ${notification.status === 'sent' ? 'bg-emerald-500' : notification.status === 'failed' ? 'bg-red-500' : 'bg-amber-400'}`} />
                               {index < emailTimeline.length - 1 && <span className="w-px flex-1 min-h-10 bg-slate-200 dark:bg-white/10" />}
                             </div>
-                            <button onClick={() => setSelectedEmail(notification)} className="flex-1 pb-4 text-left text-sm font-bold text-slate-900 dark:text-white hover:text-[#4F37FE] transition-colors">
+                            <button onClick={() => setSelectedEmail(notification)} className={`flex-1 pb-4 text-left text-sm font-bold hover:text-[#4F37FE] transition-colors ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                               {getEmailDetails(notification).subject}
                             </button>
                           </div>
@@ -797,7 +797,7 @@ export default function ClientAppDashboard({
                   <div className="mb-5 flex items-start gap-3">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#4F37FE]/10 text-[#4F37FE]"><Share2 className="h-5 w-5" /></div>
                     <div>
-                      <h3 className="text-[20px] font-black text-slate-900 dark:text-white">Google Play testing workflow</h3>
+                      <h3 className={`text-[20px] font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Google Play testing workflow</h3>
                       <p className="mt-0.5 text-[12px] font-medium text-slate-400">Current stage: <span className="font-bold text-[#4F37FE]">{workflowStage}</span></p>
                     </div>
                   </div>
@@ -810,7 +810,7 @@ export default function ClientAppDashboard({
 
                   <div className={`mb-6 rounded-2xl border p-5 ${isDarkMode ? 'border-white/10 bg-[#181926]' : 'border-slate-200 bg-slate-50'}`}>
                     <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-                      <div><p className="text-sm font-bold">Verified tester emails ({verifiedEmails.length}/{selectedProjectModel?.testersRequired ?? 0})</p><p className="mt-1 text-xs text-slate-400">Copy these addresses into the Google Play closed-testing email list.</p></div>
+                      <div><p className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Verified tester emails ({verifiedEmails.length}/{selectedProjectModel?.testersRequired ?? 0})</p><p className="mt-1 text-xs text-slate-400">Copy these addresses into the Google Play closed-testing email list.</p></div>
                       <button type="button" disabled={verifiedEmails.length < 14} title={verifiedEmails.length < 14 ? `${14 - verifiedEmails.length} more approved testers required` : undefined} onClick={async () => { await navigator.clipboard.writeText(verifiedEmails.join(', ')); setEmailWorkflowMessage(`${verifiedEmails.length} emails copied.`); }} className="rounded-xl bg-[#4F37FE] px-5 py-2.5 text-xs font-bold text-white disabled:opacity-40">Copy comma-separated</button>
                     </div>
                     <div className="mt-3 max-h-32 overflow-y-auto whitespace-pre-wrap rounded-xl bg-black/5 p-3 font-mono text-xs dark:bg-black/20">{verifiedEmails.length ? verifiedEmails.join(',\n') : 'No verified emails yet.'}</div>
@@ -850,7 +850,7 @@ export default function ClientAppDashboard({
                       <FileText className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-[20px] font-black text-slate-900 dark:text-white">Project Files <span className="text-sm font-semibold text-slate-400">(Optional)</span></h3>
+                      <h3 className={`text-[20px] font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Project Files <span className="text-sm font-semibold text-slate-400">(Optional)</span></h3>
                       <p className="text-[12px] font-medium text-slate-400 mt-0.5">Share supporting instructions, credentials, screenshots, or app builds only when needed.</p>
                     </div>
                   </div>

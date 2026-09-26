@@ -447,15 +447,15 @@ export default function AdminConsole({
       <div className="flex-grow flex flex-col min-w-0 min-h-screen md:h-screen overflow-y-auto pb-20 md:pb-0">
         
         {/* Main Header */}
-        <header className={`px-4 md:px-8 py-4 md:py-5 border-b flex items-center justify-between sticky top-0 backdrop-blur-md z-10 ${
+        <header className={`px-4 md:px-8 py-3 sm:py-5 border-b flex items-center justify-between sticky top-0 backdrop-blur-md z-10 ${
           isDarkMode ? 'bg-[#090A0F]/90 border-white/5' : 'bg-white/90 border-slate-200'
         }`}>
-          <div>
-            <div className="flex items-center gap-2 md:hidden mb-1">
-              <img src="/launchops-logo.png" alt="UXOS Logo" className="w-7 h-7 object-contain" />
-              <span className={`text-lg font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>UXOS Admin</span>
+          <div className="min-w-0 flex-1 pr-2">
+            <div className="flex items-center gap-2 md:hidden mb-0.5">
+              <img src="/launchops-logo.png" alt="UXOS Logo" className="w-6 h-6 object-contain" />
+              <span className={`text-base font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>UXOS Admin</span>
             </div>
-            <h1 className={`text-lg md:text-xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+            <h1 className={`text-base sm:text-lg md:text-xl font-black tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
               {activeTab === 'dashboard' && 'Admin Overview'}
               {activeTab === 'projects' && 'Projects'}
               {activeTab === 'testers' && 'Tester Management'}
@@ -463,7 +463,7 @@ export default function AdminConsole({
               {activeTab === 'support' && 'Support Inbox'}
               {activeTab === 'cashouts' && 'Payouts & Wallets'}
             </h1>
-            <p className="text-[10px] text-slate-500 mt-0.5">
+            <p className="text-[10px] text-slate-500 mt-0.5 truncate">
               {activeTab === 'dashboard' && "Here's what's happening on UXOS today."}
               {activeTab === 'projects' && 'Manage all app testing campaigns'}
               {activeTab === 'testers' && 'Manage tester accounts and assignments'}
@@ -473,8 +473,8 @@ export default function AdminConsole({
             </p>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className={`flex items-center gap-2 px-3 py-1.5 border rounded-xl text-xs font-bold ${
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 border rounded-xl text-xs font-bold ${
               isDarkMode ? 'bg-white/5 border-white/10 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
             }`}>
               <Calendar className="w-4 h-4 text-blue-500" />
@@ -486,13 +486,13 @@ export default function AdminConsole({
               <Bell className="w-4 h-4 text-slate-400" />
               {notifications.some((notification) => !notification.readAt) && <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full" />}
             </button>
-            {notificationDropdownOpen && <div className={`absolute right-0 top-12 w-80 max-h-96 overflow-y-auto rounded-xl border p-2 shadow-xl ${isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200'}`}>
+            {notificationDropdownOpen && <div className={`absolute right-0 top-12 w-72 sm:w-80 max-h-96 overflow-y-auto rounded-xl border p-2 shadow-xl ${isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200'}`}>
               {notifications.filter((notification) => !notification.readAt).length === 0 ? <p className="p-3 text-xs text-slate-500">You're all caught up.</p> : notifications.filter((notification) => !notification.readAt).map((notification) => <button key={notification._id} onClick={() => { onReadNotification(notification._id); if (notification.type === 'project_request') handleTabSelect('projects'); else if (notification.type === 'support_request') handleTabSelect('support'); setNotificationDropdownOpen(false); }} className={`w-full text-left p-3 rounded-lg text-xs border mb-1 transition-colors ${isDarkMode ? 'bg-blue-500/15 border-blue-500/30 text-white' : 'bg-blue-50 border-blue-200 text-slate-900'}`}><span className="flex items-center justify-between gap-2 font-bold"><span>{notification.type === 'project_request' ? 'New published project' : notification.type.replace(/_/g, ' ')}</span><span className="text-[8px] uppercase px-1.5 py-0.5 rounded-full bg-blue-600 text-white">New</span></span><span className="text-slate-500 block mt-1">{String(notification.payload.appName ?? '')}</span></button>) }
               {notifications.filter((notification) => notification.status === 'failed').map((notification) => <div key={`failed-${notification._id}`} className="mb-1 rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs"><p className="font-bold text-red-500">Failed: {notification.type.replace(/_/g, ' ')}</p><p className="mt-1 truncate text-[9px] text-slate-500">{notification.lastError || 'Delivery failed'}</p><button type="button" onClick={() => { void onResendNotification(notification._id); }} className="mt-2 rounded-lg border-0 bg-red-600 px-2.5 py-1 text-[9px] font-black uppercase text-white">Retry delivery</button></div>)}
             </div>}
             </div>
 
-            <button onClick={() => handleTabSelect('projects')} className="px-4 py-2 text-white text-xs font-black rounded-xl bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/25 border-0 cursor-pointer active:scale-[0.97] transition-all">
+            <button onClick={() => handleTabSelect('projects')} className="hidden sm:inline-flex px-4 py-2 text-white text-xs font-black rounded-xl bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/25 border-0 cursor-pointer active:scale-[0.97] transition-all">
               Manage Projects
             </button>
           </div>
@@ -1026,7 +1026,7 @@ export default function AdminConsole({
             <div className="space-y-6">
               <div className="flex flex-col gap-4">
                 <div>
-                  <h2 className={`text-xl font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Registered QA Specialists</h2>
+                  <h2 className={`text-lg sm:text-xl font-black break-words ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Registered QA Specialists</h2>
                   <p className="text-[11px] text-slate-500 mt-1">Review profiles, target testing devices, and verified overall bug count.</p>
                 </div>
 

@@ -225,6 +225,8 @@ export default function ClientFlowManager({
     <ClientWizardLayout
       isDarkMode={isDarkMode}
       onOpenSupport={() => setIsSupportOpen(true)}
+      currentUser={currentUser}
+      currentClient={currentClient}
     >
       <AnimatePresence mode="wait">
         <div className="w-full">

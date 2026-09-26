@@ -987,8 +987,8 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
       {/* Main Screen Router */}
       <main className="relative min-h-screen">
         {dashboardError && isDashboard && (
-          <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] rounded-xl border px-4 py-3 text-sm font-semibold shadow-xl transition-colors ${
-            isDarkMode ? 'border-red-500/30 bg-red-950 text-red-100' : 'border-red-200 bg-red-50 text-red-700'
+          <div className={`fixed bottom-20 md:bottom-6 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-auto max-w-md mx-auto z-[100] rounded-xl border px-4 py-3 text-xs sm:text-sm font-semibold shadow-2xl transition-colors text-center break-words ${
+            isDarkMode ? 'border-red-500/30 bg-red-950/95 text-red-100 backdrop-blur-md' : 'border-red-200 bg-red-50/95 text-red-700 backdrop-blur-md'
           }`}>
             {dashboardError}
           </div>

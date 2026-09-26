@@ -10,16 +10,22 @@ import Step5TesterEmails from './Step5TesterEmails';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, ArrowRight } from 'lucide-react';
 
+import type { BackendClient, LaunchOpsUser } from '../../lib/launchops-api';
+
 interface ClientOnboardingWizardProps {
   isDarkMode: boolean;
   onFinish?: (campaignData: any) => void;
   onCancel?: () => void;
+  currentUser?: LaunchOpsUser | null;
+  currentClient?: BackendClient | null;
 }
 
 export default function ClientOnboardingWizard({
   isDarkMode,
   onFinish,
-  onCancel
+  onCancel,
+  currentUser,
+  currentClient
 }: ClientOnboardingWizardProps) {
   // Steps: 1 to 5
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -82,7 +88,7 @@ export default function ClientOnboardingWizard({
 
   if (isCompleted) {
     return (
-      <ClientWizardLayout isDarkMode={isDarkMode}>
+      <ClientWizardLayout isDarkMode={isDarkMode} currentUser={currentUser} currentClient={currentClient}>
         <div className={`p-10 rounded-3xl border text-center max-w-lg space-y-6 shadow-xl ${
           isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200/90'
         }`}>
@@ -115,7 +121,7 @@ export default function ClientOnboardingWizard({
   }
 
   return (
-    <ClientWizardLayout isDarkMode={isDarkMode}>
+    <ClientWizardLayout isDarkMode={isDarkMode} currentUser={currentUser} currentClient={currentClient}>
       <AnimatePresence mode="wait">
         {/* Step 1: Service Selection */}
         {currentStep === 1 && (

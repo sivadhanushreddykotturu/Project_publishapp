@@ -237,11 +237,11 @@ export default function ClerkAuthScreen({ isDarkMode, initialRole = "tester", on
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4">
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 mb-4 transform rotate-12">
-            <span className="font-extrabold italic text-lg">LT</span>
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <img src="/launchops-logo.png" alt="UXOS Logo" className="w-12 h-12 object-contain" />
           </div>
           <h2 className={`text-3xl font-black tracking-tight ${isDarkMode ? "text-white" : "text-slate-950"}`}>
-            LaunchTest Account
+            UXOS Account
           </h2>
           <p className={`mt-2 text-sm font-semibold ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>
             Sign in to your client or tester workspace.

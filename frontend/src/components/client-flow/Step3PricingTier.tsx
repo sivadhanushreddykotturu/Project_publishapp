@@ -114,15 +114,15 @@ export default function Step3PricingTier({
       </div>
 
       {/* Main Pricing Box */}
-      <div className={`rounded-3xl border p-8 md:p-10 shadow-sm relative overflow-hidden ${
+      <div className={`rounded-3xl border p-4 sm:p-8 md:p-10 shadow-sm relative overflow-hidden ${
         isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200/90'
       }`}>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           {/* ================= LEFT: PRICING CARD ================= */}
-          <div className="lg:col-span-5 rounded-3xl bg-[#4F37FE] text-white p-6 relative overflow-hidden shadow-lg shadow-[#4F37FE]/20 flex flex-col justify-between min-h-[460px]">
+          <div className="lg:col-span-5 rounded-3xl bg-[#4F37FE] text-white p-5 sm:p-6 relative overflow-hidden shadow-lg shadow-[#4F37FE]/20 flex flex-col justify-between min-h-[380px] sm:min-h-[460px]">
             <div>
               {/* Header Badge */}
-              <div className="flex items-center justify-between gap-2 mb-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                 <div>
                   <h3 className="text-[17px] font-black leading-tight">
                     Playstore Closed Testing
@@ -139,11 +139,11 @@ export default function Step3PricingTier({
               {/* Price & Billing */}
               <div className="my-6">
                 <div className="flex items-baseline gap-3">
-                  <span className="text-[38px] font-black tracking-tight">
+                  <span className="text-[32px] sm:text-[38px] font-black tracking-tight">
                     {currentTier.price}
                   </span>
                   {currentTier.originalPrice && (
-                    <span className="text-[18px] text-white/60 line-through font-semibold">
+                    <span className="text-[16px] sm:text-[18px] text-white/60 line-through font-semibold">
                       {currentTier.originalPrice}
                     </span>
                   )}
@@ -155,7 +155,7 @@ export default function Step3PricingTier({
             </div>
 
             {/* Illustration / Graphic inside card (matching media_1789055504578.png) */}
-            <div className="relative h-48 rounded-2xl overflow-hidden bg-white/10 flex items-center justify-center border border-white/20">
+            <div className="relative h-40 sm:h-48 rounded-2xl overflow-hidden bg-white/10 flex items-center justify-center border border-white/20">
               <img
                 src="/playstoretesting.png"
                 alt="Playstore testing visual"
@@ -166,13 +166,13 @@ export default function Step3PricingTier({
           </div>
 
           {/* ================= RIGHT: FEATURES & SLIDER ================= */}
-          <div className="lg:col-span-7 space-y-8 pl-0 lg:pl-4">
+          <div className="lg:col-span-7 space-y-6 sm:space-y-8 pl-0 lg:pl-4">
             {/* Features Checklist Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3.5 gap-x-4">
               {features.map((f, i) => (
                 <div key={i} className="flex items-center gap-2.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#4F37FE] shrink-0"></span>
-                  <span className={`text-[14px] font-semibold ${
+                  <span className={`text-[13px] sm:text-[14px] font-semibold ${
                     isDarkMode ? 'text-slate-300' : 'text-slate-700'
                   }`}>
                     {f.title}
@@ -182,13 +182,13 @@ export default function Step3PricingTier({
             </div>
 
             {/* Huge Dynamic Counter */}
-            <div className="pt-4">
-              <div className="flex items-baseline gap-3">
-                <span className="text-[52px] md:text-[64px] font-black tracking-tight text-[#4F37FE] leading-none">
+            <div className="pt-2 sm:pt-4">
+              <div className="flex flex-wrap items-baseline gap-2 sm:gap-3">
+                <span className="text-3xl sm:text-5xl md:text-[64px] font-black tracking-tight text-[#4F37FE] leading-none">
                   {currentTier.testers}
                 </span>
                 {currentTier.onboardingLabel && (
-                  <span className="text-[24px] font-bold text-[#4F37FE]/80">
+                  <span className="text-base sm:text-xl md:text-2xl font-bold text-[#4F37FE]/80">
                     {currentTier.onboardingLabel}
                   </span>
                 )}
@@ -227,7 +227,7 @@ export default function Step3PricingTier({
               </div>
 
               {/* Step Labels */}
-              <div className="flex justify-between text-[11px] font-bold text-slate-400 pt-3">
+              <div className="flex justify-between text-[9px] sm:text-[11px] font-bold text-slate-400 pt-3">
                 <span>14 Testers</span>
                 <span>20 Testers</span>
                 <span>25 Testers</span>
@@ -239,10 +239,10 @@ export default function Step3PricingTier({
       </div>
 
       {/* Navigation Buttons */}
-      <div className="flex items-center justify-center gap-4 pt-4">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 pt-4 w-full max-w-xl mx-auto">
         <button
           onClick={onBack}
-          className={`px-12 py-3.5 rounded-2xl text-[15px] font-bold border transition-colors cursor-pointer ${
+          className={`w-full sm:w-auto px-8 py-3.5 rounded-2xl text-[15px] font-bold border transition-colors cursor-pointer text-center ${
             isDarkMode 
               ? 'bg-[#0F1017] border-white/10 text-white hover:bg-white/5' 
               : 'bg-white border-slate-200/90 text-slate-800 hover:bg-slate-50'
@@ -254,7 +254,7 @@ export default function Step3PricingTier({
         <button
           onClick={handlePay}
           disabled={isPaying || isPaid || selectedTierIndex === 3}
-          className="px-12 py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-600/50 disabled:cursor-not-allowed text-white text-[15px] font-bold rounded-2xl shadow-md transition-all cursor-pointer"
+          className="w-full sm:w-auto px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-600/50 disabled:cursor-not-allowed text-white text-[15px] font-bold rounded-2xl shadow-md transition-all cursor-pointer text-center"
         >
           {isPaying ? 'Opening Razorpay…' : selectedTierIndex === 3 ? 'Contact Sales' : isPaid ? 'Payment Confirmed' : 'Pay Now with Razorpay'}
         </button>
@@ -262,13 +262,13 @@ export default function Step3PricingTier({
         {skipPayment && selectedTierIndex !== 3 && <button
           onClick={handleSkipPayment}
           disabled={isPaying}
-          className="px-12 py-3.5 bg-[#4F37FE] hover:bg-[#432EE0] disabled:opacity-50 disabled:cursor-not-allowed text-white text-[15px] font-bold rounded-2xl shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer"
+          className="w-full sm:w-auto px-8 py-3.5 bg-[#4F37FE] hover:bg-[#432EE0] disabled:opacity-50 disabled:cursor-not-allowed text-white text-[15px] font-bold rounded-2xl shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer text-center"
         >
           Continue Without Payment
         </button>}
       </div>
-      {skipPayment && <p className="text-center text-sm text-slate-500">Choose Razorpay to preview the real checkout, or use the temporary bypass to create the project without recording a payment.</p>}
-      {paymentError && <p className="text-center text-sm font-semibold text-red-500">{paymentError}</p>}
+      {skipPayment && <p className="text-center text-xs sm:text-sm text-slate-500 px-4">Choose Razorpay to preview the real checkout, or use the temporary bypass to create the project without recording a payment.</p>}
+      {paymentError && <p className="text-center text-xs sm:text-sm font-semibold text-red-500 px-4">{paymentError}</p>}
     </div>
   );
 }
