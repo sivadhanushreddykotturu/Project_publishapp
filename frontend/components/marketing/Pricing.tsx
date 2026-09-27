@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Check, ArrowRight, ShieldCheck, Minus, Plus, Sparkles, Apple, Smartphone, AlertCircle } from "lucide-react";
+import { Check, ArrowRight, ShieldCheck, Minus, Plus, Sparkles, AlertCircle } from "lucide-react";
 import { formatINR } from "@/lib/format";
 
 const MIN_TESTERS = 14;
@@ -51,9 +51,12 @@ export function Pricing() {
                 <span className="rounded-full bg-indigo-50 border border-indigo-100 px-3 py-1 text-[11px] font-bold tracking-wide text-[#4F37FE]">
                   ANDROID ESSENTIAL
                 </span>
-                <span className="flex items-center gap-1 text-[12px] font-semibold text-slate-500">
-                  <Smartphone className="size-3.5 text-indigo-600" />
-                  Android
+                <span className="flex items-center text-[12px] font-semibold text-slate-500">
+                  <img
+                    src="/android-5-logo.svg"
+                    alt="Android"
+                    className="h-3.5 w-auto object-contain"
+                  />
                 </span>
               </div>
 
@@ -228,8 +231,12 @@ export function Pricing() {
                 <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-[11px] font-bold tracking-wide text-slate-800">
                   APPLE SERVICES
                 </span>
-                <span className="flex items-center gap-1 text-[12px] font-semibold text-slate-700">
-                  <Apple className="size-3.5 text-slate-900" />
+                <span className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-700">
+                  <img
+                    src="/apple-black-logo.svg"
+                    alt="Apple"
+                    className="size-3.5 object-contain"
+                  />
                   iOS / macOS
                 </span>
               </div>
@@ -300,8 +307,12 @@ export function Pricing() {
         {/* 4. iOS Testing (COMING SOON) Banner */}
         <div className="mt-10 rounded-3xl border border-dashed border-slate-300 bg-white p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xs">
           <div className="flex items-center gap-4">
-            <div className="size-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
-              <Apple className="size-7 text-[#4F37FE]" />
+            <div className="size-14 rounded-2xl bg-slate-100 border border-slate-200/80 flex items-center justify-center shrink-0">
+              <img
+                src="/apple-black-logo.svg"
+                alt="Apple"
+                className="size-7 object-contain"
+              />
             </div>
             <div>
               <div className="flex items-center gap-2.5">

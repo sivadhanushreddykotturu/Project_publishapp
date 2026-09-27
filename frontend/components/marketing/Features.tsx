@@ -4,8 +4,6 @@ import {
   ClipboardList,
   Users,
   FileCheck2,
-  Apple,
-  Sparkles,
   ArrowRight,
 } from "lucide-react";
 
@@ -36,9 +34,39 @@ const steps = [
   },
 ];
 
+function UxosHeaderLogoIcon() {
+  return (
+    <img
+      src="/launchops-logo.png"
+      alt="UXOS Logo"
+      className="size-6 object-contain"
+    />
+  );
+}
+
+function GooglePlayStoreIcon() {
+  return (
+    <img
+      src="/google-play-store-logo.svg"
+      alt="Google Play"
+      className="size-5.5 object-contain"
+    />
+  );
+}
+
+function AppleBlackLogoIcon() {
+  return (
+    <img
+      src="/apple-black-logo.svg"
+      alt="Apple"
+      className="size-5 object-contain"
+    />
+  );
+}
+
 const services = [
   {
-    icon: Sparkles,
+    icon: UxosHeaderLogoIcon,
     iconBg: "bg-purple-100 text-purple-700",
     title: "UX Testing",
     badge: "Only Android",
@@ -48,8 +76,8 @@ const services = [
     href: "/auth/client",
   },
   {
-    icon: Smartphone,
-    iconBg: "bg-indigo-100 text-indigo-700",
+    icon: GooglePlayStoreIcon,
+    iconBg: "bg-indigo-50 text-indigo-700",
     title: "Play Store Closed Testing",
     badge: "Android",
     desc: "14-day Google Play closed testing with verified physical Android devices. Real opted-in testers, daily check-ins, automated free tester replacement, and completion reports.",
@@ -58,7 +86,7 @@ const services = [
     href: "/auth/client",
   },
   {
-    icon: Apple,
+    icon: AppleBlackLogoIcon,
     iconBg: "bg-slate-100 text-slate-800",
     title: "Apple Connect Setup",
     badge: "Setup Only",
@@ -68,7 +96,7 @@ const services = [
     href: "/auth/client",
   },
   {
-    icon: Apple,
+    icon: AppleBlackLogoIcon,
     iconBg: "bg-amber-100 text-amber-800",
     title: "iOS App Testing",
     badge: "Coming Soon",

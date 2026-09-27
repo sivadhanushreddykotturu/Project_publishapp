@@ -90,8 +90,17 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const parts = window.location.pathname.split('/').filter(Boolean);
+      const storedRole = localStorage.getItem('launchops_user_role')?.toLowerCase();
       if (parts.length > 0) {
-        const mainTab = parts[0];
+        let mainTab = parts[0];
+        if (storedRole === 'tester' && (mainTab === 'client' || mainTab === 'wizard')) {
+          mainTab = 'tester';
+          window.history.replaceState(null, '', '/tester');
+        } else if (storedRole === 'client' && mainTab === 'tester') {
+          mainTab = 'client';
+          window.history.replaceState(null, '', '/client');
+        }
+
         if (mainTab === 'wizard') {
           setCurrentTab('client');
           setInitialSubTab('new-app');
@@ -218,8 +227,20 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
 
   const refreshTesterData = async () => {
     const token = await getTokenOrThrow();
-    const [me, profileResponse, opportunities, assignmentResponse, walletResponse, bugResponse, notificationResponse, supportResponse] = await Promise.all([
-      getCurrentLaunchOpsUser(token), getMyTesterProfile(token), listTesterOpportunities(token),
+    const me = await getCurrentLaunchOpsUser(token);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('launchops_user_role', me.data.user.role);
+    }
+    if (me.data.user.role === 'client') {
+      handleSetTab('client');
+      return;
+    }
+    if (me.data.user.role === 'admin') {
+      handleSetTab('admin');
+      return;
+    }
+    const [profileResponse, opportunities, assignmentResponse, walletResponse, bugResponse, notificationResponse, supportResponse] = await Promise.all([
+      getMyTesterProfile(token), listTesterOpportunities(token),
       listMyAssignments(token), getMyWallet(token), listMyBugReports(token), listMyNotifications(token), listMySupportTickets(token),
     ]);
     const tester = mapTesterProfile(profileResponse.data, me.data.user);
@@ -242,8 +263,20 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
 
   const refreshClientData = async () => {
     const token = await getTokenOrThrow();
-    const [me, clientResponse, projectResponse, invoiceResponse, notificationResponse, supportResponse] = await Promise.all([
-      getCurrentLaunchOpsUser(token), getMyClientProfile(token), listProjects(token), listInvoices(token), listMyNotifications(token), listMySupportTickets(token),
+    const me = await getCurrentLaunchOpsUser(token);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('launchops_user_role', me.data.user.role);
+    }
+    if (me.data.user.role === 'tester') {
+      handleSetTab('tester');
+      return;
+    }
+    if (me.data.user.role === 'admin') {
+      handleSetTab('admin');
+      return;
+    }
+    const [clientResponse, projectResponse, invoiceResponse, notificationResponse, supportResponse] = await Promise.all([
+      getMyClientProfile(token), listProjects(token), listInvoices(token), listMyNotifications(token), listMySupportTickets(token),
     ]);
     setCurrentUser(me.data.user);
     setCurrentClient(clientResponse.data);
@@ -266,8 +299,20 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
 
   const refreshAdminData = async () => {
     const token = await getTokenOrThrow();
-    const [me, projectResponse, testerResponse, clientResponse, withdrawalResponse, notificationResponse, dashboardResponse, supportResponse] = await Promise.all([
-      getCurrentLaunchOpsUser(token), listProjects(token), listAdminTesters(token), listAdminClients(token), listAdminWithdrawals(token), listMyNotifications(token), getAdminDashboard(token), listMySupportTickets(token),
+    const me = await getCurrentLaunchOpsUser(token);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('launchops_user_role', me.data.user.role);
+    }
+    if (me.data.user.role === 'tester') {
+      handleSetTab('tester');
+      return;
+    }
+    if (me.data.user.role === 'client') {
+      handleSetTab('client');
+      return;
+    }
+    const [projectResponse, testerResponse, clientResponse, withdrawalResponse, notificationResponse, dashboardResponse, supportResponse] = await Promise.all([
+      listProjects(token), listAdminTesters(token), listAdminClients(token), listAdminWithdrawals(token), listMyNotifications(token), getAdminDashboard(token), listMySupportTickets(token),
     ]);
     setCurrentUser(me.data.user);
     const testers = testerResponse.data.map((profile) => mapTesterProfile(profile as BackendTesterProfile, profile.userId));

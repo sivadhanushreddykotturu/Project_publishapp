@@ -10,12 +10,50 @@ import { asyncHandler } from "../utils/asyncHandler";
 // route-level guards (requireAuth / requireRole) do that.
 export const clerkAuth = clerkMiddleware();
 
+import { clerkClient } from "@clerk/express";
+import { Client } from "../models/Client";
+import { Tester } from "../models/Tester";
+
 // Loads the LaunchOps User document that mirrors the authenticated Clerk identity
-// (users.clerkUserId, per Tech Spec §4) and attaches it as req.dbUser.
+// and attaches it as req.dbUser. Auto-provisions if missing.
 export const attachDbUser = asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {
   const { userId } = getAuth(req);
   if (userId) {
-    req.dbUser = (await User.findOne({ clerkUserId: userId })) ?? undefined;
+    let dbUser = await User.findOne({ clerkUserId: userId });
+    if (!dbUser) {
+      try {
+        const clerkUser = await clerkClient.users.getUser(userId);
+        const email = clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)?.emailAddress
+          || clerkUser.emailAddresses[0]?.emailAddress
+          || `user_${userId}@placeholder.local`;
+        const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || email.split("@")[0] || "User";
+
+        let existingUser = await User.findOne({ email });
+        if (existingUser) {
+          existingUser.clerkUserId = userId;
+          await existingUser.save();
+          dbUser = existingUser;
+        } else {
+          const url = req.originalUrl || req.url || "";
+          const role: Role = url.includes("/admin") ? "admin" : url.includes("/client") ? "client" : "tester";
+          dbUser = await User.create({
+            clerkUserId: userId,
+            email,
+            name,
+            role,
+          });
+
+          if (role === "client") {
+            await Client.create({ userId: dbUser._id, companyName: name });
+          } else if (role === "tester") {
+            await Tester.create({ userId: dbUser._id });
+          }
+        }
+      } catch (err) {
+        console.warn("Auto-provisioning user failed in attachDbUser:", err);
+      }
+    }
+    req.dbUser = dbUser ?? undefined;
   }
   next();
 });

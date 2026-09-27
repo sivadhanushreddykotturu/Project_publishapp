@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Menu, X, ArrowRight } from "lucide-react";
-import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { SignedIn, SignedOut, UserButton, useUser, useAuth } from "@clerk/nextjs";
 import UXOSBrandLogo from "@/src/components/ui/UXOSBrandLogo";
 
 const LINKS = [
@@ -17,10 +17,86 @@ const LINKS = [
 export function Nav() {
   const [mounted, setMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { user } = useUser();
+  const { getToken } = useAuth();
+  const [dashboardHref, setDashboardHref] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("launchops_user_role")?.toLowerCase();
+      if (stored === "tester") return "/tester";
+      if (stored === "admin") return "/admin";
+    }
+    return "/client";
+  });
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    // 1. Check Clerk public metadata
+    const metaRole = (user.publicMetadata?.role as string | undefined)?.toLowerCase();
+    if (metaRole === "tester") {
+      setDashboardHref("/tester");
+      return;
+    }
+    if (metaRole === "admin") {
+      setDashboardHref("/admin");
+      return;
+    }
+    if (metaRole === "client") {
+      setDashboardHref("/client");
+      return;
+    }
+
+    // 2. Check localStorage
+    if (typeof window !== "undefined") {
+      const storedRole = localStorage.getItem("launchops_user_role")?.toLowerCase();
+      if (storedRole === "tester") {
+        setDashboardHref("/tester");
+        return;
+      }
+      if (storedRole === "admin") {
+        setDashboardHref("/admin");
+        return;
+      }
+      if (storedRole === "client") {
+        setDashboardHref("/client");
+        return;
+      }
+    }
+
+    // 3. Fallback: resolve from backend
+    let cancelled = false;
+    async function resolveRole() {
+      try {
+        const token = await getToken();
+        if (!token || cancelled) return;
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api/v1"}/users/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const role = json?.data?.user?.role?.toLowerCase();
+          if (!cancelled && role) {
+            if (typeof window !== "undefined") {
+              localStorage.setItem("launchops_user_role", role);
+            }
+            if (role === "tester") setDashboardHref("/tester");
+            else if (role === "admin") setDashboardHref("/admin");
+            else setDashboardHref("/client");
+          }
+        }
+      } catch {
+        // fail open
+      }
+    }
+    void resolveRole();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, getToken]);
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur-md transition-all font-sans shadow-xs">
@@ -63,7 +139,7 @@ export function Nav() {
               </SignedOut>
               <SignedIn>
                 <Link
-                  href="/client"
+                  href={dashboardHref}
                   className="bg-[#4F37FE] hover:bg-[#432ee0] text-white px-5 py-2.5 rounded-full text-xs md:text-sm font-bold flex items-center gap-2 transition hover:shadow-lg hover:shadow-indigo-500/20 cursor-pointer border-0"
                 >
                   <span>Dashboard</span>
@@ -120,20 +196,52 @@ export function Nav() {
             </a>
           ))}
           <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
-            <Link
-              href="/auth"
-              onClick={() => setMenuOpen(false)}
-              className="block py-2 text-[14px] font-bold text-slate-800"
-            >
-              Log In
-            </Link>
-            <Link
-              href="/auth/client"
-              onClick={() => setMenuOpen(false)}
-              className="bg-[#4F37FE] text-white text-center py-2.5 rounded-xl font-bold text-sm"
-            >
-              Start Testing
-            </Link>
+            {hasClerkKey ? (
+              <>
+                <SignedOut>
+                  <Link
+                    href="/auth"
+                    onClick={() => setMenuOpen(false)}
+                    className="block py-2 text-[14px] font-bold text-slate-800"
+                  >
+                    Log In
+                  </Link>
+                  <Link
+                    href="/auth/client"
+                    onClick={() => setMenuOpen(false)}
+                    className="bg-[#4F37FE] text-white text-center py-2.5 rounded-xl font-bold text-sm"
+                  >
+                    Start Testing
+                  </Link>
+                </SignedOut>
+                <SignedIn>
+                  <Link
+                    href={dashboardHref}
+                    onClick={() => setMenuOpen(false)}
+                    className="bg-[#4F37FE] text-white text-center py-2.5 rounded-xl font-bold text-sm"
+                  >
+                    Dashboard
+                  </Link>
+                </SignedIn>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/auth"
+                  onClick={() => setMenuOpen(false)}
+                  className="block py-2 text-[14px] font-bold text-slate-800"
+                >
+                  Log In
+                </Link>
+                <Link
+                  href="/auth/client"
+                  onClick={() => setMenuOpen(false)}
+                  className="bg-[#4F37FE] text-white text-center py-2.5 rounded-xl font-bold text-sm"
+                >
+                  Start Testing
+                </Link>
+              </>
+            )}
           </div>
         </nav>
       )}
