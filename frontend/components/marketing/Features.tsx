@@ -34,32 +34,32 @@ const steps = [
   },
 ];
 
-function UxosHeaderLogoIcon() {
+function UxosHeaderLogoIcon({ className = "size-6" }: { className?: string; strokeWidth?: number }) {
   return (
     <img
       src="/launchops-logo.png"
       alt="UXOS Logo"
-      className="size-6 object-contain"
+      className={`${className} object-contain`}
     />
   );
 }
 
-function GooglePlayStoreIcon() {
+function GooglePlayStoreIcon({ className = "size-5.5" }: { className?: string; strokeWidth?: number }) {
   return (
     <img
       src="/google-play-store-logo.svg"
       alt="Google Play"
-      className="size-5.5 object-contain"
+      className={`${className} object-contain`}
     />
   );
 }
 
-function AppleBlackLogoIcon() {
+function AppleBlackLogoIcon({ className = "size-5" }: { className?: string; strokeWidth?: number }) {
   return (
     <img
       src="/apple-black-logo.svg"
       alt="Apple"
-      className="size-5 object-contain"
+      className={`${className} object-contain`}
     />
   );
 }

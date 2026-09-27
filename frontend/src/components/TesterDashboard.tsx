@@ -69,6 +69,7 @@ export default function TesterDashboard({
   const [selectedAppId, setSelectedAppId] = useState<string>(initialProjectId);
   const [selectedStep, setSelectedStep] = useState<1 | 2 | 3>(1);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   useEffect(() => {
     if (initialTab?.startsWith('projects/')) {
@@ -293,6 +294,7 @@ export default function TesterDashboard({
             {/* Bell with unread badge */}
             <div className="relative">
               <button
+                onClick={() => setNotificationsOpen((open) => !open)}
                 className={`w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer border-0 transition-all active:scale-95 ${
                   isDarkMode ? 'bg-white/5 hover:bg-white/10 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
                 }`}
@@ -302,6 +304,27 @@ export default function TesterDashboard({
               </button>
               {notifications && notifications.some(n => !n.readAt) && (
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-blue-500 ring-2 ring-white dark:ring-[#0F1017]" />
+              )}
+              {notificationsOpen && (
+                <div className={`absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl border shadow-xl ${isDarkMode ? 'border-white/10 bg-[#181926]' : 'border-slate-200 bg-white'}`}>
+                  <div className="border-b border-slate-200/20 px-4 py-3 text-sm font-black">Notifications</div>
+                  <div className="max-h-96 overflow-y-auto p-2">
+                    {notifications.filter((notification) => !notification.readAt).length === 0 ? (
+                      <p className="px-3 py-8 text-center text-xs text-slate-400">No new notifications.</p>
+                    ) : notifications.filter((notification) => !notification.readAt).map((notification) => (
+                      <button key={notification._id} onClick={() => {
+                        onReadNotification(notification._id);
+                        setNotificationsOpen(false);
+                        const projectId = notification.payload.projectId;
+                        if (projectId && projects.some((project) => project.id === projectId)) openProject(projectId);
+                        else if (notification.type.startsWith('support_')) handleTabSelect('support');
+                      }} className={`mb-1 w-full cursor-pointer rounded-xl px-3 py-3 text-left transition ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`}>
+                        <p className="text-xs font-bold">{notification.payload.appName || notification.payload.subject?.toString() || notification.type.replace(/_/g, ' ')}</p>
+                        <p className="mt-1 text-[10px] text-slate-400">{new Date(notification.createdAt).toLocaleString()}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 
@@ -318,7 +341,7 @@ export default function TesterDashboard({
 
         {/* Page Views */}
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
-          {assignments.filter((assignment) => assignment.status === 'active' && assignment.currentStep === 4).map((assignment) => (
+          {activeTab === 'instructions' && assignments.filter((assignment) => assignment.projectId === selectedAppId && assignment.status === 'active' && assignment.currentStep === 4).map((assignment) => (
             <section key={assignment.id} className={`mb-6 rounded-2xl border p-5 ${isDarkMode ? 'border-white/10 bg-[#0F1017]' : 'border-slate-200 bg-white'}`}>
               <h2 className="text-sm font-black">48-hour testing screenshot · {assignment.appName}</h2>
               <p className="mt-1 text-xs text-slate-500">Upload one current testing screenshot. The next upload unlocks 48 hours after this submission.</p>
@@ -381,6 +404,10 @@ export default function TesterDashboard({
               onUploadProof={onUploadProof}
               onSubmitStep1Email={onSubmitStep1Email}
               onClickStep3Link={onClickStep3Link}
+              bugs={bugs.filter((bug) => bug.appId === selectedAppId)}
+              device={activeTester.devices[0] || 'Unknown device'}
+              osVersion={activeTester.deviceDetails?.[0]?.androidVersion || ''}
+              onSubmitBugReport={onSubmitBugReport}
               onCompleteStep={(step) => {
                 if (step < 3) setSelectedStep((step + 1) as any);
               }}
@@ -401,9 +428,12 @@ export default function TesterDashboard({
           {activeTab === 'support' && (
             <TesterSupportView
               isDarkMode={isDarkMode}
+              tickets={supportTickets}
+              projects={projects}
               onSubmitTicket={async (ticket) => {
-                await onSendSupport({ subject: ticket.subject, message: ticket.message });
+                await onSendSupport(ticket);
               }}
+              onReply={onReplyToSupport}
             />
           )}
         </main>

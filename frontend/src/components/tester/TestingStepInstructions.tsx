@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, ChevronLeft, Copy, FolderClosed, Headphones } from 'lucide-react';
-import type { TestApp, TesterAssignment } from '../../types';
+import type { BugReport, TestApp, TesterAssignment } from '../../types';
 
 interface Props {
   isDarkMode: boolean; appName?: string; appSubtitle?: string; initialStep?: 1 | 2 | 3;
@@ -10,14 +10,20 @@ interface Props {
   onCompleteStep?: (step: number) => void; onUploadProof?: (file: File) => Promise<string>;
   onSubmitStep1Email?: (id: string, email: string, proof?: string) => void | Promise<void>;
   onClickStep3Link?: (id: string, proof?: string) => void | Promise<void>;
+  bugs?: BugReport[]; device?: string; osVersion?: string;
+  onSubmitBugReport?: (bug: Omit<BugReport, 'id' | 'createdAt' | 'testerName' | 'testerAvatar' | 'screenshot'> & { screenshot?: string }) => void | Promise<void>;
 }
 
-export default function TestingStepInstructions({ isDarkMode, appName = 'Testing project', appSubtitle = 'Testing campaign', initialStep = 1, project, assignment, onBack, onOpenSupport, onCompleteStep, onUploadProof, onSubmitStep1Email, onClickStep3Link }: Props) {
+export default function TestingStepInstructions({ isDarkMode, appName = 'Testing project', appSubtitle = 'Testing campaign', initialStep = 1, project, assignment, onBack, onOpenSupport, onCompleteStep, onUploadProof, onSubmitStep1Email, onClickStep3Link, bugs = [], device = 'Unknown device', osVersion = '', onSubmitBugReport }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(initialStep);
   const [email, setEmail] = useState(assignment?.testerEmail || '');
   const [file, setFile] = useState<File | null>(null);
   const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [bugTitle, setBugTitle] = useState('');
+  const [bugSeverity, setBugSeverity] = useState<BugReport['severity']>('Medium');
+  const [bugSteps, setBugSteps] = useState('');
+  const [submittingBug, setSubmittingBug] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => setStep(initialStep), [initialStep]);
   useEffect(() => setEmail(assignment?.testerEmail || ''), [assignment?.testerEmail]);
@@ -42,6 +48,17 @@ export default function TestingStepInstructions({ isDarkMode, appName = 'Testing
   };
 
   const label = submitting ? 'Submitting...' : step === 1 ? 'Submit Email & Proof' : step === 2 ? 'Waiting for Admin Approval' : project?.optInUrl ? 'Open Testing Link' : 'Testing Link Not Available';
+  const submitBug = async () => {
+    if (!project || !onSubmitBugReport || !bugTitle.trim()) return;
+    setSubmittingBug(true);
+    try {
+      await onSubmitBugReport({
+        appId: project.id, appName: project.name, title: bugTitle.trim(), category: 'Functionality', severity: bugSeverity,
+        status: 'Open', device, osVersion, reproductionSteps: bugSteps.split('\n').map(item => item.trim()).filter(Boolean),
+      });
+      setBugTitle(''); setBugSteps(''); setBugSeverity('Medium');
+    } finally { setSubmittingBug(false); }
+  };
   return <div className="max-w-7xl mx-auto space-y-6">
     <header className="flex items-center justify-between"><div className="flex items-center gap-4">
       <button onClick={onBack} className="w-12 h-12 rounded-2xl bg-[#4F37FE] text-white flex items-center justify-center"><ChevronLeft className="w-6 h-6" /></button>
@@ -85,5 +102,19 @@ export default function TestingStepInstructions({ isDarkMode, appName = 'Testing
         <button onClick={act} disabled={submitting || step === 2} className="w-full h-14 rounded-2xl bg-[#4F37FE] disabled:bg-slate-300 text-white font-bold">{label}</button>
       </section>
     </div>
+
+    {assignment && assignment.currentStep >= 3 && <section className={`rounded-3xl p-8 border ${isDarkMode ? 'bg-[#0F1017] border-white/5' : 'bg-white border-slate-200'}`}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div><h2 className="text-xl font-black">Bug reports for this project</h2><p className="mt-1 text-sm text-slate-400">Reports you submit here are sent directly to the admin review queue.</p>
+          <div className="mt-5 space-y-3">{bugs.length ? bugs.map(bug => <div key={bug.id} className={`rounded-2xl border p-4 ${isDarkMode ? 'border-white/10' : 'border-slate-200'}`}><div className="flex justify-between gap-4"><p className="font-bold">{bug.title}</p><span className="text-xs font-bold text-[#4F37FE]">{bug.status}</span></div><p className="mt-1 text-xs text-slate-400">{bug.severity} severity</p></div>) : <p className="text-sm text-slate-400">No bugs submitted for this project yet.</p>}</div>
+        </div>
+        <div className="space-y-3"><h3 className="font-black">Report a bug</h3>
+          <input value={bugTitle} onChange={e => setBugTitle(e.target.value)} placeholder="Bug summary" className="w-full rounded-2xl border border-slate-200 bg-transparent px-4 py-3 text-sm outline-none focus:border-[#4F37FE] dark:border-white/10" />
+          <select value={bugSeverity} onChange={e => setBugSeverity(e.target.value as BugReport['severity'])} className="w-full rounded-2xl border border-slate-200 bg-transparent px-4 py-3 text-sm dark:border-white/10"><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select>
+          <textarea rows={4} value={bugSteps} onChange={e => setBugSteps(e.target.value)} placeholder="Reproduction steps, one per line" className="w-full resize-none rounded-2xl border border-slate-200 bg-transparent px-4 py-3 text-sm outline-none focus:border-[#4F37FE] dark:border-white/10" />
+          <button onClick={submitBug} disabled={!bugTitle.trim() || submittingBug} className="w-full rounded-2xl bg-[#4F37FE] py-3.5 font-bold text-white disabled:bg-slate-300">{submittingBug ? 'Submitting...' : 'Submit Bug Report'}</button>
+        </div>
+      </div>
+    </section>}
   </div>;
 }

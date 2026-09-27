@@ -23,7 +23,7 @@ async function loadOwnedAssignment(req: Request) {
 export const getMyAssignments = asyncHandler(async (req: Request, res: Response) => {
   const tester = await Tester.findOne({ userId: req.dbUser!._id });
   if (!tester) throw ApiError.notFound("Tester profile not found");
-  const assignments = await Assignment.find({ testerId: tester._id }).populate("projectId").sort({ createdAt: -1 });
+  const assignments = await Assignment.find({ testerId: tester._id, status: { $ne: "removed" } }).populate("projectId").sort({ createdAt: -1 });
   res.status(200).json({ data: assignments });
 });
 

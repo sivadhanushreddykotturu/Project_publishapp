@@ -14,6 +14,8 @@ const LINKS = [
   { href: "/tester", label: "Tester Hub" },
 ];
 
+const hasClerkKey = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+
 export function Nav() {
   const [mounted, setMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);

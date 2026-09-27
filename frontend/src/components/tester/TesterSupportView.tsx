@@ -1,277 +1,78 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Search, ChevronLeft, Plus, Send } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronLeft, MessageSquare, Send } from 'lucide-react';
+import type { BackendSupportTicket } from '../../lib/launchops-api';
+import type { TestApp } from '../../types';
 
-interface Message {
-  id: string;
-  sender: 'user' | 'support';
-  text: string;
-  time: string;
-}
-
-interface SupportApp {
-  id: string;
-  name: string;
-  subtitle: string;
-  iconBg: string;
-  iconContent: React.ReactNode;
-  statusText: string;
-  statusDotColor: 'green' | 'yellow' | 'orange';
-  description: string;
-}
-
-const SUPPORT_APPS: SupportApp[] = [];
-
-interface TesterSupportViewProps {
+interface Props {
   isDarkMode: boolean;
+  tickets?: BackendSupportTicket[];
+  projects?: TestApp[];
   onSubmitTicket?: (ticket: { subject: string; message: string; projectId?: string }) => Promise<void>;
+  onReply?: (ticketId: string, body: string) => Promise<void>;
 }
 
-export default function TesterSupportView({ isDarkMode, onSubmitTicket }: TesterSupportViewProps) {
-  const [selectedApp, setSelectedApp] = useState<SupportApp | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [inputText, setInputText] = useState('');
-  const [messages, setMessages] = useState<Record<string, Message[]>>({});
+function projectName(ticket: BackendSupportTicket) {
+  return typeof ticket.projectId === 'object' ? ticket.projectId.appDetails?.appName : undefined;
+}
 
-  const handleSendMessage = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!inputText.trim() || !selectedApp) return;
+function authorRole(message: BackendSupportTicket['messages'][number]) {
+  return typeof message.authorId === 'object' ? message.authorId.role : undefined;
+}
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      sender: 'user',
-      text: inputText.trim(),
-      time: `Sent ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-    };
+export default function TesterSupportView({ isDarkMode, tickets = [], projects = [], onSubmitTicket = async () => undefined, onReply = async () => undefined }: Props) {
+  const [selectedId, setSelectedId] = useState<string>('');
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [projectId, setProjectId] = useState('');
+  const [reply, setReply] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const selected = tickets.find((ticket) => ticket._id === selectedId);
+  const panel = isDarkMode ? 'bg-[#0F1017] border-white/10' : 'bg-white border-slate-200';
 
-    setMessages(prev => ({
-      ...prev,
-      [selectedApp.id]: [...(prev[selectedApp.id] || []), newMessage]
-    }));
-    setInputText('');
-
-    // Simulated instant reply from support
-    setTimeout(() => {
-      const reply: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: 'support',
-        text: "Thank you for reaching out. We have logged your query and an admin will update you shortly.",
-        time: `Sent ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-      };
-      setMessages(prev => ({
-        ...prev,
-        [selectedApp.id]: [...(prev[selectedApp.id] || []), reply]
-      }));
-    }, 1200);
-  };
-
-  // If in chat mode
-  if (selectedApp) {
-    const currentMessages = messages[selectedApp.id] || [];
-
-    return (
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Chat Top Header */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setSelectedApp(null)}
-            className="w-12 h-12 rounded-2xl bg-[#4F37FE] hover:bg-[#432EE0] text-white flex items-center justify-center shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer"
-          >
-            <ChevronLeft className="w-6 h-6 stroke-[3]" />
-          </button>
-
-          <div>
-            <h1 className={`text-[24px] font-black tracking-tight leading-tight ${isDarkMode ? 'text-white' : 'text-[#0E1015]'}`}>
-              {selectedApp.name}
-            </h1>
-            <p className="text-[13px] text-slate-400 font-medium">
-              {selectedApp.subtitle}
-            </p>
-          </div>
-        </div>
-
-        {/* Chat Main Frame */}
-        <div className={`rounded-3xl border p-8 shadow-xs flex flex-col justify-between min-h-[580px] ${
-          isDarkMode ? 'bg-[#0F1017] border-white/5' : 'bg-white border-slate-200/80'
-        }`}>
-          {/* Message Thread Area */}
-          <div className="space-y-6 flex-1 overflow-y-auto pr-2">
-            {currentMessages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
-              >
-                <div
-                  className={`max-w-md px-6 py-3.5 rounded-2xl text-[15px] font-medium leading-relaxed ${
-                    msg.sender === 'user'
-                      ? isDarkMode
-                        ? 'bg-[#1E202E] text-slate-100'
-                        : 'bg-[#EDEDF0] text-slate-800'
-                      : 'bg-[#4F37FE] text-white'
-                  }`}
-                >
-                  {msg.text}
-                </div>
-                <span className="text-[10px] text-slate-400 font-medium mt-1 px-1">
-                  {msg.time}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Bottom Chat Input Bar */}
-          <form onSubmit={handleSendMessage} className="pt-6 flex items-center gap-3">
-            {/* Attachment Button */}
-            <button
-              type="button"
-              onClick={() => alert("Upload query screenshot or document")}
-              className={`w-12 h-12 rounded-2xl border flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors shrink-0 cursor-pointer ${
-                isDarkMode ? 'border-white/10 hover:bg-white/5' : 'border-slate-300 hover:bg-slate-50'
-              }`}
-            >
-              <Plus className="w-5 h-5 stroke-[2.5]" />
-            </button>
-
-            {/* Input Field */}
-            <input
-              type="text"
-              placeholder="Describe your query here..."
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              className={`flex-1 px-5 py-3.5 rounded-2xl border text-[14px] outline-none transition-colors ${
-                isDarkMode 
-                  ? 'bg-[#181926] border-white/10 text-white placeholder:text-slate-500 focus:border-[#4F37FE]' 
-                  : 'bg-white border-slate-300 text-slate-800 placeholder:text-slate-400 focus:border-[#4F37FE]'
-              }`}
-            />
-
-            {/* Send Button */}
-            <button
-              type="submit"
-              className="px-10 py-3.5 rounded-2xl bg-[#4F37FE] hover:bg-[#432EE0] text-white text-[15px] font-bold shadow-md shadow-[#4F37FE]/20 transition-all cursor-pointer shrink-0"
-            >
-              Send
-            </button>
-          </form>
-        </div>
+  if (selected) {
+    return <div className="mx-auto max-w-5xl space-y-5">
+      <div className="flex items-center gap-4">
+        <button onClick={() => setSelectedId('')} className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl bg-[#4F37FE] text-white"><ChevronLeft /></button>
+        <div><h2 className="text-xl font-black">{selected.subject}</h2><p className="text-xs text-slate-400">{projectName(selected) || 'General support'} · {selected.status.replace('_', ' ')}</p></div>
       </div>
-    );
+      <section className={`rounded-3xl border p-6 ${panel}`}>
+        <div className="min-h-80 space-y-4">
+          {selected.messages.map((item, index) => {
+            const fromSupport = authorRole(item) === 'admin';
+            return <div key={`${item.createdAt}-${index}`} className={`flex ${fromSupport ? 'justify-start' : 'justify-end'}`}>
+              <div className={`max-w-xl rounded-2xl px-5 py-3 ${fromSupport ? 'bg-[#4F37FE] text-white' : isDarkMode ? 'bg-white/10' : 'bg-slate-100'}`}>
+                <p className="text-xs font-bold opacity-70">{fromSupport ? 'UXOS Support' : 'You'}</p><p className="mt-1 text-sm whitespace-pre-wrap">{item.body}</p><p className="mt-2 text-[10px] opacity-60">{new Date(item.createdAt).toLocaleString()}</p>
+              </div>
+            </div>;
+          })}
+        </div>
+        <form className="mt-6 flex gap-3" onSubmit={async (event) => { event.preventDefault(); if (!reply.trim()) return; setSaving(true); setError(''); try { await onReply(selected._id, reply.trim()); setReply(''); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not send reply.'); } finally { setSaving(false); } }}>
+          <input value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Reply to this conversation" className={`min-w-0 flex-1 rounded-xl border px-4 py-3 text-sm outline-none ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-white'}`} />
+          <button disabled={saving || !reply.trim()} className="flex cursor-pointer items-center gap-2 rounded-xl bg-[#4F37FE] px-5 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><Send className="h-4 w-4" />Send</button>
+        </form>
+        {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
+      </section>
+    </div>;
   }
 
-  // Support Apps List
-  const filteredApps = SUPPORT_APPS.filter(app =>
-    app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    app.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  return (
-    <div className="space-y-8 max-w-7xl mx-auto">
-      {/* Top Search Bar */}
-      <div className={`relative flex items-center rounded-2xl border px-4 py-3 shadow-xs ${
-        isDarkMode ? 'bg-[#0F1017] border-white/5' : 'bg-white border-slate-200/80'
-      }`}>
-        <Search className="w-4 h-4 text-slate-400 mr-3 shrink-0" />
-        <input
-          type="text"
-          placeholder="Search..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className={`w-full bg-transparent text-[15px] outline-none placeholder:text-slate-400 ${
-            isDarkMode ? 'text-white' : 'text-slate-800'
-          }`}
-        />
-      </div>
-
-      {/* Grid of Support Apps */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredApps.map((app) => {
-          const dotColorClass = 
-            app.statusDotColor === 'green' ? 'bg-[#10B981]' :
-            app.statusDotColor === 'orange' ? 'bg-[#F97316]' :
-            'bg-[#EAB308]';
-
-          return (
-            <div
-              key={app.id}
-              className={`rounded-3xl border flex flex-col justify-between overflow-hidden shadow-xs transition-shadow duration-200 ${
-                isDarkMode ? 'bg-[#0F1017] border-white/5' : 'bg-white border-slate-200/80'
-              }`}
-            >
-              {/* Top Details Area */}
-              <div className="p-6 pb-4">
-                <div className="flex items-start gap-4">
-                  <div 
-                    className="w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 shadow-xs"
-                    style={{ backgroundColor: app.iconBg }}
-                  >
-                    {app.iconContent}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <h3 className={`text-[19px] font-extrabold truncate ${isDarkMode ? 'text-white' : 'text-[#0E1015]'}`}>
-                      {app.name}
-                    </h3>
-                    <p className="text-[13px] text-slate-400 font-medium truncate">
-                      {app.subtitle}
-                    </p>
-
-                    <div className="flex items-center gap-2 mt-2">
-                      <div className="flex items-center -space-x-2">
-                        <div className="w-5 h-5 rounded-full overflow-hidden ring-1 ring-white dark:ring-slate-900">
-                          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=50&auto=format&fit=crop&q=80" alt="avatar" className="w-full h-full object-cover" />
-                        </div>
-                        <div className="w-5 h-5 rounded-full overflow-hidden ring-1 ring-white dark:ring-slate-900">
-                          <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=50&auto=format&fit=crop&q=80" alt="avatar" className="w-full h-full object-cover" />
-                        </div>
-                        <div className="w-6 h-5 rounded-full bg-[#4F37FE] text-white text-[10px] font-bold flex items-center justify-center ring-1 ring-white dark:ring-slate-900">
-                          4+
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400 ml-1">
-                        <span className={`w-2 h-2 rounded-full ${dotColorClass}`}></span>
-                        <span>{app.statusText}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="w-full h-[1.5px] bg-gradient-to-r from-transparent via-[#4F37FE]/40 to-transparent my-4"></div>
-
-                <div>
-                  <h4 className={`text-[15px] font-extrabold mb-1.5 ${isDarkMode ? 'text-white' : 'text-[#0E1015]'}`}>
-                    Description
-                  </h4>
-                  <p className="text-[13px] text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-4">
-                    {app.description}
-                  </p>
-                </div>
-              </div>
-
-              {/* Card Bottom Strip */}
-              <div className={`p-4 mx-2 mb-2 rounded-2xl flex items-center justify-center ${
-                isDarkMode ? 'bg-[#181926]' : 'bg-[#F2F3FF]'
-              }`}>
-                <button
-                  onClick={() => setSelectedApp(app)}
-                  className="w-full py-3 bg-[#4F37FE] hover:bg-[#432EE0] text-white text-[14px] font-bold rounded-xl shadow-xs transition-colors cursor-pointer text-center"
-                >
-                  Open Chat
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Storage Note */}
-      <div className="pt-6">
-        <p className="text-[14px] text-slate-500 dark:text-slate-400 font-normal">
-          Note: Once testing is completed, the data will be deleted from the backend for storage management.
-        </p>
-      </div>
-    </div>
-  );
+  return <div className="mx-auto max-w-6xl space-y-6">
+    <section className={`rounded-3xl border p-6 ${panel}`}>
+      <h2 className="text-lg font-black">Message UXOS Support</h2><p className="mt-1 text-xs text-slate-400">Create a ticket and continue the conversation when support replies.</p>
+      <form className="mt-5 grid gap-3" onSubmit={async (event) => { event.preventDefault(); if (!subject.trim() || !message.trim()) return; setSaving(true); setError(''); try { await onSubmitTicket({ subject: subject.trim(), message: message.trim(), projectId: projectId || undefined }); setSubject(''); setMessage(''); setProjectId(''); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create ticket.'); } finally { setSaving(false); } }}>
+        <div className="grid gap-3 md:grid-cols-2">
+          <input value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Subject" className={`rounded-xl border px-4 py-3 text-sm outline-none ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-slate-200'}`} />
+          <select value={projectId} onChange={(event) => setProjectId(event.target.value)} className={`rounded-xl border px-4 py-3 text-sm outline-none ${isDarkMode ? 'border-white/10 bg-[#181926]' : 'border-slate-200'}`}><option value="">General support</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select>
+        </div>
+        <textarea rows={4} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Describe what you need help with" className={`resize-none rounded-xl border px-4 py-3 text-sm outline-none ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-slate-200'}`} />
+        <button disabled={saving || !subject.trim() || !message.trim()} className="cursor-pointer rounded-xl bg-[#4F37FE] py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Sending...' : 'Create Ticket'}</button>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+      </form>
+    </section>
+    <section className={`rounded-3xl border p-6 ${panel}`}><h2 className="text-lg font-black">Your tickets</h2>
+      <div className="mt-4 space-y-3">{tickets.length === 0 ? <p className="py-8 text-center text-sm text-slate-400">No support tickets yet.</p> : tickets.map((ticket) => <button key={ticket._id} onClick={() => setSelectedId(ticket._id)} className={`flex w-full cursor-pointer items-center justify-between rounded-2xl border p-4 text-left ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-slate-50'}`}><div className="flex items-center gap-3"><MessageSquare className="h-5 w-5 text-[#4F37FE]" /><div><p className="text-sm font-bold">{ticket.subject}</p><p className="text-xs text-slate-400">{projectName(ticket) || 'General support'} · {ticket.messages.length} message{ticket.messages.length === 1 ? '' : 's'}</p></div></div><span className="rounded-full bg-[#4F37FE]/10 px-3 py-1 text-[10px] font-bold uppercase text-[#4F37FE]">{ticket.status.replace('_', ' ')}</span></button>)}</div>
+    </section>
+  </div>;
 }
