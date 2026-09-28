@@ -33,6 +33,15 @@ afterEach(async () => {
 });
 
 describe("client & tester onboarding — real HTTP requests through the actual routes", () => {
+  it("never provisions an admin from an unknown identity requesting an admin endpoint", async () => {
+    const res = await request(app)
+      .get("/api/v1/metrics/admin-dashboard")
+      .set("x-test-user", "clerk_attacker");
+
+    expect(res.status).toBe(401);
+    expect(await User.findOne({ clerkUserId: "clerk_attacker" })).toBeNull();
+  });
+
   it("POST /users/sync with role=client creates a User and a Client profile", async () => {
     const res = await request(app)
       .post("/api/v1/users/sync")

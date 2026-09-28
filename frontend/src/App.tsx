@@ -1181,6 +1181,12 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
             >
               {dashboardLoading ? (
                 <DashboardLoadingScreen isDarkMode={isDarkMode} />
+              ) : currentUser?.role !== 'admin' ? (
+                <div className="min-h-screen bg-slate-50 px-6 py-24 text-center dark:bg-slate-950 dark:text-white">
+                  <h1 className="text-2xl font-black">Admin access required</h1>
+                  <p className="mt-3 text-sm text-slate-500">This account is not authorized to access the admin portal.</p>
+                  <button onClick={() => handleSetTab(currentUser?.role === 'tester' ? 'tester' : currentUser?.role === 'client' ? 'client' : 'home')} className="mt-6 rounded-xl bg-[#4F37FE] px-5 py-3 text-sm font-bold text-white">Return to your dashboard</button>
+                </div>
               ) : <AdminConsole
                 isDarkMode={isDarkMode}
                 onToggleDarkMode={toggleDarkMode}

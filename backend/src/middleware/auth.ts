@@ -10,49 +10,14 @@ import { asyncHandler } from "../utils/asyncHandler";
 // route-level guards (requireAuth / requireRole) do that.
 export const clerkAuth = clerkMiddleware();
 
-import { clerkClient } from "@clerk/express";
-import { Client } from "../models/Client";
-import { Tester } from "../models/Tester";
-
 // Loads the LaunchOps User document that mirrors the authenticated Clerk identity
-// and attaches it as req.dbUser. Auto-provisions if missing.
+// and attaches it as req.dbUser. Provisioning is deliberately restricted to
+// POST /users/sync, whose schema only permits client/tester roles. Never infer a
+// role from the requested URL.
 export const attachDbUser = asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {
   const { userId } = getAuth(req);
   if (userId) {
-    let dbUser = await User.findOne({ clerkUserId: userId });
-    if (!dbUser) {
-      try {
-        const clerkUser = await clerkClient.users.getUser(userId);
-        const email = clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)?.emailAddress
-          || clerkUser.emailAddresses[0]?.emailAddress
-          || `user_${userId}@placeholder.local`;
-        const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || email.split("@")[0] || "User";
-
-        let existingUser = await User.findOne({ email });
-        if (existingUser) {
-          existingUser.clerkUserId = userId;
-          await existingUser.save();
-          dbUser = existingUser;
-        } else {
-          const url = req.originalUrl || req.url || "";
-          const role: Role = url.includes("/admin") ? "admin" : url.includes("/client") ? "client" : "tester";
-          dbUser = await User.create({
-            clerkUserId: userId,
-            email,
-            name,
-            role,
-          });
-
-          if (role === "client") {
-            await Client.create({ userId: dbUser._id, companyName: name });
-          } else if (role === "tester") {
-            await Tester.create({ userId: dbUser._id });
-          }
-        }
-      } catch (err) {
-        console.warn("Auto-provisioning user failed in attachDbUser:", err);
-      }
-    }
+    const dbUser = await User.findOne({ clerkUserId: userId });
     req.dbUser = dbUser ?? undefined;
   }
   next();
@@ -63,6 +28,7 @@ export const attachDbUser = asyncHandler(async (req: Request, _res: Response, ne
 export function requireAuth() {
   return (req: Request, _res: Response, next: NextFunction) => {
     if (!req.dbUser) throw ApiError.unauthorized();
+    if (req.dbUser.status !== "active") throw ApiError.forbidden("Account is suspended");
     next();
   };
 }
@@ -70,6 +36,7 @@ export function requireAuth() {
 export function requireRole(...roles: Role[]) {
   return (req: Request, _res: Response, next: NextFunction) => {
     if (!req.dbUser) throw ApiError.unauthorized();
+    if (req.dbUser.status !== "active") throw ApiError.forbidden("Account is suspended");
     if (!roles.includes(req.dbUser.role)) {
       throw ApiError.forbidden(`Requires role: ${roles.join(" or ")}`);
     }
