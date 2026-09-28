@@ -14,6 +14,12 @@ import { ApiError } from "../utils/apiError";
 const ALLOWED_EXTENSIONS = ["png", "jpg", "jpeg", "mp4", "mov", "pdf", "doc", "docx", "aab", "apk"] as const;
 const PUT_URL_EXPIRY_SECONDS = 300;
 const GET_URL_EXPIRY_SECONDS = 3600;
+const MIME_TYPES_BY_EXTENSION: Record<string, string[]> = {
+  png: ["image/png"], jpg: ["image/jpeg"], jpeg: ["image/jpeg"],
+  mp4: ["video/mp4"], mov: ["video/quicktime"], pdf: ["application/pdf"],
+  doc: ["application/msword"], docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+  aab: ["application/octet-stream", "application/zip"], apk: ["application/vnd.android.package-archive", "application/octet-stream"],
+};
 
 function extensionOf(filename: string): string {
   const ext = filename.split(".").pop()?.toLowerCase() ?? "";
@@ -30,6 +36,9 @@ export function assertAllowedExtension(filename: string) {
 
 export async function createUploadUrl(params: { filename: string; contentType: string; scope: string }) {
   const ext = assertAllowedExtension(params.filename);
+  if (!MIME_TYPES_BY_EXTENSION[ext]?.includes(params.contentType.toLowerCase())) {
+    throw ApiError.badRequest("File content type does not match its extension");
+  }
   const key = `${params.scope}/${randomUUID()}.${ext}`;
 
   const command = new PutObjectCommand({

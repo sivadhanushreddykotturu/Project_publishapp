@@ -8,6 +8,7 @@ import { Tester } from "../models/Tester";
 import { Role } from "../models/enums";
 import { ApiError } from "../utils/apiError";
 import { asyncHandler } from "../utils/asyncHandler";
+import { env } from "../config/env";
 
 const syncSchema = z.object({
   role: z.enum(["client", "tester"]),
@@ -40,6 +41,15 @@ export const syncUser = asyncHandler(async (req: Request, res: Response) => {
 
   const body = syncSchema.parse(req.body);
   const normalizedEmail = body.email.trim().toLowerCase();
+  if (!env.isTest) {
+    const clerkUser = await clerkClient.users.getUser(userId);
+    const verifiedEmails = clerkUser.emailAddresses
+      .filter((entry) => entry.verification?.status === "verified")
+      .map((entry) => entry.emailAddress.trim().toLowerCase());
+    if (!verifiedEmails.includes(normalizedEmail)) {
+      throw ApiError.forbidden("Registration email must be verified on the signed-in account");
+    }
+  }
 
   let user = await User.findOne({ clerkUserId: userId });
   if (!user) {

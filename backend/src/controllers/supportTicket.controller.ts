@@ -11,6 +11,9 @@ import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { Notification } from "../models/Notification";
 import { User } from "../models/User";
+import { Project } from "../models/Project";
+import { Tester } from "../models/Tester";
+import { Assignment } from "../models/Assignment";
 
 const createSchema = z.object({
   subject: z.string().min(1),
@@ -21,6 +24,18 @@ const createSchema = z.object({
 
 export const createSupportTicket = asyncHandler(async (req: Request, res: Response) => {
   const body = createSchema.parse(req.body);
+  if (body.projectId) {
+    const project = await Project.findById(body.projectId);
+    if (!project) throw ApiError.notFound("Project not found");
+    if (req.dbUser!.role === "client") {
+      const client = await Client.findOne({ userId: req.dbUser!._id });
+      if (!client || !project.clientId.equals(client._id)) throw ApiError.forbidden("Project is not accessible to this account");
+    } else {
+      const tester = await Tester.findOne({ userId: req.dbUser!._id });
+      const assignment = tester && await Assignment.exists({ projectId: project._id, testerId: tester._id, status: { $ne: "removed" } });
+      if (!assignment) throw ApiError.forbidden("Project is not accessible to this account");
+    }
+  }
   const ticket = await SupportTicket.create({
     raisedBy: req.dbUser!._id,
     projectId: body.projectId,

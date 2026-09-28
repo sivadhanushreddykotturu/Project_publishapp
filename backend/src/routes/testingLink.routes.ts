@@ -22,6 +22,9 @@ const router = Router();
 router.get(
   "/:assignmentId",
   asyncHandler(async (req, res) => {
+    if (!Types.ObjectId.isValid(req.params.assignmentId)) {
+      return res.status(404).json({ error: { message: "Testing link not found" } });
+    }
     const optInUrl = await resolveTestingLinkClick(new Types.ObjectId(req.params.assignmentId));
     res.redirect(302, optInUrl);
   })

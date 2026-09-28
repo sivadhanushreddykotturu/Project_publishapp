@@ -71,6 +71,21 @@ describe("client & tester onboarding — real HTTP requests through the actual r
     expect(tester!.status).toBe("active");
   });
 
+  it("does not issue a download URL for an unreferenced storage key", async () => {
+    await request(app)
+      .post("/api/v1/users/sync")
+      .set("x-test-user", "clerk_file_attacker")
+      .send({ role: "tester", name: "File Attacker", email: "file-attacker@example.com" });
+
+    const res = await request(app)
+      .get("/api/v1/uploads/presign-download")
+      .query({ key: "testing-files/11111111-1111-4111-8111-111111111111.pdf" })
+      .set("x-test-user", "clerk_file_attacker");
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.message).toMatch(/not accessible/i);
+  });
+
   it("prevents an existing Clerk account from switching between client and tester", async () => {
     await request(app).post("/api/v1/users/sync").set("x-test-user", "clerk_locked").send({
       role: "client",

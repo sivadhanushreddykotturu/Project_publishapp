@@ -59,7 +59,15 @@ export const listPublicTesterDirectory = asyncHandler(async (_req: Request, res:
     .sort({ ratingAvg: -1, ratingCount: -1 })
     .limit(100)
     .lean();
-  res.status(200).json({ data: testers });
+  res.status(200).json({ data: testers.map((tester) => ({
+    _id: tester._id,
+    userId: tester.userId,
+    devices: tester.devices.map((device) => ({ model: device.model, androidVersion: device.androidVersion })),
+    experienceLevel: tester.experienceLevel,
+    ratingAvg: tester.ratingAvg,
+    ratingCount: tester.ratingCount,
+    status: tester.status,
+  })) });
 });
 
 export const getTesterById = asyncHandler(async (req: Request, res: Response) => {

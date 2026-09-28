@@ -105,7 +105,9 @@ export const listProjects = asyncHandler(async (req: Request, res: Response) => 
   }
 
   const [items, total] = await Promise.all([
-    Project.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    Project.find(filter)
+      .select("-clientId -verification -clientFiles -creationAudit -playIntegration.aabFileUrl -playIntegration.optInUrl -playIntegration.testerGoogleGroupEmail -playIntegration.lastApiError")
+      .sort({ createdAt: -1 }).skip(skip).limit(limit),
     Project.countDocuments(filter),
   ]);
   res.status(200).json({ data: items, meta: buildPageMeta(page, limit, total) });
@@ -407,7 +409,8 @@ export const markProjectTestersInvited = asyncHandler(async (req: Request, res: 
 
 /** Hard-blocked until the mandatory 14-day testing period has actually elapsed. */
 export const applyProjectForProduction = asyncHandler(async (req: Request, res: Response) => {
-  const project = await applyForProduction(new Types.ObjectId(req.params.id), req.dbUser!._id);
+  const visibleProject = await loadVisibleProject(req);
+  const project = await applyForProduction(visibleProject._id, req.dbUser!._id);
   res.status(200).json({ data: project });
 });
 

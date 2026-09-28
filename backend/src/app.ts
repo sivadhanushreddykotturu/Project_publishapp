@@ -10,13 +10,47 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import apiRoutes from "./routes/index";
 import paymentRoutes from "./routes/payment.routes";
 import testingLinkRoutes from "./routes/testingLink.routes";
+import rateLimit from "express-rate-limit";
+import { env } from "./config/env";
 
 export function createApp() {
   const app = express();
+  if (env.isProd) app.set("trust proxy", 1);
 
   app.use(helmet());
-  app.use(cors({ origin: true, credentials: true }));
+  const allowedOrigins = new Set([
+    env.webBaseUrl.replace(/\/$/, ""),
+    "https://uxos.in",
+    "https://www.uxos.in",
+    ...(env.isProd ? [] : ["http://localhost:3000", "http://localhost:3002"]),
+  ]);
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin.replace(/\/$/, ""))) return callback(null, true);
+      return callback(new Error("Origin not allowed by CORS"));
+    },
+    credentials: true,
+  }));
   app.use(pinoHttp({ logger }));
+
+  app.use("/api/v1", rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: env.isTest ? 10_000 : 500,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+  }));
+  app.use("/api/v1/users/sync", rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: env.isTest ? 10_000 : 20,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+  }));
+  app.use("/t", rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: env.isTest ? 10_000 : 60,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+  }));
 
   // Mounted before express.json() — Razorpay webhook verification needs the raw
   // request body untouched (see routes/payment.routes.ts and services/payment.service.ts).
