@@ -14,7 +14,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: NODE_VERSION
-        value: 20.19.0
+        value: 22.22.0
       - key: MONGODB_URI
         sync: false
       - key: CLERK_SECRET_KEY
