@@ -149,11 +149,11 @@ export default function ClientWizardLayout({
         </span>
 
         {/* Platform Logo Circle (UXOS logo) */}
-        <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-900 border border-slate-700/60 p-1 flex items-center justify-center shrink-0 shadow-lg shadow-black/20">
+        <div className="w-14 h-14 md:w-16 md:h-16 rounded-full shadow-lg flex items-center justify-center shrink-0 overflow-hidden border-2 border-[#4F37FE]/30 bg-white dark:bg-[#0F1017] p-1.5 transition-all">
           <img 
-            src="/launchops-logo.png" 
+            src="/logo-purple.png" 
             alt="UXOS Logo" 
-            className="w-full h-full object-contain"
+            className="w-full h-full object-contain rounded-full"
           />
         </div>
       </header>

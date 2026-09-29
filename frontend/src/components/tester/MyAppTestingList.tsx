@@ -251,7 +251,9 @@ export default function MyAppTestingList({
                       </button>
                     ) : (
                       <button
-                        className="px-6 py-2.5 bg-white dark:bg-[#0F1017] border-2 border-[#4F37FE] text-[#4F37FE] text-[13px] font-black rounded-xl hover:bg-[#4F37FE]/5 transition-all cursor-pointer"
+                        className={`px-6 py-2.5 border-2 border-[#4F37FE] text-[13px] font-black rounded-xl hover:bg-[#4F37FE]/5 transition-all cursor-pointer ${
+                          isDarkMode ? 'bg-[#0F1017] text-white' : 'bg-white text-[#4F37FE]'
+                        }`}
                       >
                         {app.buttonLabel}
                       </button>

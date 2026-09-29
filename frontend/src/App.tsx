@@ -53,6 +53,8 @@ type AuthScreenRenderProps = {
 };
 
 type AppProps = {
+  isAuthLoaded?: boolean;
+  isSignedIn?: boolean;
   getAuthToken?: () => Promise<string | null>;
   onSignOut?: () => Promise<void>;
   renderAuthScreen?: (props: AuthScreenRenderProps) => ReactNode;
@@ -71,7 +73,7 @@ function DashboardLoadingScreen({ isDarkMode }: { isDarkMode: boolean }) {
   );
 }
 
-export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppProps = {}) {
+export default function App({ isAuthLoaded = true, isSignedIn = false, getAuthToken, onSignOut, renderAuthScreen }: AppProps = {}) {
   // Data version guard — bump this whenever mock data schema changes to clear stale localStorage
   const DATA_VERSION = 'v2';
   if (typeof window !== 'undefined') {
@@ -86,6 +88,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   // Navigation State
   const [currentTab, setCurrentTab] = useState<string>('home');
   const [initialSubTab, setInitialSubTab] = useState<string>('');
+  const [currentUser, setCurrentUser] = useState<LaunchOpsUser | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -150,6 +153,68 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     }
   }, []);
 
+  // Synchronize authenticated user profile from backend on session load
+  useEffect(() => {
+    let cancelled = false;
+    if (!isAuthLoaded || !isSignedIn) {
+      setCurrentUser(null);
+      return;
+    }
+    async function loadUserSession() {
+      try {
+        const token = await getAuthToken?.();
+        if (!token || cancelled) return;
+        const me = await getCurrentLaunchOpsUser(token);
+        if (!cancelled && me?.data?.user) {
+          setCurrentUser(me.data.user);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('launchops_user_role', me.data.user.role);
+          }
+        }
+      } catch {
+        // fail silently; session error handling will be handled in data loader
+      }
+    }
+    void loadUserSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthLoaded, isSignedIn, getAuthToken]);
+
+  // Universal Role Guard: enforce authentication and role authorization for all dashboard routes
+  useEffect(() => {
+    if (!isAuthLoaded) return;
+
+    const protectedTabs = ['tester', 'client', 'admin'];
+    if (!protectedTabs.includes(currentTab)) return;
+
+    // 1. Unauthenticated redirect to auth screen
+    if (!isSignedIn) {
+      if (typeof window !== 'undefined') {
+        const fullPath = window.location.pathname;
+        if (protectedTabs.some((t) => fullPath.startsWith(`/${t}`))) {
+          sessionStorage.setItem('launchops_return_url', fullPath);
+        }
+        window.history.replaceState(null, '', `/auth/${currentTab === 'client' ? 'client' : 'tester'}`);
+      }
+      setCurrentTab('auth');
+      setInitialSubTab(currentTab === 'client' ? 'client' : 'tester');
+      return;
+    }
+
+    // 2. Cross-role unauthorized access redirect
+    if (currentUser) {
+      const allowedRole = currentUser.role;
+      if (currentTab !== allowedRole) {
+        if (typeof window !== 'undefined') {
+          window.history.replaceState(null, '', `/${allowedRole}`);
+        }
+        setCurrentTab(allowedRole);
+        setInitialSubTab('');
+      }
+    }
+  }, [currentTab, isAuthLoaded, isSignedIn, currentUser]);
+
   const handleSetTab = (tab: string, subtab?: string) => {
     if (tab === 'home') {
       if (typeof window !== 'undefined') {
@@ -200,7 +265,6 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   const [dashboardError, setDashboardError] = useState('');
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [notifications, setNotifications] = useState<BackendNotification[]>([]);
-  const [currentUser, setCurrentUser] = useState<LaunchOpsUser | null>(null);
   const [currentClient, setCurrentClient] = useState<BackendClient | null>(null);
 
   // Tester Flow Data States
@@ -344,9 +408,9 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
     setDashboardError('');
     setDashboardLoading(true);
     try {
-      if (currentTab === 'tester') await refreshTesterData();
-      if (currentTab === 'client') await refreshClientData();
-      if (currentTab === 'admin') await refreshAdminData();
+      if (currentTab === 'tester' && currentUser?.role === 'tester') await refreshTesterData();
+      else if (currentTab === 'client' && currentUser?.role === 'client') await refreshClientData();
+      else if (currentTab === 'admin' && currentUser?.role === 'admin') await refreshAdminData();
     } catch (error) {
       setDashboardError(error instanceof Error ? error.message : 'Could not load dashboard data.');
     } finally {
@@ -355,8 +419,13 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
   };
 
   useEffect(() => {
-    if (['tester', 'client', 'admin'].includes(currentTab)) void refreshCurrentDashboard();
-  }, [currentTab]);
+    if (['tester', 'client', 'admin'].includes(currentTab)) {
+      if (!isAuthLoaded || !isSignedIn || !currentUser || currentUser.role !== currentTab) {
+        return;
+      }
+      void refreshCurrentDashboard();
+    }
+  }, [currentTab, isAuthLoaded, isSignedIn, currentUser]);
 
   const handleUpdateTesterProfile = (updated: Partial<Tester>) => {
     setActiveTester(prev => ({
@@ -1086,7 +1155,15 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                     handleSetTab('client', 'dashboard');
                   } else {
                     setActiveTester({ ...emptyTester, name });
-                    handleSetTab('tester');
+                    const returnUrl = typeof window !== 'undefined' ? sessionStorage.getItem('launchops_return_url') : null;
+                    if (returnUrl && returnUrl.startsWith('/tester')) {
+                      sessionStorage.removeItem('launchops_return_url');
+                      const parts = returnUrl.split('/').filter(Boolean);
+                      const subtab = parts.slice(1).join('/');
+                      handleSetTab('tester', subtab);
+                    } else {
+                      handleSetTab('tester');
+                    }
                   }
                 },
                 onBackToHome: () => handleSetTab('home'),
@@ -1102,7 +1179,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             >
-              {dashboardLoading ? (
+              {(!isAuthLoaded || !isSignedIn || !currentUser || currentUser.role !== 'tester' || dashboardLoading) ? (
                 <DashboardLoadingScreen isDarkMode={isDarkMode} />
               ) : <TesterDashboard
                 isDarkMode={isDarkMode}
@@ -1141,7 +1218,9 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             >
-              <ClientFlowManager
+              {(!isAuthLoaded || !isSignedIn || !currentUser || currentUser.role !== 'client' || dashboardLoading) ? (
+                <DashboardLoadingScreen isDarkMode={isDarkMode} />
+              ) : <ClientFlowManager
                 isDarkMode={isDarkMode}
                 onToggleDarkMode={toggleDarkMode}
                 onBackToHome={() => handleSetTab('home')}
@@ -1167,7 +1246,7 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
                 onReadNotification={apiMarkNotificationRead}
                 onUpdateProfile={apiUpdateClientProfile}
                 onDownloadCompletionReport={apiDownloadCompletionReport}
-              />
+              />}
             </motion.div>
           )}
 
@@ -1179,14 +1258,8 @@ export default function App({ getAuthToken, onSignOut, renderAuthScreen }: AppPr
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             >
-              {dashboardLoading ? (
+              {(!isAuthLoaded || !isSignedIn || !currentUser || currentUser.role !== 'admin' || dashboardLoading) ? (
                 <DashboardLoadingScreen isDarkMode={isDarkMode} />
-              ) : currentUser?.role !== 'admin' ? (
-                <div className="min-h-screen bg-slate-50 px-6 py-24 text-center dark:bg-slate-950 dark:text-white">
-                  <h1 className="text-2xl font-black">Admin access required</h1>
-                  <p className="mt-3 text-sm text-slate-500">This account is not authorized to access the admin portal.</p>
-                  <button onClick={() => handleSetTab(currentUser?.role === 'tester' ? 'tester' : currentUser?.role === 'client' ? 'client' : 'home')} className="mt-6 rounded-xl bg-[#4F37FE] px-5 py-3 text-sm font-bold text-white">Return to your dashboard</button>
-                </div>
               ) : <AdminConsole
                 isDarkMode={isDarkMode}
                 onToggleDarkMode={toggleDarkMode}

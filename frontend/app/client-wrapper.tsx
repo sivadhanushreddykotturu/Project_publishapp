@@ -6,7 +6,9 @@ import App from "../src/App";
 import ClerkAuthScreen from "../src/integration/ClerkAuthScreen";
 import AuthConfigurationScreen from "../src/integration/AuthConfigurationScreen";
 
-const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+const clerkPublishableKey =
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+  "pk_test_bm9ibGUtZ29iYmxlci04OC5jbGVyay5hY2NvdW50cy5kZXYk";
 
 export default function ClientWrapper() {
   const [mounted, setMounted] = useState(false);
@@ -26,6 +28,8 @@ export default function ClientWrapper() {
   if (!clerkPublishableKey) {
     return (
       <App
+        isAuthLoaded={true}
+        isSignedIn={false}
         getAuthToken={async () => null}
         renderAuthScreen={(props) => (
           <AuthConfigurationScreen isDarkMode={props.isDarkMode} onBackToHome={props.onBackToHome} />
@@ -61,16 +65,10 @@ function LaunchOpsApp() {
     return null;
   }, [getToken, isLoaded, isSignedIn]);
 
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   return (
     <App
+      isAuthLoaded={isLoaded}
+      isSignedIn={Boolean(isSignedIn)}
       getAuthToken={getAuthToken}
       onSignOut={() => signOut({ redirectUrl: "/" })}
       renderAuthScreen={(props) => <ClerkAuthScreen {...props} />}

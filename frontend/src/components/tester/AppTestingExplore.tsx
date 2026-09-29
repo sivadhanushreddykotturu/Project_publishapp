@@ -249,7 +249,9 @@ export default function AppTestingExplore({
                     {app.userState === 'joined_testing' && (
                       <button
                         onClick={() => handleAction(app)}
-                        className="px-6 py-2.5 bg-white dark:bg-[#0F1017] border-2 border-[#4F37FE] text-[#4F37FE] text-[13px] font-black rounded-xl hover:bg-[#4F37FE]/5 transition-all cursor-pointer"
+                        className={`px-6 py-2.5 border-2 border-[#4F37FE] text-[13px] font-black rounded-xl hover:bg-[#4F37FE]/5 transition-all cursor-pointer ${
+                          isDarkMode ? 'bg-[#0F1017] text-white' : 'bg-white text-[#4F37FE]'
+                        }`}
                       >
                         Open Project
                       </button>
@@ -267,7 +269,9 @@ export default function AppTestingExplore({
                     {app.userState === 'joined_queue' && (
                       <button
                         onClick={() => handleAction(app)}
-                        className="px-6 py-2.5 bg-white dark:bg-[#0F1017] border-2 border-[#4F37FE] text-[#4F37FE] text-[13px] font-black rounded-xl hover:bg-[#4F37FE]/5 transition-all cursor-pointer"
+                        className={`px-6 py-2.5 border-2 border-[#4F37FE] text-[13px] font-black rounded-xl hover:bg-[#4F37FE]/5 transition-all cursor-pointer ${
+                          isDarkMode ? 'bg-[#0F1017] text-white' : 'bg-white text-[#4F37FE]'
+                        }`}
                       >
                         Joined Queue
                       </button>
