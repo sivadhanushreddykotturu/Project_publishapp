@@ -52,6 +52,21 @@ describe("app boot", () => {
     expect(res.status).toBe(401);
   });
 
+  it("does not grant CORS access to an untrusted browser origin", async () => {
+    const res = await request(app).get("/health").set("Origin", "https://evil.example");
+    expect(res.status).toBe(200);
+    expect(res.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("rejects malformed payment webhook signatures without throwing", async () => {
+    const res = await request(app)
+      .post("/api/v1/payments/webhook")
+      .set("Content-Type", "application/json")
+      .set("x-razorpay-signature", "invalid")
+      .send({});
+    expect(res.status).toBe(401);
+  });
+
   it("returns 404 with a helpful message for unknown routes", async () => {
     const res = await request(app).get("/api/v1/does-not-exist");
     expect(res.status).toBe(404);

@@ -27,7 +27,7 @@ export function createApp() {
   app.use(cors({
     origin(origin, callback) {
       if (!origin || allowedOrigins.has(origin.replace(/\/$/, ""))) return callback(null, true);
-      return callback(new Error("Origin not allowed by CORS"));
+      return callback(null, false);
     },
     credentials: true,
   }));
@@ -66,10 +66,12 @@ export function createApp() {
     res.status(200).json({ status: "ok", uptime: process.uptime() });
   });
 
-  app.get("/api-docs.json", (_req: Request, res: Response) => {
-    res.status(200).json(swaggerSpec);
-  });
-  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: "LaunchOps API Docs" }));
+  if (!env.isProd) {
+    app.get("/api-docs.json", (_req: Request, res: Response) => {
+      res.status(200).json(swaggerSpec);
+    });
+    app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: "LaunchOps API Docs" }));
+  }
 
   // clerkMiddleware() must run before any route that calls getAuth()/attachDbUser.
   app.use("/api/v1", clerkAuth, attachDbUser, apiRoutes);

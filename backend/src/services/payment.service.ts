@@ -36,11 +36,12 @@ export async function createCheckoutOrder(invoiceId: Types.ObjectId) {
 
 /** Verifies req.body was signed by Razorpay before trusting a webhook payload. */
 export function verifyWebhookSignature(rawBody: Buffer, signatureHeader: string | undefined): boolean {
-  if (!signatureHeader) return false;
+  if (!env.razorpay.webhookSecret || !signatureHeader) return false;
   const expected = crypto
     .createHmac("sha256", env.razorpay.webhookSecret)
     .update(rawBody)
     .digest("hex");
+  if (expected.length !== signatureHeader.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signatureHeader));
 }
 

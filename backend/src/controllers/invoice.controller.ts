@@ -53,6 +53,7 @@ const onboardingTiers = [
 
 /** Creates a Razorpay order for the self-serve wizard before project activation. */
 export const checkoutOnboardingTier = asyncHandler(async (req: Request, res: Response) => {
+  if (!env.razorpay.keyId || !env.razorpay.keySecret) throw new ApiError(503, "Online payment is not configured");
   const tierIndex = Number(req.body?.tierIndex);
   const tier = onboardingTiers[tierIndex];
   if (!tier) throw ApiError.badRequest("Select a fixed-price testing tier");
@@ -68,6 +69,7 @@ export const checkoutOnboardingTier = asyncHandler(async (req: Request, res: Res
 
 /** Verifies the browser checkout result before the wizard can continue. */
 export const verifyOnboardingPayment = asyncHandler(async (req: Request, res: Response) => {
+  if (!env.razorpay.keySecret) throw new ApiError(503, "Online payment is not configured");
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body ?? {};
   if (![razorpay_order_id, razorpay_payment_id, razorpay_signature].every((value) => typeof value === "string" && value)) {
     throw ApiError.badRequest("Incomplete Razorpay payment confirmation");
@@ -98,12 +100,17 @@ export const razorpayWebhook = asyncHandler(async (req: Request, res: Response) 
   const signature = req.headers["x-razorpay-signature"] as string | undefined;
   const rawBody = req.body as Buffer;
 
-  if (!verifyWebhookSignature(rawBody, signature)) {
+  if (!Buffer.isBuffer(rawBody) || !verifyWebhookSignature(rawBody, signature)) {
     logger.warn("Rejected Razorpay webhook with invalid signature");
     throw ApiError.unauthorized("Invalid webhook signature");
   }
 
-  const payload = JSON.parse(rawBody.toString("utf8"));
-  await handlePaymentCapturedWebhook(payload);
+  let payload: unknown;
+  try {
+    payload = JSON.parse(rawBody.toString("utf8"));
+  } catch {
+    throw ApiError.badRequest("Invalid webhook payload");
+  }
+  await handlePaymentCapturedWebhook(payload as Parameters<typeof handlePaymentCapturedWebhook>[0]);
   res.status(200).json({ received: true });
 });

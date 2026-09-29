@@ -4,6 +4,7 @@ import { Tester } from "../models/Tester";
 import { ApiError } from "../utils/apiError";
 import { asyncHandler } from "../utils/asyncHandler";
 import { getPagination, buildPageMeta } from "../utils/pagination";
+import { User } from "../models/User";
 
 const deviceSchema = z.object({
   model: z.string().min(1),
@@ -82,5 +83,9 @@ export const updateTesterStatus = asyncHandler(async (req: Request, res: Respons
   const { status } = statusSchema.parse(req.body);
   const tester = await Tester.findByIdAndUpdate(req.params.id, { status }, { new: true });
   if (!tester) throw ApiError.notFound("Tester not found");
+  await User.updateOne(
+    { _id: tester.userId, role: "tester" },
+    { $set: { status: status === "active" ? "active" : "suspended" } }
+  );
   res.status(200).json({ data: tester });
 });

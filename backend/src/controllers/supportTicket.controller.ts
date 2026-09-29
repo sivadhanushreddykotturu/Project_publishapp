@@ -16,8 +16,8 @@ import { Tester } from "../models/Tester";
 import { Assignment } from "../models/Assignment";
 
 const createSchema = z.object({
-  subject: z.string().min(1),
-  message: z.string().min(1),
+  subject: z.string().trim().min(1).max(200),
+  message: z.string().trim().min(1).max(10_000),
   projectId: z.string().optional(),
   cc: z.array(z.string().email()).max(10).default([]),
 });
@@ -141,7 +141,7 @@ export const getSupportTicketById = asyncHandler(async (req: Request, res: Respo
   res.status(200).json({ data: ticket });
 });
 
-const messageSchema = z.object({ body: z.string().min(1) });
+const messageSchema = z.object({ body: z.string().trim().min(1).max(10_000) });
 
 export const addSupportTicketMessage = asyncHandler(async (req: Request, res: Response) => {
   const ticket = await loadVisibleTicket(req);

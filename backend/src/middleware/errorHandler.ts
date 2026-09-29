@@ -19,6 +19,11 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     return;
   }
 
+  if (err && typeof err === "object" && "name" in err && ["CastError", "BSONError"].includes(String((err as Error).name))) {
+    res.status(400).json({ error: { message: "Invalid identifier" } });
+    return;
+  }
+
   logger.error({ err }, "Unhandled error");
   res.status(500).json({ error: { message: "Internal server error" } });
 }
