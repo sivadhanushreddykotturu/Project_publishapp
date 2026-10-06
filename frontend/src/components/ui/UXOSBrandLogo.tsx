@@ -25,11 +25,11 @@ export const UXOSBrandLogo: React.FC<UXOSBrandLogoProps> = ({
 
   const content = (
     <div className={`flex items-center gap-2.5 select-none ${className}`}>
-      <div className={`${currentSize.img} rounded-full flex items-center justify-center shrink-0`}>
+      <div className={`${currentSize.img} flex items-center justify-center shrink-0`}>
         <img
-          src="/logo-purple.png"
+          src="/launchops-logo.png"
           alt="UXOS Logo"
-          className="w-full h-full object-contain drop-shadow-sm"
+          className="w-full h-full object-contain"
         />
       </div>
       {showText && (

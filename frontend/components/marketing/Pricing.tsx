@@ -164,7 +164,7 @@ export function Pricing() {
                 User Experience (UX) Testing
               </h3>
               <p className="mt-1 text-[14px] text-slate-500 font-medium">
-                In-depth usability review, flow friction analysis, and detailed QA bug reports.
+                Usability review and flow friction analysis.
               </p>
 
               {/* Price display */}
@@ -176,7 +176,7 @@ export function Pricing() {
                   <span className="text-sm font-semibold text-slate-500">/ 14 testers</span>
                 </div>
                 <p className="mt-1 text-[12.5px] font-medium text-slate-400">
-                  One-time payment · 14 verified testers included
+                  For first test cycle · 14 verified testers included
                 </p>
 
                 {/* Important notice badge */}
@@ -199,7 +199,7 @@ export function Pricing() {
                   "14 Real testers on physical Android devices (Only Android)",
                   "Complete 14-day closed testing coverage included",
                   "Usability analysis: onboarding, navigation & checkout friction",
-                  "Consolidated QA & UX report with screenshots and video logs",
+                  "UX report with screenshots and video logs",
                   "Actionable design & workflow improvement suggestions",
                   "Dedicated coordinator & direct WhatsApp communication",
                 ].map((feat) => (
@@ -276,8 +276,6 @@ export function Pricing() {
                 {[
                   "Apple Developer & App Store Connect account onboarding",
                   "App ID, bundle identifier, & capabilities configuration",
-                  "Certificates, signing keys & provisioning profiles setup",
-                  "TestFlight internal & external beta testing group creation",
                   "App Review Guidelines compliance pre-flight checklist",
                   "Step-by-step guidance for build upload & release readiness",
                 ].map((feat) => (

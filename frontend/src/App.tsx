@@ -104,7 +104,12 @@ export default function App({ isAuthLoaded = true, isSignedIn = false, getAuthTo
           window.history.replaceState(null, '', '/client');
         }
 
-        if (mainTab === 'wizard') {
+        if (mainTab === 'home') {
+          if (typeof window !== 'undefined') {
+            window.location.href = '/';
+            return;
+          }
+        } else if (mainTab === 'wizard') {
           setCurrentTab('client');
           setInitialSubTab('new-app');
         } else if (mainTab === 'client') {
@@ -114,7 +119,7 @@ export default function App({ isAuthLoaded = true, isSignedIn = false, getAuthTo
           } else if (parts[1]) {
             setInitialSubTab(parts[1]);
           }
-        } else if (['home', 'auth', 'tester', 'client', 'admin', 'solutions', 'resources', 'pricing', 'company'].includes(mainTab)) {
+        } else if (['auth', 'tester', 'client', 'admin', 'solutions', 'resources', 'pricing', 'company'].includes(mainTab)) {
           setCurrentTab(mainTab);
           if (parts[1]) {
             setInitialSubTab(mainTab === 'tester' ? parts.slice(1).join('/') : parts[1]);
@@ -130,13 +135,18 @@ export default function App({ isAuthLoaded = true, isSignedIn = false, getAuthTo
       const handlePopState = () => {
         const subparts = window.location.pathname.split('/').filter(Boolean);
         const p = subparts[0] || 'home';
-        if (p === 'wizard') {
+        if (p === 'home') {
+          if (typeof window !== 'undefined') {
+            window.location.href = '/';
+            return;
+          }
+        } else if (p === 'wizard') {
           setCurrentTab('client');
           setInitialSubTab('new-app');
         } else if (p === 'client' && (subparts[1] === 'wizard' || subparts[1] === 'new-app')) {
           setCurrentTab('client');
           setInitialSubTab('new-app');
-        } else if (['home', 'auth', 'tester', 'client', 'admin', 'solutions', 'resources', 'pricing', 'company'].includes(p)) {
+        } else if (['auth', 'tester', 'client', 'admin', 'solutions', 'resources', 'pricing', 'company'].includes(p)) {
           setCurrentTab(p);
           if (subparts[1]) {
             setInitialSubTab(p === 'tester' ? subparts.slice(1).join('/') : subparts[1]);
@@ -144,8 +154,10 @@ export default function App({ isAuthLoaded = true, isSignedIn = false, getAuthTo
             setInitialSubTab('');
           }
         } else {
-          setCurrentTab('home');
-          setInitialSubTab('');
+          if (typeof window !== 'undefined') {
+            window.location.href = '/';
+            return;
+          }
         }
       };
       window.addEventListener('popstate', handlePopState);

@@ -47,7 +47,7 @@ function UxosHeaderLogoIcon({ className = "size-6" }: { className?: string; stro
 function GooglePlayStoreIcon({ className = "size-5.5" }: { className?: string; strokeWidth?: number }) {
   return (
     <img
-      src="/google-play-store-logo.svg"
+      src="/google-play-icon.svg"
       alt="Google Play"
       className={`${className} object-contain`}
     />
